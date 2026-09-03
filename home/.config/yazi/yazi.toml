@@ -1,0 +1,47 @@
+[mgr]
+ratio = [1, 3, 4]
+sort_by = "natural"
+sort_sensitive = false
+sort_reverse = false
+sort_dir_first = true
+show_hidden = false
+show_symlink = true
+
+[preview]
+tab_size = 2
+max_width = 1200
+max_height = 900
+cache_dir = ""
+image_delay = 0
+image_filter = "triangle"
+image_quality = 75
+
+[opener]
+# Paths are substituted by yazi's own placeholders -- `%s` for every selected
+# path, `%s1` for just the hovered one. The shell's `"$@"` looks like it
+# should work and silently expands to nothing, which is how `nvim "$@"` used
+# to open an empty editor instead of the file under the cursor.
+edit = [
+    # No `kitty -e` here: `block` already hands this terminal over to the
+    # editor, so wrapping it opened a second window on top of the one yazi
+    # is running in.
+    { run = 'nvim %s', block = true, desc = "Editar en nvim", for = "unix" },
+]
+open = [
+    { run = 'xdg-open %s1', desc = "Abrir", for = "unix" },
+]
+play-gif = [
+    { run = 'mpv --loop %s', orphan = true, desc = "Reproducir gif animado" },
+]
+[plugin]
+prepend_fetchers = [
+    { url = "*", run = "git", group = "git" },
+    { url = "*/", run = "git", group = "git" },
+]
+prepend_preloaders = [
+    { mime = "{audio,video,image}/*", run = "mediainfo" },
+]
+[open]
+prepend_rules = [
+    { mime = "image/gif", use = ["play-gif", "open"] },
+]

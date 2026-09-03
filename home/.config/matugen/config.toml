@@ -1,0 +1,9 @@
+[config]
+
+[templates.quickshell]
+input_path = '~/.config/matugen/templates/quickshell.json'
+output_path = '~/.cache/matugen/quickshell.json'
+
+[templates.kitty]
+input_path = '~/.config/matugen/templates/kitty-colors.conf'
+output_path = '~/.cache/matugen/kitty-colors.conf'

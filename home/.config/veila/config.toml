@@ -1,0 +1,20 @@
+theme = "seceda"
+
+[background]
+mode = "file" # Background source (accepts "file", "gradient", "layered", "radial", or "solid")
+path = "/home/gone/Pictures/Wallpapers/remielle-wallpaper.jpg" # Wallpaper image path used when mode = "file"
+
+[visuals.now_playing]
+enabled = true
+
+[visuals.clock]
+format = "24h"
+
+[weather]
+enabled = true # Enable background weather fetching (accepts true or false)
+location = "Santiago" # Place name used for weather lookup (accepts any geocodable city or place name)
+unit = "celsius" # Temperature unit (accepts "celsius" or "fahrenheit")
+
+[visuals.outputs]
+ui_mode = "single"
+ui_output = "DP-2"

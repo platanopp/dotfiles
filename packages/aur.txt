@@ -1,0 +1,9 @@
+hyprmod
+nerd-fonts-sf-mono
+nvibrant-bin
+otf-apple-sf-pro
+ripdrag
+rose-pine-hyprcursor
+spicetify-cli
+spotify
+veila-bin

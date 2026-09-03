@@ -1,0 +1,14 @@
+[Icons]
+Theme=breeze-dark
+
+[KDE]
+widgetStyle=qt6ct-style
+
+[Colors:View]
+BackgroundNormal=26,26,26
+BackgroundAlternate=35,35,35
+ForegroundNormal=226,226,226
+ForegroundInactive=165,165,165:
+
+[General]
+ColorScheme=BreezeDark

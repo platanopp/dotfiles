@@ -1,0 +1,64 @@
+"$schema" = 'https://starship.rs/config-schema.json'
+
+format = """
+$directory$git_branch$git_status$fill$time
+$character"""
+
+add_newline = true
+
+[fill]
+symbol = " "
+
+[directory]
+style = "bold #9dd6ff"
+truncation_length = 3
+truncate_to_repo = true
+format = "[$path]($style)[$read_only]($read_only_style) "
+
+[git_branch]
+symbol = " "
+style = "bold #c9c9c9"
+format = "[on]($style) [$symbol$branch]($style) "
+
+[git_status]
+style = "bold #ff6b6b"
+format = "([$all_status$ahead_behind]($style)) "
+
+[cmd_duration]
+min_time = 2000
+format = "took [$duration](bold #f2c46d) "
+
+[time]
+disabled = false
+style = "#888888"
+format = "[$time]($style)"
+time_format = "%H:%M"
+
+[character]
+success_symbol = "[❯](bold #9dd6ff)"
+error_symbol = "[❯](bold #ff6b6b)"
+vimcmd_symbol = "[❮](bold #9dd6ff)"
+
+[username]
+show_always = false
+
+[hostname]
+ssh_only = true
+format = "[$hostname]($style) "
+style = "bold #9dd6ff"
+
+[nodejs]
+symbol = " "
+style = "bold #7ec699"
+
+[python]
+symbol = " "
+style = "bold #f2c46d"
+
+[rust]
+symbol = " "
+style = "bold #f2755a"
+
+[package]
+symbol = " "
+style = "bold #c9a0ff"

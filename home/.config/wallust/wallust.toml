@@ -1,0 +1,7 @@
+backend = "resized"
+color_space = "lab"
+palette = "dark"
+
+[templates.quickshell]
+template = "quickshell.json"
+target = "~/.cache/wallust/quickshell.json"

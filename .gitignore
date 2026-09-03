@@ -1,0 +1,20 @@
+# Downloaded, not written. Every one of these has a manifest of its own that
+# the installer replays, so carrying the payload would be carrying a cache.
+home/.config/yazi/plugins/
+home/.config/zsh/plugins/
+home/.config/spicetify/Themes/
+home/.config/spicetify/Extensions/
+home/.config/spicetify/CustomApps/
+home/.config/Vencord/dist/
+home/.config/Vencord/themes/
+
+# Runtime, not configuration.
+home/.config/qBittorrent/ipc-socket
+home/.config/qBittorrent/lockfile
+home/.config/**/*.log
+home/.config/**/Cache/
+home/.config/**/GPUCache/
+
+# Backups this repo's own tooling makes.
+*.bak
+.backup/

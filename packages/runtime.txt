@@ -1,0 +1,18 @@
+# What this configuration calls at runtime, by name.
+#
+# Separate from pacman.txt on purpose. That file is what the machine happened
+# to have installed explicitly; this one is what the shell would break without.
+# Three of these were installed only as somebody else's dependency, so a fresh
+# machine would have got them by luck rather than by asking -- and when that
+# luck changes, what breaks is a widget, quietly.
+#
+# imagemagick   the wallpaper cropper (scripts/wallpaper_crop.py)
+# lua           the keybind cheatsheet reads hyprland.lua with it
+# libpulse      pactl, for the per-application volume list
+# xdg-utils     opening the vault from the notes widget
+# fontconfig    fc-cache, so newly installed fonts are seen
+imagemagick
+lua
+libpulse
+xdg-utils
+fontconfig

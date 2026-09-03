@@ -1,0 +1,59 @@
+# What this repo tracks, as paths relative to $HOME.
+#
+# An allowlist, not a denylist. ~/.config is 1.5 GB and most of it is state:
+# browser profiles, Electron caches, session tokens, game saves. Listing what
+# to keep means a new app dropping a token in there is out by default; a
+# denylist would have been one forgotten entry away from publishing it.
+#
+# Lines are paths. Blank lines and # comments are ignored.
+
+# ── Shell ────────────────────────────────────────────────────────────────
+.zshrc
+.zprofile
+.config/zsh
+.config/starship.toml
+.config/fish
+
+# ── Compositor and the shell that runs on it ─────────────────────────────
+.config/hypr
+.config/quickshell
+.config/veila
+.config/rofi
+.config/fuzzel
+
+# ── Terminal and editors ─────────────────────────────────────────────────
+.config/kitty
+.config/nvim
+.config/micro/settings.json
+.config/micro/colorschemes
+
+# ── Tools ────────────────────────────────────────────────────────────────
+.config/yazi
+.config/btop
+.config/eza
+.config/fastfetch
+.config/mpv
+.config/qBittorrent/qBittorrent.conf
+.config/qBittorrent/categories.json
+.config/qBittorrent/watched_folders.json
+
+# ── Theming ──────────────────────────────────────────────────────────────
+.config/matugen
+.config/wallust
+.config/wal
+.config/gtk-3.0
+.config/qt5ct
+.config/qt6ct
+.config/kdeglobals
+.config/nwg-look
+.config/dolphinrc
+
+# ── Desktop plumbing ─────────────────────────────────────────────────────
+.config/mimeapps.list
+.config/xdg-desktop-portal
+.config/autostart
+.config/trashrc
+
+# ── Application tweaks ───────────────────────────────────────────────────
+.config/spicetify/config-xpui.ini
+.config/Vencord/settings

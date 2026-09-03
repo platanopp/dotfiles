@@ -1,0 +1,34 @@
+# Only the additions and overrides live here; yazi's own defaults stay in
+# force underneath. Every entry carries a `desc` because the shell's
+# shortcut sheet reads this file and shows it.
+[mgr]
+prepend_keymap = [
+    # ── Navegación ───────────────────────────────────────────────────────
+    { on = ["g", "h"], run = "cd ~",                desc = "Go home" },
+    # Was ~/Descargas, which does not exist on this machine -- the bind did
+    # nothing at all.
+    { on = ["g", "d"], run = "cd ~/Downloads",      desc = "Go to Downloads" },
+    { on = ["g", "p"], run = "cd ~/Pictures",       desc = "Go to Pictures" },
+    { on = ["g", "o"], run = "cd ~/obsidian",       desc = "Go to Obsidian" },
+    { on = ["g", "c"], run = "cd ~/.config",        desc = "Go to the config folder" },
+    { on = "z",        run = "plugin zoxide",       desc = "Jump with zoxide" },
+
+    # ── Selección y archivos ─────────────────────────────────────────────
+    { on = "<C-a>",    run = "toggle_all",          desc = "Invert the selection" },
+    { on = "c",        run = "plugin compress",     desc = "Compress the selection" },
+    { on = "T",        run = "plugin chmod",        desc = "Change permissions" },
+    { on = "M",        run = "plugin mount",        desc = "Manage disks and partitions" },
+    { on = "F",        run = "plugin full-border",  desc = "Toggle the full border" },
+
+    # The one thing a TUI cannot do by itself: hand a file to another app by
+    # dragging it. ripdrag puts the selection in a small window that any
+    # GTK/Qt app accepts a drop from. `--orphan` so yazi is not held while
+    # that window is open.
+    #
+    # `%s` is yazi 26's placeholder for the selected paths. The older `"$@"`
+    # form is not an error here -- it expands to nothing, and the command
+    # runs on no files at all.
+    #
+    # Alt rather than Ctrl: <C-d> is yazi's own "half page down".
+    { on = "<A-d>",    run = 'shell --orphan -- ripdrag -x -a %s', desc = "Drag the selection to another app" },
+]
