@@ -304,4 +304,16 @@ Scope {
 
         onPressed: AppState.toggleWallpapers()
     }
+
+    // Routed through the shell rather than run as a bare wpctl bind, so the
+    // bar's microphone indicator moves with the key instead of waiting for
+    // the next poll to notice -- and so the cue is played by the thing that
+    // knows which way the toggle went.
+    GlobalShortcut {
+        appid: "quickshell"
+        name: "micmute"
+        description: "Mute or unmute the microphone"
+
+        onPressed: AppState.toggleMicMute()
+    }
 }
