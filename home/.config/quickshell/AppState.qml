@@ -61,6 +61,33 @@ Singleton {
         micToggleProc.command = ["bash", "-lc", "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"]
         micToggleProc.running = true
         root.micMuted = !root.micMuted
+        // Cued off the state we just moved to rather than off a re-read: the
+        // sound is the answer to the key press, and waiting for wpctl to be
+        // asked back would put it a poll behind the thing it is confirming.
+        root.playCue(root.micMuted ? "device-removed" : "device-added")
+    }
+
+    // A short sound from the freedesktop theme, by name.
+    //
+    // device-added and device-removed are a rising and a falling pair, which
+    // is the distinction that matters here: muted or not has to be audible
+    // without looking, and two sounds that differ only in being sounds would
+    // not tell you which way the toggle went.
+    //
+    // Detached on purpose. The cue is 0.22s and the shortcut can be pressed
+    // again inside that, and the second press should be heard rather than
+    // cancelling the first -- which is what re-running a tracked Process
+    // would do.
+    function playCue(name) {
+        cueProc.command = ["bash", "-lc",
+            "exec setsid pw-play --volume=0.5 \"/usr/share/sounds/freedesktop/stereo/$1.oga\" >/dev/null 2>&1 &",
+            "_", name]
+        cueProc.running = true
+    }
+
+    Process {
+        id: cueProc
+        running: false
     }
 
     function toggleWifiRadio() {

@@ -285,6 +285,9 @@ local function describe(action)
         if name == "quickshell:wallpapers" then
             return { action = "Choose the wallpaper", category = "System" }
         end
+        if name == "quickshell:micmute" then
+            return { action = "Mute or unmute the microphone", category = "System" }
+        end
         return { action = "Global shortcut: " .. name, category = "System" }
     end
     if disp == "layout" then
