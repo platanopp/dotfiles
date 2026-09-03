@@ -1019,7 +1019,69 @@ Singleton {
         target: Hyprland
 
         function onRawEvent(event) {
-            if (event.name === "configreloaded") hyprBindsDebounce.restart()
+            if (event.name !== "configreloaded") return
+            hyprBindsDebounce.restart()
+            // The gaps can have moved with it, and the bar is meant to line up
+            // with the windows whatever they are now.
+            root.refreshGaps()
+        }
+    }
+
+    // ── Window gaps ──────────────────────────────────────────────────────
+    //
+    // Asked of Hyprland rather than repeated here. The bar sits at the same
+    // inset as the windows underneath it, and an inset written down in two
+    // configs is one that will eventually disagree with itself -- silently,
+    // as a few pixels of misalignment nobody can place.
+    //
+    // The defaults are Hyprland's own, so the bar is only ever wrong for the
+    // moment before the first answer arrives.
+    property int gapTop: 20
+    property int gapRight: 30
+    property int gapBottom: 30
+    property int gapLeft: 30
+
+    function refreshGaps() {
+        if (!gapsProc.running) gapsProc.running = true
+    }
+
+    // hyprctl reports gaps_out as a CSS shorthand string, so it expands the
+    // way CSS margins do: one value for all sides, two for vertical and
+    // horizontal, three for top / sides / bottom, four for each in turn.
+    function parseGaps(text) {
+        var css = ""
+        try {
+            css = (JSON.parse(text).css || "").trim()
+        } catch (e) {
+            return
+        }
+        if (css.length === 0) return
+
+        var parts = css.split(/\s+/)
+        var n = []
+        for (var i = 0; i < parts.length; i++) {
+            var v = parseInt(parts[i])
+            if (isNaN(v)) return
+            n.push(v)
+        }
+
+        if (n.length === 1) n = [n[0], n[0], n[0], n[0]]
+        else if (n.length === 2) n = [n[0], n[1], n[0], n[1]]
+        else if (n.length === 3) n = [n[0], n[1], n[2], n[1]]
+        else if (n.length !== 4) return
+
+        root.gapTop = n[0]
+        root.gapRight = n[1]
+        root.gapBottom = n[2]
+        root.gapLeft = n[3]
+    }
+
+    Process {
+        id: gapsProc
+        running: true
+        command: ["hyprctl", "getoption", "general:gaps_out", "-j"]
+        stdout: StdioCollector {
+            onStreamFinished: root.parseGaps(text)
         }
     }
 

@@ -28,7 +28,11 @@ Scope {
                 right: true
             }
 
-	    implicitHeight: 51
+	    // The strip is only as tall as it needs to hold the pill at the
+	    // gap, and its height is what Hyprland reserves -- so raising the
+	    // top gap moves the bar down and the windows with it, instead of
+	    // sliding the pill out of a strip that stayed 51px tall.
+	    implicitHeight: AppState.gapTop + leftPill.implicitHeight + 3
             color: "transparent"
 
             // See the pills: masked rather than unmapped, so the layer surface
@@ -205,8 +209,10 @@ Scope {
                 visible: !bar.barHidden
                 anchors.left: parent.left
                 anchors.top: parent.top
-                anchors.leftMargin: 10
-                anchors.topMargin: 8
+                // The one pill anchored to the screen rather than to a
+                // neighbour, so it is where the left edge of the row is set.
+                anchors.leftMargin: AppState.gapLeft
+                anchors.topMargin: AppState.gapTop
                 implicitWidth: leftRow.implicitWidth + 20
                 implicitHeight: 40
                 radius: 20
