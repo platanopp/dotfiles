@@ -4,8 +4,18 @@ The configuration for a Hyprland desktop on CachyOS/Arch, plus an installer
 that puts a fresh machine into the same state.
 
 ```sh
-git clone <this repo> ~/dotfiles && cd ~/dotfiles && ./install.sh
+sudo pacman -S --needed git github-cli   # a fresh Arch install has neither
+gh auth login                            # the repo is private
+gh repo clone platanopp/dotfiles ~/dotfiles
+cd ~/dotfiles && ./install.sh
 ```
+
+Four lines rather than one because the repo is private, and a private repo
+cannot be cloned by the machine that has not been set up yet. `git clone` over
+HTTPS fails with `could not read Username`: GitHub stopped accepting passwords
+there, so it wants a token. `gh auth login` gets one through the browser and
+leaves git able to use it, which is the only part of this that cannot come out
+of the repo itself.
 
 Run `./install.sh --dry-run` first if you want to see what it would touch.
 
