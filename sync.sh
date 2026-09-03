@@ -42,6 +42,29 @@ while IFS= read -r line; do
 done < "$repo/manifest.txt"
 
 echo "synced $copied entries"
+
+# Configuration directories bring their own .gitignore, and git honours them
+# wherever they sit -- so a rule written for somebody's upstream repo silently
+# decides what this backup keeps. Only one file was being dropped when this
+# was found, and it was harmless; the point is that it was being dropped
+# without a word. Rules from this repo's own .gitignore are the intended ones
+# and stay quiet. Anything else gets named.
+surprises=()
+while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    source_rule="$(cd "$repo" && git check-ignore -v "$f" 2>/dev/null | cut -d: -f1)"
+    case "$source_rule" in
+        .gitignore|"") ;;
+        *) surprises+=("$f  (by $source_rule)") ;;
+    esac
+done < <(cd "$repo" && git ls-files --others --ignored --exclude-standard home/ 2>/dev/null)
+
+if [ ${#surprises[@]} -gt 0 ]; then
+    echo
+    echo "held back by a .gitignore that came with a config, not by this repo:"
+    printf '  %s\n' "${surprises[@]}"
+    echo "  keep one with: git add -f <path>"
+fi
 if [ ${#missing[@]} -gt 0 ]; then
     echo "not on this machine (skipped):"
     printf '  %s\n' "${missing[@]}"
