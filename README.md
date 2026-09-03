@@ -4,10 +4,7 @@ The configuration for a Hyprland desktop on CachyOS/Arch, plus an installer
 that puts a fresh machine into the same state.
 
 ```sh
-sudo pacman -S --needed git github-cli   # a fresh Arch install has neither
-gh auth login                            # the repo is private
-gh repo clone platanopp/dotfiles ~/dotfiles
-cd ~/dotfiles && ./install.sh
+git clone https://github.com/platanopp/dotfiles.git ~/dotfiles && cd ~/dotfiles && ./install.sh
 ```
 
 Four lines rather than one because the repo is private, and a private repo
