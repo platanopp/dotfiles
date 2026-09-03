@@ -53,7 +53,9 @@ PanelWindow {
         top: true
         left: true
     }
-    margins.top: -4
+    // The content inside insets itself by 12, so the window sits back by
+    // that much and the drawn edge lands exactly on Hyprland's gap.
+    margins.top: AppState.gapTop - 12
 
     // PanelWindow anchors to edges, so centring is done by hand. Held in a
     // plain property as well as the margin: a grouped property is not
