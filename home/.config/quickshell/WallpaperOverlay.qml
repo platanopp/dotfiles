@@ -1,5 +1,6 @@
 import Quickshell
 import Quickshell.Wayland
+import Quickshell.Widgets
 import QtQuick
 import QtQuick.Effects
 
@@ -450,12 +451,6 @@ PanelWindow {
                         scale: 1
                         opacity: 0
 
-                        // The cached panels stay built but sit off the path,
-                        // where they draw nothing. Saying so outright is
-                        // cheaper than compositing a dozen fully transparent
-                        // items every frame.
-                        visible: opacity > 0
-
                         Component.onCompleted: {
                             // Size falls off with distance from the middle
                             // rather than in one step. The step version made the
@@ -509,91 +504,69 @@ PanelWindow {
                             visible: thumb.status !== Image.Ready
                         }
 
-                        // The parallax. The panel is a narrow window; the photo
-                        // behind it is over twice as wide and slides the other
-                        // way as the panel travels, so it covers less ground than
-                        // its own frame does. That lag is the whole effect --
-                        // something moving slower than the thing in front of it
-                        // reads as further away, which is what the z-order and
-                        // the scale above are already claiming but never showed.
-                        //
-                        // Two wrappers, and not one by accident. The inner clips
-                        // the overhang the slide feeds on; the outer rounds the
-                        // corners. Rounding is a layer plus a mask, and a layer
-                        // takes its texture from the content it can see: handed
-                        // the wide image directly it sized itself to that, and
-                        // the effect then squeezed the result back into the
-                        // panel -- drawing the photo shrunk and inset, with the
-                        // panel's own fill showing around it. Clipping first
-                        // leaves the outer item one child of exactly its own
-                        // size, and nothing for the layer to misjudge.
-                        Item {
-                            id: rounded
-                            anchors.fill: parent
+                        // Shadow under the middle panel, cast from the plate
+                    // above rather than from the photo.
+                    //
+                    // The plate is static, which is the point: a layer only
+                    // renders when its item does, and an item that is off the
+                    // path is scaled to nothing and never drawn. A photo that
+                    // finishes loading in that state leaves its layer holding
+                    // the empty texture it was given, and the panel comes back
+                    // blank -- which is exactly what happened once the whole
+                    // folder was kept warm off-path. A solid rectangle has
+                    // nothing to arrive late.
+                    MultiEffect {
+                        anchors.fill: parent
+                        source: cardMask
+                        shadowEnabled: true
+                        shadowColor: "#000000"
+                        shadowBlur: 0.9
+                        shadowVerticalOffset: 10
+                        autoPaddingEnabled: true
+                        shadowOpacity: card.isCurrent ? 0.55 : 0
 
-                            // Rendered into a texture and never drawn directly.
-                            // The effect below is what puts it on screen, and it
-                            // rounds and shadows in the same pass -- so the
-                            // shadow is cast from the photo's own rounded
-                            // silhouette rather than from a plate behind it.
-                            visible: false
-                            layer.enabled: true
-
-                            Item {
-                                anchors.fill: parent
-                                clip: true
-
-                                Image {
-                                    id: thumb
-                                    width: parent.width + overlay.parallaxRange * 2
-                                    height: parent.height
-
-                                    // Centred at rest, hard left at one end of
-                                    // the row and hard right at the other.
-                                    x: -overlay.parallaxRange * (1 + card.shift)
-
-                                    source: "file://" + card.modelData
-                                    fillMode: Image.PreserveAspectCrop
-                                    asynchronous: true
-
-                                    // The panel is a tall crop of a wide picture,
-                                    // so height is what sets the decode -- seven
-                                    // of these plus the cache are live at once.
-                                    sourceSize.height: Math.round(overlay.panelHeight * 1.3)
-                                }
-                            }
+                        Behavior on shadowOpacity {
+                            NumberAnimation { duration: Theme.durLong; easing.type: Easing.OutCubic }
                         }
+                    }
 
-                        // Rounds and shadows in one pass. Two separate effects is
-                        // what put an outline around every panel: the shadow one
-                        // had to be cast from something, that something was a
-                        // rectangle the size of the panel, and a MultiEffect
-                        // paints its source along with its shadow. Casting from
-                        // the masked photo instead means there is no plate left
-                        // to show through.
-                        MultiEffect {
-                            anchors.fill: parent
-                            source: rounded
-                            visible: thumb.status === Image.Ready
+                    // The parallax. The panel is a narrow window; the photo
+                    // behind it is over twice as wide and slides the other way
+                    // as the panel travels, so it covers less ground than its
+                    // own frame does. That lag is the whole effect -- something
+                    // moving slower than the thing in front of it reads as
+                    // further away.
+                    //
+                    // ClippingRectangle rounds the corners by clipping, with no
+                    // layer and no mask, so the photo is drawn straight and
+                    // there is no texture to be captured at the wrong moment.
+                    ClippingRectangle {
+                        anchors.fill: parent
+                        radius: cardMask.radius
+                        color: "transparent"
+                        visible: thumb.status === Image.Ready
 
-                            maskEnabled: true
-                            maskSource: cardMask
+                        Image {
+                            id: thumb
+                            width: parent.width + overlay.parallaxRange * 2
+                            height: parent.height
 
-                            shadowEnabled: true
-                            shadowColor: "#000000"
-                            shadowBlur: 0.9
-                            shadowVerticalOffset: 10
-                            autoPaddingEnabled: true
+                            // Centred at rest, hard left at one end of the row
+                            // and hard right at the other.
+                            x: -overlay.parallaxRange * (1 + card.shift)
 
-                            // Only the panel in the middle is lifted off the row.
-                            shadowOpacity: card.isCurrent ? 0.55 : 0
+                            source: "file://" + card.modelData
+                            fillMode: Image.PreserveAspectCrop
+                            asynchronous: true
 
-                            Behavior on shadowOpacity {
-                                NumberAnimation { duration: Theme.durLong; easing.type: Easing.OutCubic }
-                            }
+                            // The panel is a tall crop of a wide picture, so
+                            // height is what sets the decode -- a dozen of
+                            // these are live at once.
+                            sourceSize.height: Math.round(overlay.panelHeight * 1.3)
                         }
+                    }
 
-                        // Ring on the wallpaper that is currently up, so the one
+                    // Ring on the wallpaper that is currently up, so the one
                         // in the middle is not mistaken for the one in use.
                         Rectangle {
                             anchors.fill: parent
