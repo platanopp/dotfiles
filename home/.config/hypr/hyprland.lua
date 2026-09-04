@@ -22,6 +22,10 @@ hl.on("hyprland.start", function()
      hl.exec_cmd("nvibrant 300 0 0 600")
       end, { timeout = 2000, type = "oneshot" })
     hl.exec_cmd("kitty")
+    -- Chat and the game client, parked on workspace 2 by the rules further
+    -- down so they come up behind the terminal instead of over it.
+    hl.exec_cmd("discord")
+    hl.exec_cmd("steam")
     hl.exec_cmd("quickshell")
     hl.exec_cmd("hyprpaper")
     hl.exec_cmd("systemctl --user start hyprpolkitagent")
@@ -232,6 +236,26 @@ hl.window_rule({
     no_focus = true,
 })
 
+-- ── Chat and games keep to workspace 2 ─────────────────────────────
+--
+-- By rule and not by an argument on the exec above: both take long enough to
+-- start that the workspace focused at launch is not necessarily the one still
+-- focused when their window finally maps, and Steam maps a splash first and
+-- its real window second. `silent` places them without dragging focus along,
+-- so a login that starts on workspace 1 stays there.
+hl.window_rule({
+    name      = "discord-on-2",
+    match     = { class = "^discord$" },
+    workspace = "2 silent",
+})
+hl.window_rule({
+    name      = "steam-on-2",
+    -- Anything launched from Steam gets its own class (steam_app_...), so
+    -- this catches the client and its dialogs and no actual game.
+    match     = { class = "^steam$" },
+    workspace = "2 silent",
+})
+
 hl.window_rule({
     name  = "move-hyprland-run",
     match = { class = "hyprland-run" },
@@ -384,6 +408,15 @@ hl.monitor({
     scale = 1,
     cm = "srgb",
 })
+
+-- Which workspace lands on which of the two. Left to itself Hyprland gives
+-- workspace 1 to the output it enumerates first -- HDMI-A-1, at 0x0 -- and
+-- pushes 2 onto DP-2; that is backwards. Work belongs on the 240Hz DP-2, so
+-- 1 is pinned there and 2, where Discord and Steam open, sits on the HDMI
+-- panel. `default` is what makes each monitor come up on its own workspace
+-- at start rather than only honouring the pin once the workspace is used.
+hl.workspace_rule({ workspace = "1", monitor = "DP-2",     default = true })
+hl.workspace_rule({ workspace = "2", monitor = "HDMI-A-1", default = true })
 
 -- ── Shell fit-up ─────────────────────────────────────────────────────────
 --
