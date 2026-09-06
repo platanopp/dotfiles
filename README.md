@@ -3,6 +3,11 @@
 The configuration for a Hyprland desktop on CachyOS/Arch, plus an installer
 that puts a fresh machine into the same state.
 
+![The bar over the desktop](home/.config/quickshell/screenshots/desktop.jpg)
+
+The shell in that picture is `home/.config/quickshell/`, which has its own
+[README](home/.config/quickshell/README.md).
+
 ```sh
 git clone https://github.com/platanopp/dotfiles.git ~/dotfiles && cd ~/dotfiles && ./install.sh
 ```
