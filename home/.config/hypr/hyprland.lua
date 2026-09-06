@@ -150,9 +150,11 @@ local closeWindowBind = hl.bind(mainMod .. " + C", hl.dsp.window.close())
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager))
 hl.bind(mainMod .. " + V", hl.dsp.window.float({ action = "toggle" }))
 hl.bind(mainMod .. " + space", hl.dsp.exec_cmd(menu))
-hl.bind(mainMod .. " + L", hl.dsp.exec_cmd("veila lock"))
 -- Handled inside the shell, which registers the name over Hyprland's
 -- global-shortcuts protocol -- see the GlobalShortcut in shell.qml.
+-- Locking is in there too so the screen can fade out before veila's lock
+-- surface arrives and fade back in once it lets go.
+hl.bind(mainMod .. " + L", hl.dsp.global("quickshell:lock"))
 hl.bind(mainMod .. " + F", hl.dsp.global("quickshell:keybinds"))
 hl.bind(mainMod .. " + W", hl.dsp.global("quickshell:wallpapers"))
 hl.bind(mainMod .. " + ALT + Z", hl.dsp.global("quickshell:micmute"))

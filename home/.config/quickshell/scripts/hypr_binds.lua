@@ -288,6 +288,9 @@ local function describe(action)
         if name == "quickshell:micmute" then
             return { action = "Mute or unmute the microphone", category = "System" }
         end
+        if name == "quickshell:lock" then
+            return { action = "Lock screen", category = "System" }
+        end
         return { action = "Global shortcut: " .. name, category = "System" }
     end
     if disp == "layout" then

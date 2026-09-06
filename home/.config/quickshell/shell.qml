@@ -283,6 +283,13 @@ Scope {
             WallpaperOverlay {
                 bar: bar
             }
+
+            // Last, so its surface is created last and sits on top of every
+            // other overlay this shell puts up -- the fade has to cover the
+            // bar and any open panel, not slide in behind them.
+            LockOverlay {
+                bar: bar
+            }
         }
     }
 
@@ -303,6 +310,17 @@ Scope {
         description: "Choose the wallpaper"
 
         onPressed: AppState.toggleWallpapers()
+    }
+
+    // Routed through the shell rather than binding `veila lock` directly, so
+    // the screen can be faded out before veila's lock surface lands on it and
+    // faded back in once it lets go -- see AppState.lockSession().
+    GlobalShortcut {
+        appid: "quickshell"
+        name: "lock"
+        description: "Lock the screen"
+
+        onPressed: AppState.lockSession()
     }
 
     // Routed through the shell rather than run as a bare wpctl bind, so the

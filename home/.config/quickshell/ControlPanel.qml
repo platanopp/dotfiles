@@ -54,8 +54,10 @@ PanelWindow {
 
     function runPowerAction(action) {
         settingsItem.panelOpen = false
-        if (action === "lock") lockProc.running = true
-        else if (action === "suspend") suspendProc.running = true
+        // Both go through AppState so the button gets the same fade the
+        // Super+L bind does; see lockSession() there.
+        if (action === "lock") AppState.lockSession()
+        else if (action === "suspend") AppState.suspendSession()
         else if (action === "reboot") rebootProc.running = true
         else if (action === "shutdown") shutdownProc.running = true
     }
@@ -695,20 +697,6 @@ PanelWindow {
                                             }
                                         }
                                     }
-
-                        Process {
-                            id: lockProc
-                            running: false
-                            command: ["bash", "-lc", "veila lock"]
-                        }
-
-                        // Suspending locks first, so the screen is already covered
-                        // when the machine wakes rather than a moment after.
-                        Process {
-                            id: suspendProc
-                            running: false
-                            command: ["bash", "-lc", "veila lock & sleep 0.3; systemctl suspend"]
-                        }
 
                         Process {
                             id: rebootProc

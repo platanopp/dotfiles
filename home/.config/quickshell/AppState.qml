@@ -946,6 +946,113 @@ Singleton {
         root.wallpapersOpen = !root.wallpapersOpen
     }
 
+    // ── Lock transition ──────────────────────────────────────────────────
+    //
+    // Phases, in order: "" idle, "closing" while the screen fades to black
+    // with the lock request in flight, "locked" while veila holds the screen,
+    // "opening" while the fade comes back off. LockOverlay draws all of it.
+    //
+    // Everything that locks comes through here rather than running `veila
+    // lock` for itself -- the Hyprland bind, the control panel's button, its
+    // suspend -- because the fade has to be finished before veila is asked,
+    // and a caller that shells out directly gets the hard cut back.
+    property string lockPhase: ""
+
+    // Set when the lock is on the way to a suspend, so the machine only goes
+    // down once the screen is actually covered. The old bind slept 0.3s and
+    // hoped; this waits for veila to say it is up.
+    property bool suspendAfterLock: false
+
+    function lockSession() {
+        if (root.lockPhase !== "") return
+        root.lockPhase = "closing"
+        lockRequestDelay.restart()
+        lockWatchdog.restart()
+    }
+
+    function suspendSession() {
+        // Already covered: nothing left to fade, so go straight down.
+        if (root.lockPhase === "locked") {
+            suspendProc.running = true
+            return
+        }
+        // Mid-transition in either direction: dropped rather than queued
+        // behind it. lockSession() would no-op and leave the flag set, and a
+        // flag left set suspends the machine the next time anything locks.
+        if (root.lockPhase !== "") return
+        root.suspendAfterLock = true
+        root.lockSession()
+    }
+
+    // Every way out of the transition, including the ones that are not an
+    // orderly unlock. A lock that never came up must not leave the screen
+    // black, so this is reachable from more than one direction on purpose and
+    // is safe to call twice.
+    function endLockTransition() {
+        if (root.lockPhase === "" || root.lockPhase === "opening") return
+        lockWatchdog.stop()
+        root.suspendAfterLock = false
+        root.lockPhase = "opening"
+        lockSettle.restart()
+    }
+
+    // veila is asked only once the curtain is opaque. Asking first lands its
+    // surface over a half-faded screen, which is the cut being removed.
+    Timer {
+        id: lockRequestDelay
+        interval: Theme.durLong
+        onTriggered: lockProc.running = true
+    }
+
+    // The fade out has no natural end -- the script exited before it started
+    // -- so idle is restored on a timer matched to it, slightly long so input
+    // comes back after the last frame rather than during it.
+    Timer {
+        id: lockSettle
+        interval: Theme.durExtraLong + 60
+        onTriggered: root.lockPhase = ""
+    }
+
+    // `veila lock --wait-ready` blocks until the lock is up, and a daemon
+    // that never gets there would otherwise hold a black screen with no lock
+    // behind it.
+    Timer {
+        id: lockWatchdog
+        interval: 8000
+        onTriggered: root.endLockTransition()
+    }
+
+    Process {
+        id: lockProc
+        running: false
+        command: ["bash", Quickshell.env("HOME") + "/.config/quickshell/scripts/lock_session.sh"]
+
+        stdout: SplitParser {
+            onRead: function(line) {
+                if (line === "locked") {
+                    lockWatchdog.stop()
+                    root.lockPhase = "locked"
+                    if (root.suspendAfterLock) {
+                        root.suspendAfterLock = false
+                        suspendProc.running = true
+                    }
+                } else if (line === "unlocked" || line === "failed") {
+                    root.endLockTransition()
+                }
+            }
+        }
+
+        // The script exits with the cycle, so this catches a cycle that ended
+        // without saying so: killed, or never started at all.
+        onExited: root.endLockTransition()
+    }
+
+    Process {
+        id: suspendProc
+        running: false
+        command: ["bash", "-lc", "systemctl suspend"]
+    }
+
     function refreshHyprBinds() {
         if (!hyprBindsProc.running) hyprBindsProc.running = true
     }
