@@ -963,6 +963,62 @@ Singleton {
         root.launcherOpen = !root.launcherOpen
     }
 
+    // ── Modo mando ─────────────────────────────────────────────────
+    //
+    // gamepad-mode.service maps a controller onto the pointer and the desktop
+    // -- left stick moves the cursor, the triggers click, the d-pad changes
+    // workspace. It runs for the whole session, so the mapping is there at the
+    // desk and not only inside a Sunshine stream.
+    //
+    // The daemon owns the mode. This side reads what it wrote and asks it to
+    // flip; it never sets the mode itself, so the tile, L3 + R3 and the
+    // notification are all describing one thing.
+    //
+    //   stopped   the service is not running, so there is nothing to flip
+    //   waiting   running, with no controller plugged in
+    //   off       controller present, acting as a plain gamepad
+    //   on        controller present, driving the desktop
+    property string gamepadMode: "stopped"
+
+    readonly property bool gamepadModeActive: root.gamepadMode === "on"
+    readonly property bool gamepadConnected:
+        root.gamepadMode === "on" || root.gamepadMode === "off"
+
+    readonly property string gamepadStatePath: {
+        var runtimeDir = Quickshell.env("XDG_RUNTIME_DIR")
+        return (runtimeDir && runtimeDir.length > 0 ? runtimeDir : "/tmp")
+             + "/gamepad-mode.state"
+    }
+
+    // A signal to the daemon rather than a write to the state file. With no
+    // pad connected there is no mode to be in, and the daemon answers that
+    // with a notification and stays where it was -- writing "on" from here
+    // would claim a change that did not happen.
+    function toggleGamepadMode() {
+        gamepadToggleProc.running = true
+    }
+
+    Process {
+        id: gamepadToggleProc
+        running: false
+        command: [Quickshell.env("HOME") + "/.config/quickshell/scripts/gamepad-mode.sh",
+                  "toggle"]
+    }
+
+    FileView {
+        id: gamepadStateFile
+        path: root.gamepadStatePath
+        watchChanges: true
+        preload: true
+        printErrors: false
+        // text() still holds the previous contents inside onFileChanged; the
+        // new mode arrives in onLoaded, once the reload lands.
+        onFileChanged: reload()
+        onLoaded: root.gamepadMode = gamepadStateFile.text().trim()
+        // No file at all: the daemon removes it on its way out.
+        onLoadFailed: root.gamepadMode = "stopped"
+    }
+
     // ── Lock transition ──────────────────────────────────────────────────
     //
     // Phases, in order: "" idle, "closing" while the screen fades to black

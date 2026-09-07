@@ -1,7 +1,7 @@
 import asyncio
+import os
+import signal
 import subprocess
-import sys
-import time
 
 from evdev import InputDevice, UInput, ecodes, list_devices
 
@@ -19,16 +19,43 @@ SCROLL_POLL_HZ = 20
 TRIGGER_THRESHOLD = 0.5
 TERMINAL_COMMAND = "kitty"
 
-# The pad does not exist yet when Sunshine runs its prep commands -- it is
-# created with the stream, a moment later. Waiting is the difference between
-# this starting and this exiting before the controller shows up.
-CONTROLLER_WAIT_SECONDS = 30
+# This runs for the length of the session, not the length of a stream, so a pad
+# that is not there yet is the normal state and not a failure. It waits, and it
+# goes back to waiting when one is unplugged -- which includes the end of a
+# Sunshine stream, since Sunshine deletes the pad it made.
 CONTROLLER_POLL_SECONDS = 0.5
+
+# Where the shell reads the mode from. Written on every change and watched by
+# AppState, so the control panel's tile follows a toggle made on the pad, and
+# SIGUSR1 (which the tile sends) drives the same toggle the pad does. One piece
+# of state, both ends looking at it.
+#
+#   waiting   running, but no controller is plugged in
+#   off       controller present, acting as a plain gamepad
+#   on        controller present, driving the desktop
+STATE_PATH = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "gamepad-mode.state")
 
 
 class GamepadState:
     def __init__(self):
+        self.controller_present = False
         self.control_mode_active = False
+        self.left_bumper_held = False
+        self.left_thumb_held = False
+        self.right_thumb_held = False
+        self.toggle_combo_fired = False
+        self.stick_x = 0.0
+        self.stick_y = 0.0
+        self.right_stick_x = 0.0
+        self.right_stick_y = 0.0
+        self.left_trigger_pressed = False
+        self.right_trigger_pressed = False
+
+    def forget_inputs(self):
+        # Called when a pad is picked up. Everything above except the mode is a
+        # reading from the last pad, and a stick left off-centre when a stream
+        # ended would otherwise still be pushing the cursor when the next one
+        # connects.
         self.left_bumper_held = False
         self.left_thumb_held = False
         self.right_thumb_held = False
@@ -42,15 +69,23 @@ class GamepadState:
 
 
 def find_controller():
+    # Every device it opens and rejects gets closed again. This used to run
+    # once at startup, where leaking the descriptors cost nothing; it runs
+    # twice a second for the length of the session now.
     for path in list_devices():
-        device = InputDevice(path)
-        name = device.name.lower()
-        if not any(hint in name for hint in CONTROLLER_NAME_HINTS):
+        try:
+            device = InputDevice(path)
+        except OSError:
             continue
-        capabilities = device.capabilities()
-        absolute_axes = [code for code, _ in capabilities.get(ecodes.EV_ABS, [])]
-        if ecodes.ABS_X in absolute_axes and ecodes.ABS_Y in absolute_axes:
+        name = device.name.lower()
+        matched = False
+        if any(hint in name for hint in CONTROLLER_NAME_HINTS):
+            capabilities = device.capabilities()
+            absolute_axes = [code for code, _ in capabilities.get(ecodes.EV_ABS, [])]
+            matched = ecodes.ABS_X in absolute_axes and ecodes.ABS_Y in absolute_axes
+        if matched:
             return device
+        device.close()
     return None
 
 
@@ -86,11 +121,41 @@ def send_notification(message):
     subprocess.Popen(["notify-send", "-a", "Modo mando", "-i", "input-gaming", message])
 
 
-def toggle_control_mode(state):
-    state.control_mode_active = not state.control_mode_active
-    status = "activado" if state.control_mode_active else "desactivado"
-    print(f"Modo mando {status}")
+def write_state(value):
+    # Written whole and moved into place: the shell watches this file, and a
+    # half-written one would read back as an empty mode.
+    temporary = f"{STATE_PATH}.tmp"
+    with open(temporary, "w", encoding="utf-8") as handle:
+        handle.write(f"{value}\n")
+    os.replace(temporary, STATE_PATH)
+
+
+def remove_state():
+    try:
+        os.unlink(STATE_PATH)
+    except FileNotFoundError:
+        pass
+
+
+def set_control_mode(state, active):
+    if state.control_mode_active == active:
+        return
+    state.control_mode_active = active
+    status = "activado" if active else "desactivado"
+    print(f"Modo mando {status}", flush=True)
+    write_state("on" if active else "off")
     send_notification(f"Modo mando {status}")
+
+
+def toggle_control_mode(state):
+    # Reachable with nothing plugged in, over SIGUSR1 from the control panel's
+    # tile. There is no mode to be in without a pad, so say so rather than
+    # flipping a switch that drives nothing.
+    if not state.controller_present:
+        print("No hay mando conectado", flush=True)
+        send_notification("No hay mando conectado")
+        return
+    set_control_mode(state, not state.control_mode_active)
 
 
 def handle_toggle_combo(state):
@@ -196,43 +261,90 @@ async def read_controller_events(device, virtual_mouse, state):
 
 
 async def await_controller():
-    deadline = time.monotonic() + CONTROLLER_WAIT_SECONDS
     while True:
         device = find_controller()
         if device is not None:
             return device
-        if time.monotonic() >= deadline:
-            return None
         await asyncio.sleep(CONTROLLER_POLL_SECONDS)
 
 
-async def main():
-    device = await await_controller()
-    if device is None:
-        print("No se encontro un mando conectado")
-        send_notification("No se encontro un mando")
-        sys.exit(1)
-
-    print(f"Mando detectado: {device.name}")
+async def run_session(device, virtual_mouse, state):
+    print(f"Mando detectado: {device.name}", flush=True)
+    state.forget_inputs()
+    state.controller_present = True
+    write_state("off")
     send_notification("Mando conectado. L3 + R3 para el modo mando")
-    virtual_mouse = create_virtual_mouse()
-    state = GamepadState()
 
+    tasks = [
+        asyncio.ensure_future(read_controller_events(device, virtual_mouse, state)),
+        asyncio.ensure_future(move_mouse_loop(virtual_mouse, state)),
+        asyncio.ensure_future(scroll_loop(virtual_mouse, state)),
+    ]
     try:
-        await asyncio.gather(
-            read_controller_events(device, virtual_mouse, state),
-            move_mouse_loop(virtual_mouse, state),
-            scroll_loop(virtual_mouse, state),
-        )
+        # The reader is the only one of the three that ever finishes, and it
+        # finishes by raising when the pad is unplugged. The two writer loops
+        # would spin forever, so the first result ends the session either way.
+        await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        for task in tasks:
+            if task.done() and not task.cancelled():
+                task.result()
     except OSError:
-        # The pad went away underneath us -- which is the normal end of a
-        # stream, since Sunshine deletes the device it made. Not an error to
-        # report as one.
-        print("El mando se desconecto")
+        # The pad went away underneath us -- the normal end of a stream, since
+        # Sunshine deletes the device it made. Not an error to report as one.
+        print("El mando se desconecto", flush=True)
     finally:
-        if state.control_mode_active:
-            send_notification("Modo mando desactivado")
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        set_control_mode(state, False)
+        state.controller_present = False
+        try:
+            device.close()
+        except OSError:
+            pass
+
+
+async def main():
+    state = GamepadState()
+    stopping = asyncio.Event()
+    loop = asyncio.get_running_loop()
+
+    # Armed before anything slow. SIGUSR1 is the control panel's way in --
+    # `gamepad-mode.sh toggle` sends it, and it lands on the same switch L3 + R3
+    # flips -- and creating the uinput device below takes a full two seconds,
+    # which is two seconds of the tile doing nothing but killing the service on
+    # the default disposition.
+    loop.add_signal_handler(signal.SIGUSR1, lambda: toggle_control_mode(state))
+    loop.add_signal_handler(signal.SIGTERM, stopping.set)
+
+    # One uinput device for the life of the daemon. Recreating it per pad would
+    # leave the compositor rediscovering a mouse every time a stream ends.
+    virtual_mouse = create_virtual_mouse()
+
+    async def sessions():
+        while True:
+            write_state("waiting")
+            device = await await_controller()
+            await run_session(device, virtual_mouse, state)
+
+    work = asyncio.ensure_future(sessions())
+    stop = asyncio.ensure_future(stopping.wait())
+    try:
+        await asyncio.wait([work, stop], return_when=asyncio.FIRST_COMPLETED)
+        if work.done():
+            work.result()
+    finally:
+        work.cancel()
+        stop.cancel()
+        await asyncio.gather(work, stop, return_exceptions=True)
+        virtual_mouse.close()
+        # Nothing is mapping anything any more, and the shell reads this file
+        # rather than asking systemd.
+        remove_state()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        pass

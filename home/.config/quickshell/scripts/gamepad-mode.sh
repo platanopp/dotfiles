@@ -1,50 +1,45 @@
 #!/usr/bin/env bash
-# Runs gamepad_mode.py for the length of a stream.
+# Front end to the gamepad mapper, for the control panel and for hands.
 #
-# Called from global_prep_cmd in sunshine.conf. Sunshine waits for `do` to
-# return before the stream starts, so `start` must not block -- it launches the
-# mapper detached and leaves. `stop` kills it again when the client goes away.
+# The mapper itself is a user service now (gamepad-mode.service, next to this
+# file) that runs for the whole session, so there is nothing here to launch or
+# reap -- what is left is asking it to switch modes and asking which mode it is
+# in.
 #
-# The mapper waits for the pad rather than looking once: Sunshine creates the
-# virtual controller with the stream, a moment after these prep commands run.
+#   toggle   flip between plain gamepad and desktop control  (== L3 + R3)
+#   state    stopped | waiting | off | on, the same file the shell watches
+#   start    bring the service up
+#   stop     take it down
+#   status   both of the above, for a terminal
+#
+# `toggle` goes over SIGUSR1 rather than through the state file, because the
+# mapper owns the state: writing "on" from out here would say the mode changed
+# without any of it actually changing.
 set -uo pipefail
 
-MAPPER="$HOME/.config/quickshell/gamepad_mode.py"
-PIDFILE="${XDG_RUNTIME_DIR:-/tmp}/gamepad-mode.pid"
-LOG="${XDG_RUNTIME_DIR:-/tmp}/gamepad-mode.log"
-
-notify() {
-    notify-send -a "Modo mando" -i input-gaming "$1" || true
-}
-
-running() {
-    [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE" 2>/dev/null)" 2>/dev/null
-}
+UNIT="gamepad-mode.service"
+STATE="${XDG_RUNTIME_DIR:-/tmp}/gamepad-mode.state"
 
 case "${1:-}" in
+toggle)
+    systemctl --user kill --signal=SIGUSR1 "$UNIT"
+    ;;
+state)
+    # The mapper removes the file on its way out, so no file means no mapper.
+    cat "$STATE" 2>/dev/null || echo stopped
+    ;;
 start)
-    if running; then
-        echo "already running as $(cat "$PIDFILE")"
-        exit 0
-    fi
-    # setsid so it outlives the prep command's own process group, which
-    # Sunshine reaps as soon as `do` returns.
-    setsid python3 "$MAPPER" >"$LOG" 2>&1 &
-    echo $! >"$PIDFILE"
-    notify "Modo mando disponible"
+    systemctl --user start "$UNIT"
     ;;
 stop)
-    if running; then
-        kill "$(cat "$PIDFILE")" 2>/dev/null
-    fi
-    rm -f "$PIDFILE"
-    notify "Modo mando apagado"
+    systemctl --user stop "$UNIT"
     ;;
 status)
-    running && echo "running as $(cat "$PIDFILE")" || echo "not running"
+    echo "service: $(systemctl --user is-active "$UNIT")"
+    echo "mode:    $(cat "$STATE" 2>/dev/null || echo stopped)"
     ;;
 *)
-    echo "usage: ${0##*/} start|stop|status" >&2
+    echo "usage: ${0##*/} toggle|state|start|stop|status" >&2
     exit 1
     ;;
 esac

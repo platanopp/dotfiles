@@ -212,6 +212,24 @@ PanelWindow {
                                                     detail: AppState.dndEnabled ? "Silenced" : "Showing"
                                                     onTapped: AppState.toggleDnd()
                                                 }
+
+                                                // Full width on its own row: it
+                                                // is the fifth of four paired
+                                                // tiles, and a half-width one
+                                                // beside a gap reads as a tile
+                                                // that failed to load.
+                                                ToggleTile {
+                                                    Layout.fillWidth: true
+                                                    Layout.columnSpan: 2
+                                                    icon: AppState.gamepadConnected ? "󰊴" : "󰺵"
+                                                    label: "Controller"
+                                                    active: AppState.gamepadModeActive
+                                                    detail: AppState.gamepadMode === "stopped" ? "Service off"
+                                                          : !AppState.gamepadConnected ? "Not connected"
+                                                          : AppState.gamepadModeActive ? "Driving the desktop"
+                                                          : "Gamepad only"
+                                                    onTapped: AppState.toggleGamepadMode()
+                                                }
                                             }
 
                                             Rectangle {
