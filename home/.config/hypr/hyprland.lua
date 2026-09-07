@@ -29,6 +29,16 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("hyprpaper")
     hl.exec_cmd("systemctl --user start hyprpolkitagent")
     hl.exec_cmd("gsettings set org.gnome.desktop.interface color-scheme prefer-dark")
+    -- Take the virtual display back out of the layout once the real panels
+    -- have enumerated. The monitor rule below has to bring DP-1 up enabled --
+    -- a login with every panel switched off has nowhere else to draw -- but
+    -- with panels attached it is just a phantom screen the pointer can wander
+    -- onto. detach only fires when something else is enabled, so the headless
+    -- case keeps it. Delayed for the same reason nvibrant is: at this point
+    -- the outputs are not necessarily up yet.
+    hl.timer(function()
+        hl.exec_cmd("$HOME/.config/quickshell/scripts/virtual-display.sh detach")
+    end, { timeout = 3000, type = "oneshot" })
 end)
 
 hl.config({
