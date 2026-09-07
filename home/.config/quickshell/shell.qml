@@ -287,6 +287,10 @@ Scope {
             // Last, so its surface is created last and sits on top of every
             // other overlay this shell puts up -- the fade has to cover the
             // bar and any open panel, not slide in behind them.
+            AppLauncher {
+                bar: bar
+            }
+
             LockOverlay {
                 bar: bar
             }
@@ -310,6 +314,14 @@ Scope {
         description: "Choose the wallpaper"
 
         onPressed: AppState.toggleWallpapers()
+    }
+
+    GlobalShortcut {
+        appid: "quickshell"
+        name: "launcher"
+        description: "Search and launch an application"
+
+        onPressed: AppState.toggleLauncher()
     }
 
     // Routed through the shell rather than binding `veila lock` directly, so

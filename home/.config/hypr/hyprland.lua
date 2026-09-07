@@ -7,7 +7,6 @@ hl.monitor({
 
 local terminal = "kitty"
 local fileManager = "kitty --class yazi -e yazi"
-local menu = "rofi -show drun"
 local mainMod = "SUPER"
 
 hl.env("QT_QPA_PLATFORMTHEME", "qt6ct")
@@ -149,12 +148,12 @@ hl.bind(mainMod .. " + Q", hl.dsp.exec_cmd(terminal))
 local closeWindowBind = hl.bind(mainMod .. " + C", hl.dsp.window.close())
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager))
 hl.bind(mainMod .. " + V", hl.dsp.window.float({ action = "toggle" }))
-hl.bind(mainMod .. " + space", hl.dsp.exec_cmd(menu))
 -- Handled inside the shell, which registers the name over Hyprland's
 -- global-shortcuts protocol -- see the GlobalShortcut in shell.qml.
 -- Locking is in there too so the screen can fade out before veila's lock
 -- surface arrives and fade back in once it lets go.
 hl.bind(mainMod .. " + L", hl.dsp.global("quickshell:lock"))
+hl.bind(mainMod .. " + space", hl.dsp.global("quickshell:launcher"))
 hl.bind(mainMod .. " + F", hl.dsp.global("quickshell:keybinds"))
 hl.bind(mainMod .. " + W", hl.dsp.global("quickshell:wallpapers"))
 hl.bind(mainMod .. " + ALT + Z", hl.dsp.global("quickshell:micmute"))
@@ -306,6 +305,21 @@ hl.layer_rule({
     xray = false,
 })
 
+hl.layer_rule({
+    name  = "quickshell-launcher-blur",
+    match = { namespace = "^quickshell:launcher$" },
+    blur  = true,
+    -- Same reasoning as the two above: the launcher's own dim is what gets
+    -- blurred through, so the threshold sits under it rather than at the
+    -- bar's 0.3.
+    ignore_alpha = 0.02,
+    -- And the same override of the catch-all xray rule. A launcher thrown
+    -- over the work should read as being on top of it, not as a hole cut
+    -- through to the wallpaper.
+    xray = false,
+})
+
+-- rofi is still installed; nothing binds it any more.
 hl.layer_rule({
     name  = "rofi-blur",
     match = { namespace = "rofi" },
