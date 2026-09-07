@@ -18,7 +18,6 @@
 .config/hypr
 .config/quickshell
 .config/veila
-.config/rofi
 .config/fuzzel
 
 # ── Terminal and editors ─────────────────────────────────────────────────

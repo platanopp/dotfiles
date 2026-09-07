@@ -206,7 +206,6 @@ end
 local EXEC_RULES = {
     { "grimblast",                 "Screenshot" },
     { "yazi",                      "File manager" },
-    { "rofi",                      "Application launcher" },
     { "veila lock",                "Lock screen" },
     { "hyprshutdown",              "Log out" },
     { "wpctl set%-volume.*%%%+",   "Volume up" },
