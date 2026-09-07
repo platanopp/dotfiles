@@ -291,6 +291,9 @@ local function describe(action)
         if name == "quickshell:lock" then
             return { action = "Lock screen", category = "System" }
         end
+        if name == "quickshell:launcher" then
+            return { action = "Application launcher", category = "System" }
+        end
         return { action = "Global shortcut: " .. name, category = "System" }
     end
     if disp == "layout" then

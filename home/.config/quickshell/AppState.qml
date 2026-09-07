@@ -946,6 +946,23 @@ Singleton {
         root.wallpapersOpen = !root.wallpapersOpen
     }
 
+    // The application launcher. Same reason as the two above for living here
+    // rather than in the component: it is opened from a global shortcut, and
+    // it has to stay on the screen it was summoned on rather than follow the
+    // pointer to the other monitor.
+    property bool launcherOpen: false
+    property string launcherScreen: ""
+
+    onLauncherOpenChanged: {
+        if (!root.launcherOpen) return
+        var monitor = Hyprland.focusedMonitor
+        root.launcherScreen = monitor ? monitor.name : ""
+    }
+
+    function toggleLauncher() {
+        root.launcherOpen = !root.launcherOpen
+    }
+
     // ── Lock transition ──────────────────────────────────────────────────
     //
     // Phases, in order: "" idle, "closing" while the screen fades to black
