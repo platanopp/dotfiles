@@ -309,13 +309,15 @@ hl.layer_rule({
     name  = "quickshell-launcher-blur",
     match = { namespace = "^quickshell:launcher$" },
     blur  = true,
-    -- Same reasoning as the two above: the launcher's own dim is what gets
-    -- blurred through, so the threshold sits under it rather than at the
-    -- bar's 0.3.
-    ignore_alpha = 0.02,
-    -- And the same override of the catch-all xray rule. A launcher thrown
-    -- over the work should read as being on top of it, not as a hole cut
-    -- through to the wallpaper.
+    -- The bar's threshold, not the cheatsheet's, because the launcher does
+    -- not dim the screen: everything outside the panel is fully transparent
+    -- and must stay unblurred, so only the panel itself clears this. At the
+    -- 0.02 the overlays use, the whole screen would blur the moment the
+    -- launcher opened -- which is the thing that was asked to stop.
+    ignore_alpha = 0.3,
+    -- Overrides the catch-all quickshell xray rule. Xray blurs to the
+    -- wallpaper and ignores the windows in between; the panel is meant to
+    -- take its frosting from whatever it was opened on top of.
     xray = false,
 })
 

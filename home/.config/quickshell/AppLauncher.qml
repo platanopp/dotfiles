@@ -8,11 +8,11 @@ import QtQuick.Layouts
 // The application launcher, opened from the bind the config points at
 // "quickshell:launcher". Replaces `rofi -show drun`.
 //
-// Structure follows KeybindsOverlay and the wallpaper picker: mapped for the
-// life of the shell and hidden by cutting input rather than by unmapping,
-// exclusive keyboard focus only while open, pinned to the screen it was
-// summoned on. Sized to what rofi was -- 600px wide, eight rows -- because
-// that is the shape the muscle memory is in.
+// Shaped after macOS Spotlight by request, which is why it breaks two of the
+// shell's own habits: it draws in SF Pro rather than the mono face the bar
+// uses, and it does not dim the desktop behind it. Everything structural is
+// still the house pattern -- mapped for the life of the shell, exclusive
+// keyboard focus only while open, pinned to the screen it was summoned on.
 PanelWindow {
     id: overlay
 
@@ -55,27 +55,34 @@ PanelWindow {
         height: 0
     }
 
+    // ── Type ─────────────────────────────────────────────────────────────
+    //
+    // The one place in the shell that is not in the mono face. Spotlight is
+    // a proportional-set panel and reads wrong in a monospace -- the names
+    // are the content here, not tabular data. Both families resolve exactly;
+    // Display is the optical size cut for the large field, Text for the rows.
+    readonly property string fontDisplay: "SF Pro Display"
+    readonly property string fontText: "SF Pro Text"
+
     // ── Geometry ─────────────────────────────────────────────────────────
-    readonly property int cardWidth: 600
-    readonly property int cardPadding: 14
-    readonly property int searchHeight: 46
-    readonly property int rowHeight: 46
+    readonly property int cardWidth: 680
+    readonly property int searchHeight: 60
+    readonly property int rowHeight: 44
     readonly property int visibleRows: 8
-    readonly property int listGap: 10
+    readonly property int listPad: 6
+
+    readonly property bool hasResults: overlay.results.length > 0
 
     readonly property int listHeight:
-        overlay.rowHeight * Math.min(Math.max(overlay.results.length, 1), overlay.visibleRows)
+        overlay.rowHeight * Math.min(overlay.results.length, overlay.visibleRows)
 
-    readonly property int cardHeight:
-        overlay.cardPadding * 2 + overlay.searchHeight + overlay.listGap + overlay.listHeight
+    // Just the field when nothing matches, the way Spotlight collapses to it.
+    readonly property int cardHeight: overlay.searchHeight
+        + (overlay.hasResults ? 1 + overlay.listPad * 2 + overlay.listHeight : 0)
 
-    // The card grows and shrinks with the result count, so it is placed by
-    // where it would sit at full height rather than by its own centre --
-    // otherwise the search field walks up the screen as you type and the
-    // thing you are aiming at moves while you aim at it.
-    readonly property int fullHeight:
-        overlay.cardPadding * 2 + overlay.searchHeight + overlay.listGap
-        + overlay.rowHeight * overlay.visibleRows
+    // Spotlight sits high rather than centred, and the field stays put while
+    // the list grows and shrinks underneath it.
+    readonly property int cardTop: Math.round(overlay.height * 0.22)
 
     // ── State ────────────────────────────────────────────────────────────
     property string query: ""
@@ -114,9 +121,7 @@ PanelWindow {
     }
 
     // The list scrolls, but past a point the tail is noise -- nobody arrows
-    // down to the fiftieth fuzzy match. Kept separate from `ranked` so the
-    // count beside the search field can report what actually matched rather
-    // than reporting the cap back at the user.
+    // down to the fiftieth fuzzy match.
     readonly property var results: overlay.ranked.slice(0, 50)
 
     // Higher wins; zero drops the entry. The tiers are in the order someone
@@ -139,7 +144,9 @@ PanelWindow {
 
         // The desktop id catches the case where the binary is what the user
         // knows the app by rather than its display name: "nvim" for Neovim,
-        // "dolphin" for org.kde.dolphin.
+        // "dolphin" for org.kde.dolphin. It earns its place twice over here,
+        // where the entries are localised to Spanish and an English query
+        // would otherwise reach nothing.
         if ((entry.id || "").toLowerCase().indexOf(q) !== -1) return 600
 
         // genericName is the curated "what this is" line -- "Terminal
@@ -228,56 +235,55 @@ PanelWindow {
     // happens to be in that slot now.
     onResultsChanged: overlay.selected = 0
 
-    // ── Backdrop ─────────────────────────────────────────────────────────
+    // ── Click-away ───────────────────────────────────────────────────────
     //
-    // The compositor blurs what is behind this surface (see the
-    // quickshell-launcher-blur layer rule), so the tint only has to settle
-    // the contrast under the card.
-    Rectangle {
+    // Deliberately draws nothing. The desktop keeps its own contrast and its
+    // own colour while this is open; the panel is the only thing that
+    // arrives. This item exists so a click outside it still closes.
+    Item {
         anchors.fill: parent
-        color: Theme.alpha(Theme.background, 0.38)
-        opacity: overlay.open ? 1 : 0
-        visible: opacity > 0
-
-        Behavior on opacity {
-            NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic }
-        }
 
         TapHandler {
             onTapped: overlay.close()
         }
     }
 
-    // ── Card ─────────────────────────────────────────────────────────────
+    // ── Panel ────────────────────────────────────────────────────────────
     Item {
         id: cardArea
 
         x: Math.round((overlay.width - overlay.cardWidth) / 2)
-        y: Math.round((overlay.height - overlay.fullHeight) / 2)
+        y: overlay.cardTop
         width: overlay.cardWidth
         height: overlay.cardHeight
 
         opacity: overlay.open ? 1 : 0
         visible: opacity > 0
-        scale: overlay.open ? 1 : 0.97
+        // Barely there, and short. Spotlight appears rather than animating.
+        scale: overlay.open ? 1 : 0.98
 
         Behavior on height {
             NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic }
         }
 
         Behavior on opacity {
-            NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic }
+            NumberAnimation { duration: Theme.durShort; easing.type: Easing.OutCubic }
         }
 
         Behavior on scale {
-            NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic }
+            NumberAnimation { duration: Theme.durShort; easing.type: Easing.OutCubic }
         }
 
         Rectangle {
             id: card
             anchors.fill: parent
-            radius: 26
+            radius: 20
             color: Theme.glass
+            // The hairline every macOS panel carries, which is what keeps a
+            // translucent surface from bleeding into a busy wallpaper now
+            // that there is no dim behind it to separate the two.
+            border.width: 1
+            border.color: Theme.outline
             visible: false
             layer.enabled: true
         }
@@ -287,35 +293,34 @@ PanelWindow {
             anchors.fill: card
             shadowEnabled: true
             shadowColor: "#000000"
-            shadowOpacity: 0.5
-            shadowBlur: 0.8
-            shadowVerticalOffset: 6
+            shadowOpacity: 0.55
+            shadowBlur: 1.0
+            shadowVerticalOffset: 10
             autoPaddingEnabled: true
         }
 
-        // Swallows clicks that land on the card, so only the backdrop closes.
+        // Swallows clicks that land on the panel, so only outside closes.
         TapHandler {}
 
         // ── Search field ─────────────────────────────────────────────────
-        Rectangle {
-            id: searchBox
-            x: overlay.cardPadding
-            y: overlay.cardPadding
-            width: parent.width - overlay.cardPadding * 2
+        //
+        // No box of its own: in Spotlight the field is the top of the panel,
+        // and a rounded well inside a rounded panel reads as two things.
+        Item {
+            id: searchRow
+            width: parent.width
             height: overlay.searchHeight
-            radius: 14
-            color: Theme.surfaceContainer
 
             RowLayout {
                 anchors.fill: parent
-                anchors.leftMargin: 14
-                anchors.rightMargin: 14
-                spacing: 10
+                anchors.leftMargin: 22
+                anchors.rightMargin: 22
+                spacing: 14
 
                 IconGlyph {
                     text: "\u{F0349}"
-                    color: Theme.textSecondary
-                    size: Theme.iconMedium
+                    color: Theme.textMuted
+                    size: 20
                 }
 
                 TextInput {
@@ -323,8 +328,8 @@ PanelWindow {
                     Layout.fillWidth: true
                     verticalAlignment: TextInput.AlignVCenter
                     color: Theme.textPrimary
-                    font.pixelSize: 14
-                    font.family: Theme.fontMono
+                    font.pixelSize: 22
+                    font.family: overlay.fontDisplay
                     selectByMouse: true
                     selectionColor: Theme.alpha(AppState.themeAccent, 0.35)
                     selectedTextColor: Theme.textPrimary
@@ -349,42 +354,31 @@ PanelWindow {
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
                         visible: searchInput.text.length === 0
-                        text: "Search…"
+                        text: "Search"
                         color: Theme.textMuted
-                        font.pixelSize: 14
-                        font.family: Theme.fontMono
+                        font.pixelSize: 22
+                        font.family: overlay.fontDisplay
                     }
-                }
-
-                Text {
-                    visible: overlay.ranked.length > 0
-                    text: overlay.ranked.length
-                    color: Theme.textMuted
-                    font.pixelSize: 11
-                    font.family: Theme.fontMono
                 }
             }
         }
 
-        // ── Results ──────────────────────────────────────────────────────
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            y: searchBox.y + searchBox.height + overlay.listGap
-            height: overlay.rowHeight
-            verticalAlignment: Text.AlignVCenter
-            visible: overlay.results.length === 0
-            text: overlay.query.trim().length === 0 ? "No applications found"
-                                                    : "Nothing matches that"
-            color: Theme.textMuted
-            font.pixelSize: 12
-            font.family: Theme.fontMono
+        // Hairline between the field and the list, inset from the rounded
+        // corners so it does not run into them.
+        Rectangle {
+            y: searchRow.height
+            x: 1
+            width: parent.width - 2
+            height: 1
+            color: Theme.outline
+            visible: overlay.hasResults
         }
 
+        // ── Results ──────────────────────────────────────────────────────
         ListView {
             id: list
-            x: overlay.cardPadding
-            y: searchBox.y + searchBox.height + overlay.listGap
-            width: parent.width - overlay.cardPadding * 2
+            y: searchRow.height + 1 + overlay.listPad
+            width: parent.width
             height: overlay.listHeight
             clip: true
             model: overlay.results
@@ -408,8 +402,9 @@ PanelWindow {
 
                 Rectangle {
                     anchors.fill: parent
-                    anchors.rightMargin: 2
-                    radius: 12
+                    anchors.leftMargin: 8
+                    anchors.rightMargin: 8
+                    radius: 8
                     color: row.current ? Theme.surfaceContainerHigh : "transparent"
 
                     Behavior on color {
@@ -418,47 +413,42 @@ PanelWindow {
 
                     RowLayout {
                         anchors.fill: parent
-                        anchors.leftMargin: 10
-                        anchors.rightMargin: 12
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 14
                         spacing: 12
 
                         IconImage {
-                            implicitSize: 26
+                            implicitSize: 28
                             mipmap: true
                             source: Quickshell.iconPath(row.modelData.entry.icon,
                                                         "application-x-executable")
                         }
 
-                        ColumnLayout {
+                        // One line, not two. Spotlight puts the name on the
+                        // left and what the thing is on the right, and the
+                        // stacked subtitle was what made the old rows read as
+                        // a settings list rather than as a launcher.
+                        Text {
                             Layout.fillWidth: true
-                            spacing: 1
+                            text: row.modelData.entry.name
+                            color: row.current ? Theme.textPrimary : Theme.textSecondary
+                            font.pixelSize: 14
+                            font.family: overlay.fontText
+                            elide: Text.ElideRight
 
-                            Text {
-                                Layout.fillWidth: true
-                                text: row.modelData.entry.name
-                                color: row.current ? Theme.textPrimary : Theme.textSecondary
-                                font.pixelSize: 13
-                                font.family: Theme.fontMono
-                                elide: Text.ElideRight
-
-                                Behavior on color {
-                                    ColorAnimation { duration: Theme.durShort }
-                                }
+                            Behavior on color {
+                                ColorAnimation { duration: Theme.durShort }
                             }
+                        }
 
-                            // The one-line description the entry gives for
-                            // itself, which is usually the difference between
-                            // two apps whose names say nothing.
-                            Text {
-                                Layout.fillWidth: true
-                                visible: text.length > 0
-                                text: row.modelData.entry.genericName
-                                      || row.modelData.entry.comment || ""
-                                color: Theme.textMuted
-                                font.pixelSize: 10
-                                font.family: Theme.fontMono
-                                elide: Text.ElideRight
-                            }
+                        Text {
+                            visible: text.length > 0
+                            text: row.modelData.entry.genericName || ""
+                            color: Theme.textMuted
+                            font.pixelSize: 11
+                            font.family: overlay.fontText
+                            elide: Text.ElideRight
+                            Layout.maximumWidth: 200
                         }
                     }
 
