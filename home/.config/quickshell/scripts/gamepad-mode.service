@@ -1,0 +1,26 @@
+# The pad-to-desktop mapper, for the length of the session.
+#
+# It used to be started and stopped by Sunshine's global_prep_cmd, so it only
+# existed while a stream was up. It lives here instead because the mapping is
+# wanted at the desk as well -- the control panel has a tile for it -- and
+# because a daemon that is already waiting cannot lose the race against
+# Sunshine creating its virtual pad, which is what it kept losing.
+#
+# Installed as a symlink, so editing it in the repo is editing the unit:
+#   systemctl --user enable --now ~/.config/quickshell/scripts/gamepad-mode.service
+[Unit]
+Description=Gamepad desktop-control mapper
+# hyprctl and notify-send both need what Hyprland exports into the user
+# manager's environment when it starts this target.
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 %h/.config/quickshell/gamepad_mode.py
+# It exits only on a bug or on being killed; either way, come back.
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target
