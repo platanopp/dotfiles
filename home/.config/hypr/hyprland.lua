@@ -321,13 +321,6 @@ hl.layer_rule({
     xray = false,
 })
 
--- rofi is still installed; nothing binds it any more.
-hl.layer_rule({
-    name  = "rofi-blur",
-    match = { namespace = "rofi" },
-    blur  = true,
-})
-
 -- ── Was hyprland-gui.lua ─────────────────────────────────────────────────
 --
 -- HyprMod kept its settings in a generated hyprland-gui.lua that this file
