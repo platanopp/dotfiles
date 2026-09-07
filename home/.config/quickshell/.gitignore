@@ -1,3 +1,4 @@
 example
 .github/chatmodes
 logs/
+__pycache__/
