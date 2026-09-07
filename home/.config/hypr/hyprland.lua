@@ -420,6 +420,35 @@ hl.monitor({
     cm = "srgb",
 })
 
+-- The virtual display, for streaming with the real panels switched off.
+--
+-- There is no monitor on this port. DP-1 is force-enabled by the kernel with
+-- a canned EDID (video=DP-1:e drm.edid_firmware=..., set in
+-- /etc/default/limine), so the GPU has an output from boot whether or not
+-- anything physical is powered on. That is the whole point: Hyprland cannot
+-- come up with zero enabled outputs, and a monitor that is merely switched
+-- off drops off the bus like an unplugged one.
+--
+-- So it stays enabled, always. Disabling it here and turning it on only to
+-- stream would put back exactly the hole it exists to fill.
+--
+-- The EDID's preferred mode is 3840x2160@60, which is a lot of pixels to
+-- render around the clock for a screen nobody is looking at. Pinned to
+-- 1080p120 instead; the same EDID also carries an exact 2560x1440@120 if
+-- a client ever wants it.
+hl.monitor({
+    output = "DP-1",
+    disabled = false,
+    -- 119.88, not 120: that is the rate the EDID actually carries, and a mode
+    -- string that matches nothing is silently dropped -- asking for 120.00
+    -- put the screen back on the preferred 4K60.
+    mode = "1920x1080@119.88Hz",
+    -- Right of HDMI-A-1, which is where Hyprland's catch-all rule was putting
+    -- it anyway. Written down so it stops depending on enumeration order.
+    position = "2560x0",
+    scale = 1,
+})
+
 -- Which workspace lands on which of the two. Left to itself Hyprland gives
 -- workspace 1 to the output it enumerates first -- HDMI-A-1, at 0x0 -- and
 -- pushes 2 onto DP-2; that is backwards. Work belongs on the 240Hz DP-2, so
