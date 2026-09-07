@@ -11,6 +11,11 @@ from evdev import InputDevice, UInput, ecodes, list_devices
 # pad", but also PS5, Nintendo -- and only the Xbox one would have matched the
 # hints below. The button codes are the same whichever it picks.
 CONTROLLER_NAME_HINTS = ("xbox", "x-box", "microsoft", "sunshine")
+
+# Any one of these means the device has a face button, so it is the pad itself
+# and not something bundled alongside it. BTN_SOUTH and BTN_A are the same
+# code; the pair below covers both the Xbox and the DualShock naming.
+GAMEPAD_BUTTONS = (ecodes.BTN_SOUTH, ecodes.BTN_EAST, ecodes.BTN_START, ecodes.BTN_MODE)
 STICK_DEADZONE = 0.15
 MOUSE_SENSITIVITY = 18
 MOUSE_POLL_HZ = 60
@@ -77,16 +82,25 @@ def find_controller():
             device = InputDevice(path)
         except OSError:
             continue
-        name = device.name.lower()
-        matched = False
-        if any(hint in name for hint in CONTROLLER_NAME_HINTS):
-            capabilities = device.capabilities()
-            absolute_axes = [code for code, _ in capabilities.get(ecodes.EV_ABS, [])]
-            matched = ecodes.ABS_X in absolute_axes and ecodes.ABS_Y in absolute_axes
-        if matched:
+        if is_controller(device):
             return device
         device.close()
     return None
+
+
+def is_controller(device):
+    if not any(hint in device.name.lower() for hint in CONTROLLER_NAME_HINTS):
+        return False
+    capabilities = device.capabilities()
+    absolute_axes = [code for code, _ in capabilities.get(ecodes.EV_ABS, [])]
+    if ecodes.ABS_X not in absolute_axes or ecodes.ABS_Y not in absolute_axes:
+        return False
+    # Sticks alone are not enough to tell a pad from the motion sensors that
+    # come with it: an accelerometer reports on ABS_X and ABS_Y too. Sunshine
+    # publishes both under one name -- more of them since it moved to
+    # libvirtualhid -- so the buttons are what separates them.
+    buttons = capabilities.get(ecodes.EV_KEY, [])
+    return any(code in buttons for code in GAMEPAD_BUTTONS)
 
 
 def create_virtual_mouse():
