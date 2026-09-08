@@ -27,7 +27,7 @@
 set -uo pipefail
 
 VIRTUAL="DP-1"
-VIRTUAL_MODE="1920x1080@119.88Hz"
+VIRTUAL_MODE="1600x900@60.00Hz"
 VIRTUAL_POSITION="2560x0"
 
 # hyprctl only lists monitors that are enabled, so this is the live answer to

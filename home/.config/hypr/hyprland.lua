@@ -443,16 +443,19 @@ hl.monitor({
 -- stream would put back exactly the hole it exists to fill.
 --
 -- The EDID's preferred mode is 3840x2160@60, which is a lot of pixels to
--- render around the clock for a screen nobody is looking at. Pinned to
--- 1080p120 instead; the same EDID also carries an exact 2560x1440@120 if
--- a client ever wants it.
+-- render for a screen nobody is looking at. Pinned to 1600x900 instead: the
+-- client on the other end is a phone, and 1080p arrives there scaled down to
+-- something too small to read. The same EDID carries 1280x720 if that is still
+-- too much, and 1920x1080 and 2560x1440 at 120 going the other way.
 hl.monitor({
     output = "DP-1",
     disabled = false,
-    -- 119.88, not 120: that is the rate the EDID actually carries, and a mode
-    -- string that matches nothing is silently dropped -- asking for 120.00
-    -- put the screen back on the preferred 4K60.
-    mode = "1920x1080@119.88Hz",
+    -- Exactly as the EDID spells it: a mode string that matches nothing is
+    -- silently dropped and the output falls back to the preferred 4K60. That
+    -- is why 1080p had to be asked for as 119.88 and not 120.00. Below 1080p
+    -- this EDID only carries 60Hz, which costs nothing here -- Sunshine asks
+    -- for 60fps anyway.
+    mode = "1600x900@60.00Hz",
     -- Right of HDMI-A-1, which is where Hyprland's catch-all rule was putting
     -- it anyway. Written down so it stops depending on enumeration order.
     position = "2560x0",
@@ -467,6 +470,12 @@ hl.monitor({
 -- at start rather than only honouring the pin once the workspace is used.
 hl.workspace_rule({ workspace = "1", monitor = "DP-2",     default = true })
 hl.workspace_rule({ workspace = "2", monitor = "HDMI-A-1", default = true })
+
+-- 3 is the remote desktop, and only that. Hyprland was already landing it on
+-- DP-1 by enumeration order; pinning it means the windows left on it stay
+-- together when DP-1 comes and goes with a stream, instead of being scattered
+-- onto whichever panel is up at the time.
+hl.workspace_rule({ workspace = "3", monitor = "DP-1", default = true })
 
 -- ── Shell fit-up ─────────────────────────────────────────────────────────
 --
