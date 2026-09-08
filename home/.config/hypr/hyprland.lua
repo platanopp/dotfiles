@@ -347,22 +347,29 @@ hl.layer_rule({
 -- the order the settings were resolved in before: where a key appears twice,
 -- the one down here is the one that was winning.
 
--- A white pointer. rose-pine's is a muted rose-grey that disappears against
--- the wallpapers this desktop uses.
+-- Posy's Improved Cursor, the white set. rose-pine's was a muted rose-grey
+-- that went missing against the wallpapers this desktop runs.
 --
--- Breeze_Light is the white one of what is installed: measured, not assumed --
--- Adwaita's pointer is 52% black pixels with a white outline, the opposite of
--- what it looks like from the name. Converted from its XCursor form with
--- `hyprcursor-util --extract` then `--create`, and installed under
--- ~/.local/share/icons, so nothing in /usr is touched and a pacman upgrade of
--- breeze-icons cannot take it away.
-hl.env("HYPRCURSOR_THEME", "Breeze_Light-hyprcursor")
+-- The white one of the eight in the set, measured rather than taken from the
+-- name: 59% white pixels against 40% black. That black is the outline, and it
+-- is the whole point of the design -- the pointer stays readable on a white
+-- page and on a dark one. Posy_Cursor_Strokeless is whiter still, at 93%, but
+-- only because the outline is gone.
+--
+-- From github.com/simtrami/posy-improved-cursor-linux, which ships XCursor
+-- only, so this is `hyprcursor-util --extract` then `--create` over it. 17
+-- real shapes and 133 aliases, and the aliases survive the conversion as
+-- define_override entries -- checked, because a lost alias means an app asking
+-- for `left_ptr` silently falls back.
+--
+-- Under ~/.local/share/icons, so nothing in /usr is touched.
+hl.env("HYPRCURSOR_THEME", "Posy_Cursor-hyprcursor")
 hl.env("HYPRCURSOR_SIZE", "28")
 
 -- The XCursor half, for XWayland and anything that does not speak hyprcursor.
--- It was never set, which left those apps on the default -- so half the screen
--- would have gone on showing a black pointer.
-hl.env("XCURSOR_THEME", "Breeze_Light")
+-- It was never set at all until now, which left those apps on the default --
+-- so half the screen would have gone on showing a different pointer.
+hl.env("XCURSOR_THEME", "Posy_Cursor")
 
 hl.config({
     cursor = {
