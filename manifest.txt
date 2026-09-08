@@ -55,11 +55,17 @@
 
 # ── Cursor ───────────────────────────────────────────────────────────────
 #
-# Generated, not hand-written: `hyprcursor-util --extract` then `--create`
-# over /usr/share/icons/Breeze_Light, which ships with breeze-icons. It is
-# here because HYPRCURSOR_THEME in hyprland.lua names it, and a machine that
-# restored the config without it would come up on the fallback pointer.
-.local/share/icons/Breeze_Light-hyprcursor
+# Posy's Improved Cursor, from github.com/simtrami/posy-improved-cursor-linux
+# (CC BY-NC 4.0). The whole set is eight themes and 76 MB; only the two
+# hyprland.lua actually names are kept here, because that is what a restored
+# machine needs to come up on the right pointer rather than the fallback. To
+# get the other six back, clone the repo and copy them into
+# ~/.local/share/icons.
+#
+# The -hyprcursor one is generated: `hyprcursor-util --extract` then
+# `--create` over the XCursor form, which is all upstream ships.
+.local/share/icons/Posy_Cursor
+.local/share/icons/Posy_Cursor-hyprcursor
 
 # ── Application tweaks ───────────────────────────────────────────────────
 .config/spicetify/config-xpui.ini
