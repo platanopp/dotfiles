@@ -53,6 +53,14 @@
 .config/autostart
 .config/trashrc
 
+# ── Cursor ───────────────────────────────────────────────────────────────
+#
+# Generated, not hand-written: `hyprcursor-util --extract` then `--create`
+# over /usr/share/icons/Breeze_Light, which ships with breeze-icons. It is
+# here because HYPRCURSOR_THEME in hyprland.lua names it, and a machine that
+# restored the config without it would come up on the fallback pointer.
+.local/share/icons/Breeze_Light-hyprcursor
+
 # ── Application tweaks ───────────────────────────────────────────────────
 .config/spicetify/config-xpui.ini
 .config/Vencord/settings
