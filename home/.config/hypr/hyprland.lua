@@ -347,8 +347,22 @@ hl.layer_rule({
 -- the order the settings were resolved in before: where a key appears twice,
 -- the one down here is the one that was winning.
 
-hl.env("HYPRCURSOR_THEME", "rose-pine-hyprcursor")
+-- A white pointer. rose-pine's is a muted rose-grey that disappears against
+-- the wallpapers this desktop uses.
+--
+-- Breeze_Light is the white one of what is installed: measured, not assumed --
+-- Adwaita's pointer is 52% black pixels with a white outline, the opposite of
+-- what it looks like from the name. Converted from its XCursor form with
+-- `hyprcursor-util --extract` then `--create`, and installed under
+-- ~/.local/share/icons, so nothing in /usr is touched and a pacman upgrade of
+-- breeze-icons cannot take it away.
+hl.env("HYPRCURSOR_THEME", "Breeze_Light-hyprcursor")
 hl.env("HYPRCURSOR_SIZE", "28")
+
+-- The XCursor half, for XWayland and anything that does not speak hyprcursor.
+-- It was never set, which left those apps on the default -- so half the screen
+-- would have gone on showing a black pointer.
+hl.env("XCURSOR_THEME", "Breeze_Light")
 
 hl.config({
     cursor = {
