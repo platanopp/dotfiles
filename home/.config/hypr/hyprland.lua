@@ -424,14 +424,28 @@ hl.config({
             enabled = true,
             shake = {
                 enabled = true,
-                -- Defaults, written down so they are tunable without going
-                -- back to the source: how readily a shake counts as one,
-                -- where the magnification starts, how fast it grows while
-                -- shaking, and how long it stays big afterwards.
+                -- How readily a shake counts as one, where the
+                -- magnification starts, and how fast it grows while shaking.
                 threshold = 6.0,
                 base = 4.0,
                 speed = 4.0,
-                timeout = 2000,
+
+                -- How long it stays big after the shake ends. The default is
+                -- 2000, which reads as the pointer being stuck large; macOS
+                -- starts shrinking the moment you stop, so: none.
+                --
+                -- 0 is a plain duration here, not a "no limit" sentinel --
+                -- `end = now + timeout`, and the next tick past `end` sets the
+                -- zoom back. The tick is a 500us event-loop timer rather than
+                -- something driven by pointer motion, so this still fires with
+                -- the mouse sitting perfectly still.
+                --
+                -- The shrink itself animates over 400ms on a bezier the plugin
+                -- hardcodes, so this is not an abrupt snap. If a shake ever
+                -- flickers mid-way -- the detector dipping under the threshold
+                -- for a tick and the pointer bouncing small and large again --
+                -- raise this to about 150 and it will ride over it.
+                timeout = 0,
             },
         },
     },
