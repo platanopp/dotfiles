@@ -249,8 +249,20 @@ PanelWindow {
                         font.bold: true
                         font.family: Theme.fontMono
 
+                        // An animation on a property leaves that property
+                        // wherever it stopped, and this one stops whenever a
+                        // title is short enough not to need scrolling. So a
+                        // long title that had scrolled left, followed by a
+                        // short one, drew the short one off the clipped edge:
+                        // the track was playing and its name was simply not
+                        // there. Both handlers are needed -- one for the title
+                        // changing under a stopped animation, one for the
+                        // animation stopping because the new title fits.
+                        onTextChanged: x = 0
+
                         SequentialAnimation on x {
                             running: titleText.implicitWidth > titleMarquee.width
+                            onRunningChanged: if (!running) titleText.x = 0
                             loops: Animation.Infinite
 
                             PauseAnimation { duration: 1400 }
