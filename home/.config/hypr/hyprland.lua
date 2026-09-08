@@ -371,6 +371,72 @@ hl.env("HYPRCURSOR_SIZE", "28")
 -- so half the screen would have gone on showing a different pointer.
 hl.env("XCURSOR_THEME", "Posy_Cursor")
 
+-- ── Shake to find ────────────────────────────────────────────────────────
+--
+-- Shaking the mouse magnifies the pointer, the way macOS and Plasma do it.
+-- Hyprland has no such option -- checked the stubs, hyprctl and the binary --
+-- so it comes from the dynamic-cursors plugin, built from source against this
+-- exact Hyprland commit (the author pins one plugin commit per Hyprland
+-- release, and v0.56.2 is pinned). Provenance is in the .version file next to
+-- the .so.
+--
+-- Guarded rather than called outright: `hyprctl reload` re-runs this file, and
+-- loading an already-loaded plugin a second time is not something to find out
+-- about the hard way. pcall because get_loaded_plugins is the plugin API
+-- talking, and this file has to parse even when that is not there yet.
+--
+-- NOTE: the plugin has to be rebuilt after every Hyprland update. It will
+-- refuse to load against a version it was not built for, and the pointer goes
+-- back to being a plain one -- annoying, not broken.
+local dynamicCursorsPath = os.getenv("HOME") .. "/.local/share/hyprland/plugins/dynamic-cursors.so"
+
+local function pluginLoaded(name)
+    local ok, plugins = pcall(hl.get_loaded_plugins)
+    if not ok or type(plugins) ~= "table" then return false end
+    for _, plugin in ipairs(plugins) do
+        if plugin.name == name then return true end
+    end
+    return false
+end
+
+-- The .so is not in the dotfiles repo: it is a binary tied to one Hyprland
+-- build, and a restored machine would have the wrong one. So its absence is a
+-- normal state to parse through, not an error -- rebuild it with
+-- `make all` in a clone of the plugin repo, at the commit its hyprpm.toml
+-- pins for the Hyprland version in use.
+local function fileExists(path)
+    local handle = io.open(path, "r")
+    if handle == nil then return false end
+    handle:close()
+    return true
+end
+
+if fileExists(dynamicCursorsPath) and not pluginLoaded("dynamic-cursors") then
+    hl.plugin.load(dynamicCursorsPath)
+end
+
+-- The key is written with an underscore. `["dynamic-cursors"]`, which is what
+-- the plugin calls itself everywhere else, is rejected as an unknown config
+-- key -- the Lua API normalises the hyphen and does not accept the original.
+hl.config({
+    plugin = {
+        dynamic_cursors = {
+            enabled = true,
+            shake = {
+                enabled = true,
+                -- Defaults, written down so they are tunable without going
+                -- back to the source: how readily a shake counts as one,
+                -- where the magnification starts, how fast it grows while
+                -- shaking, and how long it stays big afterwards.
+                threshold = 6.0,
+                base = 4.0,
+                speed = 4.0,
+                timeout = 2000,
+            },
+        },
+    },
+})
+
 hl.config({
     cursor = {
         hide_on_key_press = false,
