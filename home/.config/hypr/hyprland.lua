@@ -39,6 +39,25 @@ hl.on("hyprland.start", function()
     hl.timer(function()
         hl.exec_cmd("$HOME/.config/quickshell/scripts/virtual-display.sh detach")
     end, { timeout = 3000, type = "oneshot" })
+
+    -- Tailscale's tray icon: tailnet state and a connect/disconnect toggle
+    -- without a terminal.
+    --
+    -- Delayed because it needs somewhere to appear. The tray host is
+    -- quickshell, started a few lines up, and a StatusNotifierItem that
+    -- registers before the watcher exists has nothing to attach to. Whether
+    -- this one retries or gives up was not established -- finding out means
+    -- killing the shell out from under a live session -- so it waits instead.
+    -- If the icon is ever missing at login, that delay is the first thing to
+    -- raise.
+    --
+    -- dark:nobg, not the default dark: the default paints the glyph on an
+    -- opaque black square, which sits as a hard-edged box among the
+    -- transparent icons already in the tray. Compared side by side before
+    -- choosing.
+    hl.timer(function()
+        hl.exec_cmd("tailscale systray --theme=dark:nobg")
+    end, { timeout = 4000, type = "oneshot" })
 end)
 
 hl.config({
