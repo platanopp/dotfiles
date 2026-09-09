@@ -30,7 +30,37 @@ PanelWindow {
 
     readonly property bool open: AppState.launcherOpen && overlay.onOpeningScreen
 
-    visible: true
+    // Unmapped while closed, not merely drawn empty.
+    //
+    // A layer surface that stays mapped sits above every window under it for
+    // the life of the session, and Hyprland composites it each frame whether
+    // or not it has anything in it. There were four of these, full-screen, on
+    // every monitor.
+    //
+    // The timer is what lets it close politely: `open` goes false, the fade
+    // inside starts, and the surface stays mapped long enough for that fade to
+    // play. Without it the window would vanish on the first frame and the
+    // fade-out would never be seen.
+    //
+    // Connections rather than an `onOpenChanged` here, because two of these
+    // files already declare one and a second on the same object is a
+    // "Property value set multiple times" error.
+    visible: overlay.open || unmapDelay.running
+
+    Timer {
+        id: unmapDelay
+        // The inner fades run on durMedium; the margin covers the frame the
+        // Behavior needs to get going.
+        interval: Theme.durMedium + 80
+    }
+
+    Connections {
+        target: overlay
+        function onOpenChanged() {
+            if (!overlay.open) unmapDelay.restart()
+        }
+    }
+
     color: "transparent"
 
     WlrLayershell.namespace: "quickshell:launcher"
