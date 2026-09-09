@@ -58,6 +58,26 @@ hl.on("hyprland.start", function()
     hl.timer(function()
         hl.exec_cmd("tailscale systray --theme=dark:nobg")
     end, { timeout = 4000, type = "oneshot" })
+
+    -- Shake to find. Loaded here rather than while this file is parsed -- see
+    -- the long note further down for what that cost. The script checks its own
+    -- work and gives up quietly, so a plugin that no longer matches the ABI
+    -- means a plain pointer, never a session that will not start.
+    hl.timer(function()
+        hl.exec_cmd("$HOME/.config/hypr/load-dynamic-cursors.sh")
+    end, { timeout = 5000, type = "oneshot" })
+end)
+
+-- `hyprctl reload` resets a plugin's settings to its own defaults, so the
+-- pointer would go back to staying big for two seconds after every reload.
+-- Re-running the loader puts it back; it is idempotent, and it notices the
+-- plugin is already loaded rather than loading it twice.
+--
+-- Handlers do not stack across reloads -- measured, three reloads in a row and
+-- the callback fired once each. Worth knowing, since this file is re-parsed
+-- every time and `hl.on` therefore runs again.
+hl.on("config.reloaded", function()
+    hl.exec_cmd("$HOME/.config/hypr/load-dynamic-cursors.sh")
 end)
 
 hl.config({
@@ -393,82 +413,26 @@ hl.env("XCURSOR_THEME", "Posy_Cursor")
 -- ── Shake to find ────────────────────────────────────────────────────────
 --
 -- Shaking the mouse magnifies the pointer, the way macOS and Plasma do it.
--- Hyprland has no such option -- checked the stubs, hyprctl and the binary --
--- so it comes from the dynamic-cursors plugin, built from source against this
--- exact Hyprland commit (the author pins one plugin commit per Hyprland
--- release, and v0.56.2 is pinned). Provenance is in the .version file next to
--- the .so.
+-- Hyprland has no such option, so it comes from VirtCode's dynamic-cursors
+-- plugin, built from source against this exact Hyprland commit. Provenance is
+-- in the .version file next to the .so, and it has to be rebuilt after every
+-- Hyprland update.
 --
--- Guarded rather than called outright: `hyprctl reload` re-runs this file, and
--- loading an already-loaded plugin a second time is not something to find out
--- about the hard way. pcall because get_loaded_plugins is the plugin API
--- talking, and this file has to parse even when that is not there yet.
+-- Loaded from the start hook rather than from here, which cost a broken login
+-- to learn. A plugin's config keys do not exist until the plugin is loaded,
+-- and `hl.plugin.load` at parse time did not load it -- no plugin, and no log
+-- line either. The `hl.config` that followed then failed with `unknown config
+-- key 'plugin.dynamic_cursors.shake.*'`, and Hyprland refuses to come up on a
+-- config error.
 --
--- NOTE: the plugin has to be rebuilt after every Hyprland update. It will
--- refuse to load against a version it was not built for, and the pointer goes
--- back to being a plain one -- annoying, not broken.
-local dynamicCursorsPath = os.getenv("HOME") .. "/.local/share/hyprland/plugins/dynamic-cursors.so"
-
-local function pluginLoaded(name)
-    local ok, plugins = pcall(hl.get_loaded_plugins)
-    if not ok or type(plugins) ~= "table" then return false end
-    for _, plugin in ipairs(plugins) do
-        if plugin.name == name then return true end
-    end
-    return false
-end
-
--- The .so is not in the dotfiles repo: it is a binary tied to one Hyprland
--- build, and a restored machine would have the wrong one. So its absence is a
--- normal state to parse through, not an error -- rebuild it with
--- `make all` in a clone of the plugin repo, at the commit its hyprpm.toml
--- pins for the Hyprland version in use.
-local function fileExists(path)
-    local handle = io.open(path, "r")
-    if handle == nil then return false end
-    handle:close()
-    return true
-end
-
-if fileExists(dynamicCursorsPath) and not pluginLoaded("dynamic-cursors") then
-    hl.plugin.load(dynamicCursorsPath)
-end
-
--- The key is written with an underscore. `["dynamic-cursors"]`, which is what
--- the plugin calls itself everywhere else, is rejected as an unknown config
--- key -- the Lua API normalises the hyphen and does not accept the original.
-hl.config({
-    plugin = {
-        dynamic_cursors = {
-            enabled = true,
-            shake = {
-                enabled = true,
-                -- How readily a shake counts as one, where the
-                -- magnification starts, and how fast it grows while shaking.
-                threshold = 6.0,
-                base = 4.0,
-                speed = 4.0,
-
-                -- How long it stays big after the shake ends. The default is
-                -- 2000, which reads as the pointer being stuck large; macOS
-                -- starts shrinking the moment you stop, so: none.
-                --
-                -- 0 is a plain duration here, not a "no limit" sentinel --
-                -- `end = now + timeout`, and the next tick past `end` sets the
-                -- zoom back. The tick is a 500us event-loop timer rather than
-                -- something driven by pointer motion, so this still fires with
-                -- the mouse sitting perfectly still.
-                --
-                -- The shrink itself animates over 400ms on a bezier the plugin
-                -- hardcodes, so this is not an abrupt snap. If a shake ever
-                -- flickers mid-way -- the detector dipping under the threshold
-                -- for a tick and the pointer bouncing small and large again --
-                -- raise this to about 150 and it will ride over it.
-                timeout = 0,
-            },
-        },
-    },
-})
+-- It looked correct when written because it was tested with `hyprctl reload`
+-- while the plugin was already loaded by hand. Reload is not the path a login
+-- takes, and testing the wrong one is what let this through.
+--
+-- So nothing here touches the plugin while this file is parsed. See the start
+-- hook: both steps run over hyprctl, which is how they were actually
+-- verified, and a missing .so leaves a shell command failing quietly instead
+-- of a session that will not come up.
 
 hl.config({
     cursor = {
