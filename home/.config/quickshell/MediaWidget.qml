@@ -370,8 +370,16 @@ PanelWindow {
                                 return (band >= 0 && band < b.length) ? b[band] : 0
                             }
 
+                            // wantSpectrum, not isPlaying. This is the panel's
+                            // ring, and the panel hides by drawing nothing
+                            // rather than by unmapping -- so on isPlaying alone
+                            // these 48 marks kept turning behind a closed panel,
+                            // dirtying the surface every frame for something
+                            // nobody could see. Measured at 70% of a core in
+                            // quickshell, plus Hyprland re-blurring the region,
+                            // while a game wanted that CPU.
                             NumberAnimation on rotation {
-                                running: bar.isPlaying
+                                running: mediaWidgetItem.wantSpectrum
                                 from: 0
                                 to: 360
                                 duration: 48000
