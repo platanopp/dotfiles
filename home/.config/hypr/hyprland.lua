@@ -58,26 +58,6 @@ hl.on("hyprland.start", function()
     hl.timer(function()
         hl.exec_cmd("tailscale systray --theme=dark:nobg")
     end, { timeout = 4000, type = "oneshot" })
-
-    -- Shake to find. Loaded here rather than while this file is parsed -- see
-    -- the long note further down for what that cost. The script checks its own
-    -- work and gives up quietly, so a plugin that no longer matches the ABI
-    -- means a plain pointer, never a session that will not start.
-    hl.timer(function()
-        hl.exec_cmd("$HOME/.config/hypr/load-dynamic-cursors.sh")
-    end, { timeout = 5000, type = "oneshot" })
-end)
-
--- `hyprctl reload` resets a plugin's settings to its own defaults, so the
--- pointer would go back to staying big for two seconds after every reload.
--- Re-running the loader puts it back; it is idempotent, and it notices the
--- plugin is already loaded rather than loading it twice.
---
--- Handlers do not stack across reloads -- measured, three reloads in a row and
--- the callback fired once each. Worth knowing, since this file is re-parsed
--- every time and `hl.on` therefore runs again.
-hl.on("config.reloaded", function()
-    hl.exec_cmd("$HOME/.config/hypr/load-dynamic-cursors.sh")
 end)
 
 hl.config({
@@ -409,30 +389,6 @@ hl.env("HYPRCURSOR_SIZE", "28")
 -- It was never set at all until now, which left those apps on the default --
 -- so half the screen would have gone on showing a different pointer.
 hl.env("XCURSOR_THEME", "Posy_Cursor")
-
--- ── Shake to find ────────────────────────────────────────────────────────
---
--- Shaking the mouse magnifies the pointer, the way macOS and Plasma do it.
--- Hyprland has no such option, so it comes from VirtCode's dynamic-cursors
--- plugin, built from source against this exact Hyprland commit. Provenance is
--- in the .version file next to the .so, and it has to be rebuilt after every
--- Hyprland update.
---
--- Loaded from the start hook rather than from here, which cost a broken login
--- to learn. A plugin's config keys do not exist until the plugin is loaded,
--- and `hl.plugin.load` at parse time did not load it -- no plugin, and no log
--- line either. The `hl.config` that followed then failed with `unknown config
--- key 'plugin.dynamic_cursors.shake.*'`, and Hyprland refuses to come up on a
--- config error.
---
--- It looked correct when written because it was tested with `hyprctl reload`
--- while the plugin was already loaded by hand. Reload is not the path a login
--- takes, and testing the wrong one is what let this through.
---
--- So nothing here touches the plugin while this file is parsed. See the start
--- hook: both steps run over hyprctl, which is how they were actually
--- verified, and a missing .so leaves a shell command failing quietly instead
--- of a session that will not come up.
 
 hl.config({
     cursor = {
