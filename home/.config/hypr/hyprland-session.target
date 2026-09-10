@@ -1,0 +1,25 @@
+# El target que enciende la sesion grafica.
+#
+# El hook de inicio hacia `systemctl --user start graphical-session.target` y
+# eso fallaba en silencio en cada arranque: ese target tiene
+# RefuseManualStart=yes, o sea que systemd rechaza arrancarlo directamente.
+# Resultado, sunshine, gamepad-mode y veilad.service quedaban `enabled` pero
+# nunca `active` -- durante meses, sin un solo error visible.
+#
+# BindsTo es la salida, y esta en el manual: "if it is started or stopped as a
+# dependency of another unit, start-up or termination will succeed". Arrancar
+# este arrastra a graphical-session.target como dependencia, que si esta
+# permitido.
+#
+# BindsTo y no Wants ademas porque conviene la otra mitad: cuando la sesion
+# grafica se cae, los servicios se van con ella en vez de sobrevivir al
+# compositor.
+#
+# Instalado como symlink, igual que gamepad-mode.service:
+#   systemctl --user enable ~/.config/hypr/hyprland-session.target
+[Unit]
+Description=Hyprland session
+Documentation=man:systemd.special(7)
+BindsTo=graphical-session.target
+Wants=graphical-session-pre.target
+After=graphical-session-pre.target
