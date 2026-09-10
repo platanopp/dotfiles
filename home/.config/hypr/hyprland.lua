@@ -15,8 +15,18 @@ hl.env("XCURSOR_SIZE", "24")
 hl.env("HYPRCURSOR_SIZE", "24")
 
 hl.on("hyprland.start", function()
-    hl.exec_cmd("veilad")
-    hl.exec_cmd("systemctl --user start graphical-session.target")
+    -- Un solo arranque para toda la sesion grafica.
+    --
+    -- Antes esto decia `start graphical-session.target`, y fallaba en silencio
+    -- en cada login: ese target tiene RefuseManualStart=yes. sunshine,
+    -- gamepad-mode y veilad quedaban enabled y nunca active. hyprland-session
+    -- .target existe solo para arrastrarlo como dependencia, que si esta
+    -- permitido -- ver el comentario en ese archivo.
+    --
+    -- veilad ya no se lanza suelto aca. Lo hace veilad.service, que cuelga de
+    -- graphical-session.target; dejar los dos daba un binario suelto quedandose
+    -- con el recurso y el servicio reiniciandose en bucle contra el.
+    hl.exec_cmd("systemctl --user start hyprland-session.target")
     hl.timer(function()
      hl.exec_cmd("nvibrant 300 0 0 600")
       end, { timeout = 2000, type = "oneshot" })
