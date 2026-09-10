@@ -66,7 +66,21 @@ PanelWindow {
 
     // Content-driven rather than a fixed 664; chrome is the 12px inset plus
     // the flickable's 16px margins.
-    implicitHeight: panelOpen ? Math.min(panelColumn.implicitHeight + 56, 700) : 64
+    //
+    // The ceiling is what the screen can actually give, not a number picked by
+    // hand. It was 700, and the panel settles at 661 of content -- 717 with
+    // chrome -- so it was clipped by seventeen pixels and scrolled for them.
+    // Expanding the network list or the audio devices needs far more than that
+    // again.
+    //
+    // 48 is the 8px the panel hangs below the top edge plus a margin off the
+    // bottom, so it stops short of the screen instead of running into it. The
+    // flickable underneath stays: it is the fallback for content that outgrows
+    // even the screen, which an expanded list on a short display still can.
+    implicitHeight: panelOpen
+        ? Math.min(panelColumn.implicitHeight + 56,
+                   settingsItem.screen.height - 48)
+        : 64
 
     Behavior on implicitWidth {
         NumberAnimation { duration: 280; easing.type: Easing.OutCubic }
