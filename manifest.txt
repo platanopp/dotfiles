@@ -28,10 +28,8 @@
 
 # ── Tools ────────────────────────────────────────────────────────────────
 .config/yazi
-.config/btop
 .config/eza
 .config/fastfetch
-.config/mpv
 .config/qBittorrent/qBittorrent.conf
 .config/qBittorrent/categories.json
 .config/qBittorrent/watched_folders.json
@@ -39,8 +37,6 @@
 # ── Theming ──────────────────────────────────────────────────────────────
 .config/matugen
 .config/wallust
-.config/wal
-.config/gtk-3.0
 .config/qt5ct
 .config/qt6ct
 .config/kdeglobals
