@@ -21,9 +21,11 @@ Usa Gio en vez de dbus-next o pydbus porque PyGObject ya esta instalado y esas n
 
 import glob
 import os
+import pathlib
 import re
 import subprocess
 import sys
+import unicodedata
 
 import gi
 
@@ -33,6 +35,29 @@ from gi.repository import Gio, GLib  # noqa: E402
 BUS_NAME = "org.mpris.MediaPlayer2.osu"
 OBJECT_PATH = "/org/mpris/MediaPlayer2"
 MARKER = "working beatmap cache for"
+
+# De donde salen las imagenes de fondo.
+#
+# El log no dice ni la ruta ni el id del mapa, solo artista/titulo/mapper/
+# dificultad -- se reviso el contexto alrededor de la linea y no hay nada mas.
+# Y los archivos de lazer se guardan por hash de contenido, con la base Realm
+# como unico indice, que desde Python no es practico de leer.
+#
+# La instalacion de osu! stable si tiene las carpetas con nombre legible, y
+# resulta que cubre lo que se juega: 141 de 142 mapas de una sesion real
+# encontraron carpeta. El que faltaba era "cYsmix - triangles", el tema del menu
+# de lazer, que no es un mapa descargado sino algo que el juego trae adentro.
+#
+# Si esta carpeta desaparece, se pierden las caratulas y nada mas: los titulos
+# siguen saliendo del log igual.
+SONGS_DIR = os.environ.get(
+    "OSU_SONGS_DIR", "/mnt/ssd/Juegos/osu!/Songs")
+
+
+def normalise(text):
+    """Clave de busqueda: sin acentos, sin signos, todo junto en minuscula."""
+    text = unicodedata.normalize("NFKD", text).lower()
+    return re.sub(r"[^a-z0-9]", "", text)
 
 # Lo minimo que quickshell necesita para tratarlo como reproductor. Todo lo que
 # se puede controlar va en false: esto es una ventana a lo que osu esta haciendo,
@@ -126,9 +151,87 @@ class OsuPlayer:
         self.connection = None
         self.owner_id = None
         self.registrations = []
+        self.art = ""
         self.handle = None
         self.path = None
         self.position = 0
+        self.index = None
+        self.index_stamp = None
+        self.art_cache = {}
+
+    # ── Fondo del mapa ───────────────────────────────────────────────────
+
+    def song_index(self):
+        """{normalizado(artista+titulo): carpeta}, reconstruido si Songs cambio.
+
+        Las carpetas se llaman "<id> <artista> - <titulo>", asi que el id del
+        principio se descarta y el resto se parte en el primer " - ".
+        """
+        try:
+            stamp = os.path.getmtime(SONGS_DIR)
+        except OSError:
+            return {}
+        if self.index is not None and stamp == self.index_stamp:
+            return self.index
+
+        index = {}
+        try:
+            entries = os.listdir(SONGS_DIR)
+        except OSError:
+            self.index, self.index_stamp = {}, stamp
+            return self.index
+
+        for entry in entries:
+            name = re.sub(r"^\d+\s+", "", entry)
+            if " - " not in name:
+                continue
+            artist, title = name.split(" - ", 1)
+            index.setdefault(normalise(artist + title), entry)
+
+        self.index, self.index_stamp = index, stamp
+        return index
+
+    def background_in(self, folder):
+        """La imagen de fondo declarada en los [Events] de algun .osu."""
+        for chart in glob.glob(os.path.join(folder, "*.osu")):
+            try:
+                with open(chart, encoding="utf-8", errors="replace") as handle:
+                    in_events = False
+                    for line in handle:
+                        line = line.strip()
+                        if line.startswith("["):
+                            in_events = line.lower().startswith("[events]")
+                            continue
+                        if not in_events or not line or line.startswith("//"):
+                            continue
+                        # "0,0,"archivo.jpg",0,0" -- el primer 0 es el tipo
+                        # (fondo) y el segundo el tiempo de inicio.
+                        match = re.match(r'^0\s*,\s*0\s*,\s*"?([^",]+)"?', line)
+                        if match:
+                            # Las rutas vienen con separador de Windows.
+                            path = os.path.join(
+                                folder, match.group(1).replace("\\", "/"))
+                            if os.path.isfile(path):
+                                return path
+            except OSError:
+                continue
+        return None
+
+    def art_for(self, artist, title):
+        key = normalise(artist + title)
+        if key in self.art_cache:
+            return self.art_cache[key]
+
+        folder = self.song_index().get(key)
+        found = ""
+        if folder:
+            path = self.background_in(os.path.join(SONGS_DIR, folder))
+            if path:
+                # as_uri escapa espacios y todo lo demas; armar la URL a mano
+                # rompe con la mitad de los nombres de mapa.
+                found = pathlib.Path(path).as_uri()
+        self.art_cache[key] = found
+        return found
 
     # ── D-Bus ────────────────────────────────────────────────────────────
 
@@ -140,6 +243,10 @@ class OsuPlayer:
             "xesam:title": GLib.Variant("s", self.title),
             "xesam:artist": GLib.Variant("as", [self.artist] if self.artist else []),
         }
+        # Solo si hay algo: un artUrl vacio hace que algunos clientes muestren
+        # un hueco roto en vez de su propio marcador.
+        if self.art:
+            items["mpris:artUrl"] = GLib.Variant("s", self.art)
         return GLib.Variant("a{sv}", items)
 
     def get_property(self, _conn, _sender, _path, interface, prop):
@@ -197,7 +304,7 @@ class OsuPlayer:
             self.connection.unregister_object(reg)
         self.registrations = []
         self.owner_id = None
-        self.artist = self.title = ""
+        self.artist = self.title = self.art = ""
         print("osu-mpris: retirado", flush=True)
 
     # ── Lectura del log ──────────────────────────────────────────────────
@@ -241,6 +348,7 @@ class OsuPlayer:
 
         if latest is not None and latest != (self.artist, self.title):
             self.artist, self.title = latest
+            self.art = self.art_for(self.artist, self.title)
             self.announce()
 
     def tick(self):
