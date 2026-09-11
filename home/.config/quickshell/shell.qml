@@ -138,7 +138,16 @@ Scope {
             // state cannot break the tie either: Firefox reports Playing for a
             // tab that makes no sound, so both players look active. The tie is
             // broken by identity instead, earlier in this list winning.
-            readonly property var preferredPlayers: ["spotify"]
+            //
+            // osu ahead of Spotify: while osu is open its own music is what is
+            // actually coming out of the speakers, so that is what the bar
+            // should be naming. Spotify next, and everything else -- browser
+            // tabs, mostly -- last.
+            //
+            // Note this also widens the lock below: with two preferred players,
+            // the cycle control is hidden whenever either of them is around,
+            // not just Spotify.
+            readonly property var preferredPlayers: ["osu", "spotify"]
 
             // Set only when the user cycles players by hand. Holds a dbusName
             // rather than a list index: the list reorders as players come and
