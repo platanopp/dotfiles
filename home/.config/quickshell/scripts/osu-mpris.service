@@ -1,0 +1,21 @@
+# Publica la cancion actual de osu!lazer como reproductor MPRIS.
+#
+# Vive toda la sesion, no solo mientras osu corre: el script mismo toma y suelta
+# el nombre del bus segun osu este abierto o no, asi el widget lo muestra y lo
+# deja de mostrar solo.
+#
+# Instalado como symlink, igual que gamepad-mode.service:
+#   systemctl --user enable --now ~/.config/quickshell/scripts/osu-mpris.service
+[Unit]
+Description=osu! current beatmap as an MPRIS player
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 %h/.config/quickshell/scripts/osu-mpris.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target
