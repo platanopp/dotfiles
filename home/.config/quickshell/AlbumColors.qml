@@ -33,7 +33,11 @@ Singleton {
     readonly property bool artIsLocal: root.artUrl.indexOf("file://") === 0
     readonly property string localPath: {
         if (root.artUrl.length === 0) return ""
-        if (root.artIsLocal) return root.artUrl.substring(7)
+        // decodeURIComponent porque un file:// es una URI y viene escapada:
+        // osu manda ".../osu%21/Songs/302447%20penoreri%20-%20..." y sin
+        // decodificar eso no es una ruta que exista en disco. Da igual para
+        // rutas sin escapar -- decodificar algo sin % no lo toca.
+        if (root.artIsLocal) return decodeURIComponent(root.artUrl.substring(7))
         return root.cacheDir + "/" + Qt.md5(root.artUrl)
     }
 
