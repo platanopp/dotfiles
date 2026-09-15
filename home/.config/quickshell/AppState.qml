@@ -851,6 +851,7 @@ Singleton {
             btPoweredProc.running = true
             btConnectedProc.running = true
             micMutedProc.running = true
+            otdStateProc.running = true
             batteryProc.running = true
             uptimeProc.running = true
         }
@@ -996,6 +997,49 @@ Singleton {
     // would claim a change that did not happen.
     function toggleGamepadMode() {
         gamepadToggleProc.running = true
+    }
+
+    // ── Driver de tablet ─────────────────────────────────────────────────
+    //
+    // opentabletdriver.service lee la tablet por HID crudo y publica un
+    // dispositivo virtual propio. Mientras corre es el unico que maneja el
+    // lapiz: una regla de udev marca el dispositivo del kernel con
+    // LIBINPUT_IGNORE_DEVICE para que el compositor no reciba dos posiciones
+    // a la vez.
+    //
+    // Apagarlo desde aca deja la tablet sin funcionar del todo, no la devuelve
+    // a un modo basico. Por eso el detalle del tile lo dice en vez de un "Off"
+    // que se leeria como algo reversible sin consecuencia.
+    property bool otdRunning: false
+
+    function toggleOtd() {
+        otdToggleProc.command = ["bash", "-c", "systemctl --user "
+            + (root.otdRunning ? "stop" : "start") + " opentabletdriver.service"]
+        otdToggleProc.running = true
+        // Optimista, como los demas toggles de este archivo: se confirma a los
+        // 900ms en vez de dejar el tile quieto esperando a systemd.
+        root.otdRunning = !root.otdRunning
+        otdRefreshTimer.restart()
+    }
+
+    Process { id: otdToggleProc; running: false }
+
+    Process {
+        id: otdStateProc
+        running: false
+        // bash -c y no -lc: el resto del archivo usa shell de login por
+        // costumbre, y eso sourcea /etc/profile entero para correr un
+        // systemctl. No hay motivo para sumar otro.
+        command: ["bash", "-c", "systemctl --user is-active opentabletdriver.service"]
+        stdout: StdioCollector {
+            onStreamFinished: root.otdRunning = text.trim() === "active"
+        }
+    }
+
+    Timer {
+        id: otdRefreshTimer
+        interval: 900
+        onTriggered: otdStateProc.running = true
     }
 
     Process {
