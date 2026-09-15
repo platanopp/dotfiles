@@ -37,6 +37,8 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("steam")
     hl.exec_cmd("quickshell")
     hl.exec_cmd("hyprpaper")
+    -- Panels off after ten idle minutes; rules in hypridle.conf next door.
+    hl.exec_cmd("hypridle")
     hl.exec_cmd("systemctl --user start hyprpolkitagent")
     hl.exec_cmd("gsettings set org.gnome.desktop.interface color-scheme prefer-dark")
     -- Take the virtual display back out of the layout once the real panels

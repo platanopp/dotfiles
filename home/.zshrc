@@ -55,3 +55,4 @@ ZSH_AUTOSUGGEST_STRATEGY=(history completion)
 eval "$(starship init zsh)"
 fastfetch
 export PATH=$PATH:~/.spicetify
+export PATH=/home/gone/.local/bin:$PATH

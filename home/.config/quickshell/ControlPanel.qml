@@ -234,7 +234,6 @@ PanelWindow {
                                                 // that failed to load.
                                                 ToggleTile {
                                                     Layout.fillWidth: true
-                                                    Layout.columnSpan: 2
                                                     icon: AppState.gamepadConnected ? "󰊴" : "󰺵"
                                                     label: "Controller"
                                                     active: AppState.gamepadModeActive
@@ -243,6 +242,21 @@ PanelWindow {
                                                           : AppState.gamepadModeActive ? "Driving the desktop"
                                                           : "Gamepad only"
                                                     onTapped: AppState.toggleGamepadMode()
+                                                }
+
+                                                ToggleTile {
+                                                    Layout.fillWidth: true
+                                                    icon: "󰷋"
+                                                    label: "Tablet"
+                                                    active: AppState.otdRunning
+                                                    // Apagarlo deja el lapiz sin
+                                                    // funcionar: la regla de udev
+                                                    // hace que el compositor ignore
+                                                    // el dispositivo del kernel, asi
+                                                    // que no hay modo de respaldo.
+                                                    detail: AppState.otdRunning ? "Driver on"
+                                                                                : "No pen"
+                                                    onTapped: AppState.toggleOtd()
                                                 }
                                             }
 
