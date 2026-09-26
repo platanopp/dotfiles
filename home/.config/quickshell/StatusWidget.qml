@@ -17,7 +17,12 @@ PanelWindow {
     // restacks it on the way back: the full-width bar came back above the
     // pills and swallowed every click meant for them. The blur rule ignores
     // pixels below 0.3 alpha, so a surface drawing nothing leaves no band.
-    mask: bar.barHidden ? blankMask : null
+    // Hidden under the Settings window while it is open: it sits where
+    // Settings grows to, and a layer surface that is re-created (this one is,
+    // whenever its contents come and go) stacks itself above older ones.
+    property bool covered: false
+
+    mask: bar.barHidden || covered ? blankMask : null
 
     Region {
         id: blankMask
@@ -95,7 +100,7 @@ PanelWindow {
 
     Item {
         id: contentArea
-        visible: !bar.barHidden
+        visible: !bar.barHidden && !covered
         anchors.fill: parent
         anchors.margins: 12
 

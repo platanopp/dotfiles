@@ -2,13 +2,14 @@ import QtQuick
 import QtQuick.Layouts
 
 // Settings -> Colour: saturation per display, and the tone of the whole
-// picture. Saturation is NVIDIA's digital vibrance, set per connector through
-// nvibrant; temperature and brightness go through hyprsunset's colour matrix,
-// and gamma through a screen shader -- all three apply to every display at
-// once, which is why they sit in a section of their own.
+// picture. Saturation is NVIDIA's digital vibrance, per connector through
+// nvibrant; temperature and brightness go through hyprsunset's colour matrix
+// and gamma through a screen shader -- all three for every display at once.
 Column {
     id: page
-    spacing: 28
+    spacing: 24
+
+    readonly property color tint: Theme.accent
 
     readonly property var monitors: AppState.displayState.monitors || []
     readonly property var colour: AppState.displayState.colour
@@ -31,7 +32,7 @@ Column {
     SettingsGroup {
         width: parent.width
         title: "Saturation"
-        subtitle: "Digital vibrance through the NVIDIA driver, per display. 0% leaves colours as they come; more makes them punchier. Double-click a slider to go back to 0."
+        tint: page.tint
 
         Repeater {
             model: page.monitors
@@ -40,11 +41,15 @@ Column {
                 id: vib
                 required property var modelData
                 stacked: true
+                icon: "\u{F0301}"
+                tint: page.tint
                 title: page.shortName(vib.modelData)
-                description: vib.modelData.name
+                value: vibSlider.format(vibSlider.shown)
 
                 SettingsSlider {
+                    id: vibSlider
                     width: parent.width
+                    tint: page.tint
                     from: 0
                     to: 1023
                     neutral: 0
@@ -61,34 +66,44 @@ Column {
     SettingsGroup {
         width: parent.width
         title: "Tone"
-        subtitle: "For every display at once. The line on each track marks neutral, and a double-click goes back to it."
+        tint: page.tint
 
         SettingsRow {
             stacked: true
-            title: "Colour temperature"
-            description: "Warmer is easier on the eyes at night; neutral is 6000 K."
+            icon: "\u{F050F}"
+            tint: page.tint
+            title: "Temperature"
+            value: tempSlider.format(tempSlider.shown)
 
             SettingsSlider {
+                id: tempSlider
                 width: parent.width
+                tint: page.tint
                 from: 2500
                 to: 9000
+                step: 50
                 neutral: 6000
                 gradient: warmCool
                 value: page.colour.temperature
                 format: v => Math.round(v / 50) * 50 + " K"
-                onMoved: v => AppState.setDisplayTemperature(Math.round(v / 50) * 50)
+                onMoved: v => AppState.setDisplayTemperature(v)
             }
         }
 
         SettingsRow {
             stacked: true
+            icon: "\u{F00DF}"
+            tint: page.tint
             title: "Brightness"
-            description: "A flat multiplier on the picture, not the panel's backlight: it dims and lifts, but bends nothing."
+            value: brightSlider.format(brightSlider.shown)
 
             SettingsSlider {
+                id: brightSlider
                 width: parent.width
+                tint: page.tint
                 from: 50
                 to: 150
+                step: 1
                 neutral: 100
                 value: page.colour.brightness
                 format: v => Math.round(v) + "%"
@@ -98,32 +113,32 @@ Column {
 
         SettingsRow {
             stacked: true
+            icon: "\u{F0197}"
+            tint: page.tint
             title: "Gamma"
-            description: "Above 1.00 lifts the midtones while black stays black -- what makes a dark playfield readable."
+            value: gammaSlider.format(gammaSlider.shown)
 
             SettingsSlider {
+                id: gammaSlider
                 width: parent.width
+                tint: page.tint
                 from: 0.6
                 to: 1.6
+                step: 0.01
                 neutral: 1.0
                 value: page.colour.gamma
                 format: v => v.toFixed(2)
                 onMoved: v => AppState.setDisplayGamma(v)
             }
         }
-    }
-
-    SettingsGroup {
-        width: parent.width
-        title: "Reset"
 
         SettingsRow {
-            title: "Back to neutral tone"
-            description: "Temperature, brightness and gamma to where they started. Saturation is left as it is."
+            icon: "\u{F099B}"
+            tint: page.tint
+            title: "Neutral tone"
 
             PillButton {
                 text: "Reset"
-                icon: "\u{F099B}"
                 onClicked: {
                     AppState.setDisplayTemperature(6000)
                     AppState.setDisplayBrightness(100)

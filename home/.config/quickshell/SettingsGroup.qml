@@ -11,6 +11,7 @@ Column {
 
     property string title: ""
     property string subtitle: ""
+    property color tint: Theme.textPrimary
     default property alias rows: stack.data
 
     spacing: 10
@@ -34,14 +35,27 @@ Column {
         spacing: 3
         visible: group.title.length > 0 || group.subtitle.length > 0
 
-        Text {
+        Row {
             visible: group.title.length > 0
-            text: group.title
-            color: Theme.textPrimary
-            font.pixelSize: 12
-            font.bold: true
-            font.letterSpacing: 0.4
-            font.family: Theme.fontMono
+            spacing: 8
+
+            Rectangle {
+                anchors.verticalCenter: parent.verticalCenter
+                width: 6
+                height: 6
+                radius: 3
+                color: group.tint
+            }
+
+            Text {
+                text: group.title
+                color: Theme.textSecondary
+                font.pixelSize: 11
+                font.bold: true
+                font.letterSpacing: 1.4
+                font.capitalization: Font.AllUppercase
+                font.family: Theme.fontMono
+            }
         }
 
         Text {

@@ -1383,6 +1383,84 @@ Singleton {
         onExited: root.displayNext()
     }
 
+    // ── Hyprland options ─────────────────────────────────────────────────
+    //
+    // For the Settings window's Look and Input pages. scripts/hypr_settings.py
+    // owns the rules: a fixed list of options, each checked against its type
+    // and range; written to gui-settings.lua, never to hyprland.lua; run live
+    // and put back if Hyprland refuses it; committed to ~/dotfiles when it
+    // took. This side only asks and shows the answer.
+    property var hyprOptions: ({})
+    // { repo, hash, when, subject, unpushed } for the sidebar's footer.
+    property var dotfilesGit: ({ repo: false })
+    // The last set/reset: { ok, error?, commit: { committed, hash? } }, with
+    // `at` so the same answer twice still reads as new.
+    property var hyprLast: null
+
+    readonly property string hyprScript:
+        Quickshell.env("HOME") + "/.config/quickshell/scripts/hypr_settings.py"
+
+    property var hyprQueue: []
+
+    function hyprCmd(args) {
+        root.hyprQueue = root.hyprQueue.concat([args])
+        root.hyprNext()
+    }
+
+    function hyprNext() {
+        if (hyprProc.running || root.hyprQueue.length === 0) return
+        var next = root.hyprQueue[0]
+        root.hyprQueue = root.hyprQueue.slice(1)
+        hyprProc.mode = next[0]
+        hyprProc.command = ["python3", root.hyprScript].concat(next)
+        hyprProc.running = true
+    }
+
+    function refreshHypr() { root.hyprCmd(["get"]) }
+
+    // Shown at once, confirmed or undone by the refresh that follows.
+    function setHypr(key, value) {
+        var o = root.hyprOptions[key]
+        if (o) {
+            var next = Object.assign({}, root.hyprOptions)
+            next[key] = Object.assign({}, o, { value: value, overridden: true })
+            root.hyprOptions = next
+        }
+        root.hyprCmd(["set", key, String(value)])
+        root.hyprCmd(["get"])
+    }
+
+    function resetHypr(key) {
+        root.hyprCmd(["reset", key])
+        root.hyprCmd(["get"])
+    }
+
+    Process {
+        id: hyprProc
+        property string mode: "get"
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var d
+                try {
+                    d = JSON.parse(text)
+                } catch (e) {
+                    return
+                }
+                if (hyprProc.mode === "get") {
+                    root.hyprOptions = d.options || ({})
+                    root.dotfilesGit = d.git || ({ repo: false })
+                } else {
+                    d.at = Date.now()
+                    root.hyprLast = d
+                    // The bar parks its pills off the outer gap.
+                    root.refreshGaps()
+                }
+            }
+        }
+        onExited: root.hyprNext()
+    }
+
     // ── Idle and lock timing ─────────────────────────────────────────────
     //
     // For the Settings window's Power & idle page. The numbers live in

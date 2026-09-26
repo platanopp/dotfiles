@@ -1,13 +1,14 @@
 import QtQuick
 import QtQuick.Layouts
 
-// Settings -> Displays: where each screen sits, and the mode, refresh rate
-// and scale of the one picked on the map. Adaptive sync is compositor-wide in
-// Hyprland, so it has a section of its own rather than pretending to be per
-// display.
+// Settings -> Displays: where each screen sits, and the mode, refresh rate and
+// scale of the one picked on the map. Adaptive sync is compositor-wide in
+// Hyprland, so it sits on its own.
 Column {
     id: page
-    spacing: 28
+    spacing: 24
+
+    readonly property color tint: Theme.accent
 
     // The display the page is pointed at; the focused one until another is
     // picked on the map.
@@ -76,42 +77,65 @@ Column {
     }
 
     // ── Keep or revert ───────────────────────────────────────────────────
+    //
+    // Resolution and scale go on at once and come back by themselves unless
+    // kept: a mode the screen cannot show leaves it dark, with no way to reach
+    // the control that would undo it.
     Rectangle {
         width: parent.width
         visible: AppState.displayRevert !== null
-        height: revertRow.implicitHeight + 28
-        radius: 20
+        height: 64
+        radius: 22
         color: Theme.alpha(Theme.warning, 0.14)
         border.width: 1
         border.color: Theme.alpha(Theme.warning, 0.35)
 
         RowLayout {
-            id: revertRow
             anchors.fill: parent
-            anchors.leftMargin: 18
-            anchors.rightMargin: 14
+            anchors.leftMargin: 14
+            anchors.rightMargin: 12
             spacing: 12
 
-            ColumnLayout {
-                Layout.fillWidth: true
-                spacing: 2
+            // The countdown as a ring draining around the seconds left.
+            Item {
+                Layout.preferredWidth: 36
+                Layout.preferredHeight: 36
+
+                Canvas {
+                    id: ring
+                    anchors.fill: parent
+                    // Not "left": every Item already has one (anchors use it),
+                    // and redeclaring it stopped the whole page from loading.
+                    property real remaining: AppState.displayRevertLeft / 15
+                    onRemainingChanged: requestPaint()
+                    onPaint: {
+                        var ctx = getContext("2d")
+                        ctx.reset()
+                        ctx.lineWidth = 3
+                        ctx.strokeStyle = Theme.alpha(Theme.warning, 0.25)
+                        ctx.beginPath(); ctx.arc(18, 18, 15, 0, Math.PI * 2); ctx.stroke()
+                        ctx.strokeStyle = Theme.warning
+                        ctx.beginPath(); ctx.arc(18, 18, 15, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * ring.remaining); ctx.stroke()
+                    }
+                }
 
                 Text {
-                    text: "Keep these display settings?"
-                    color: Theme.textPrimary
-                    font.pixelSize: 13
+                    anchors.centerIn: parent
+                    text: AppState.displayRevertLeft
+                    color: Theme.warning
+                    font.pixelSize: 12
                     font.bold: true
                     font.family: Theme.fontMono
                 }
+            }
 
-                Text {
-                    Layout.fillWidth: true
-                    text: "Going back to the previous ones in " + AppState.displayRevertLeft + " s"
-                    color: Theme.warning
-                    font.pixelSize: 11
-                    font.family: Theme.fontMono
-                    wrapMode: Text.WordWrap
-                }
+            Text {
+                Layout.fillWidth: true
+                text: "Keep this?"
+                color: Theme.textPrimary
+                font.pixelSize: 13
+                font.bold: true
+                font.family: Theme.fontMono
             }
 
             PillButton { text: "Revert"; onClicked: AppState.revertDisplayChanges() }
@@ -123,19 +147,20 @@ Column {
     SettingsGroup {
         width: parent.width
         title: "Arrangement"
-        subtitle: "Where each display sits next to the other. The pointer and windows cross over at the edges lined up here."
+        tint: page.tint
 
         SettingsRow {
             stacked: true
-            title: page.monitors.length > 1 ? "Drag a display to move it" : "This display"
-            description: page.monitors.length > 1
-                ? "Edges snap to each other, so no gap is left between them. Click a display to change its settings below."
-                : "With a second display plugged in, this is where you arrange them."
+            icon: "\u{F037A}"
+            tint: page.tint
+            title: page.monitors.length > 1 ? "Drag to rearrange" : "This display"
+            value: page.monitors.length > 1 ? page.monitors.length + " displays" : ""
 
             MonitorMap {
                 width: parent.width
-                height: 200
-                implicitHeight: 200
+                height: 190
+                implicitHeight: 190
+                tint: page.tint
                 selected: page.mon ? page.mon.name : ""
                 onPicked: name => page.selected = name
             }
@@ -146,44 +171,47 @@ Column {
     SettingsGroup {
         width: parent.width
         visible: page.mon !== null
-        title: page.mon ? page.shortName(page.mon) + "  ·  " + page.mon.name : ""
-        subtitle: page.mon
-            ? "Now " + page.mon.width + " × " + page.mon.height + " at " + page.hzLabel(page.mon.refresh)
-              + (page.mon.scale !== 1 ? ", scaled " + Math.round(page.mon.scale * 100) + "%" : "")
-            : ""
+        title: page.mon ? page.shortName(page.mon) : ""
+        tint: page.tint
 
-        SettingsRow {
-            stacked: true
+        SelectRow {
+            icon: "\u{F0A24}"
             title: "Resolution"
-            description: "Changes ask to be kept: if the screen goes dark, the old one comes back by itself in 15 seconds."
-
-            ChoiceChips {
-                width: parent.width
-                options: page.resolutions
-                value: page.mon ? page.mon.width + "x" + page.mon.height : ""
-                onPicked: v => page.pickResolution(v)
-            }
+            options: page.resolutions
+            value: page.mon ? page.mon.width + "x" + page.mon.height : ""
+            onPicked: v => page.pickResolution(v)
         }
 
+        // Four rates or fewer fit in one pill; more fold away like the
+        // resolutions do.
         SettingsRow {
-            stacked: true
+            visible: page.rates.length <= 4
+            icon: "\u{F04C5}"
             title: "Refresh rate"
-            description: page.rates.length > 1 ? "How many times a second the picture is redrawn."
-                                               : "The only rate this resolution offers."
 
-            ChoiceChips {
-                width: parent.width
+            Segmented {
                 options: page.rates
                 value: page.currentMode
                 onPicked: v => AppState.proposeDisplayMode(page.mon.name, v)
             }
         }
 
+        SelectRow {
+            visible: page.rates.length > 4
+            icon: "\u{F04C5}"
+            title: "Refresh rate"
+            options: page.rates
+            value: page.currentMode
+            onPicked: v => AppState.proposeDisplayMode(page.mon.name, v)
+        }
+
         SettingsRow {
+            icon: "\u{F06ED}"
+            tint: page.tint
             title: "Scale"
-            description: "Makes everything on this display bigger. Hyprland may round it to the nearest size the resolution divides into."
 
             Segmented {
+                tint: page.tint
                 options: [
                     { value: 1, label: "100%" },
                     { value: 1.25, label: "125%" },
@@ -199,18 +227,20 @@ Column {
     // ── Sync ─────────────────────────────────────────────────────────────
     SettingsGroup {
         width: parent.width
-        title: "Sync"
-        subtitle: "Hyprland applies this to every display at once."
+        title: "Every display"
+        tint: page.tint
 
         SettingsRow {
-            stacked: true
+            icon: "\u{F04E6}"
+            tint: page.tint
             title: "Adaptive sync"
-            description: "Lets a display follow the frame rate it is being fed -- G-SYNC and FreeSync on Wayland. Some panels flicker with it always on, which is what \"Fullscreen\" is for."
+            description: "G-SYNC / FreeSync"
 
             Segmented {
+                tint: page.tint
                 options: [
                     { value: 0, label: "Off" },
-                    { value: 1, label: "Always" },
+                    { value: 1, label: "On" },
                     { value: 2, label: "Fullscreen" }
                 ]
                 value: AppState.displayState.vrr

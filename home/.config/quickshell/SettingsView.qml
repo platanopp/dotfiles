@@ -3,9 +3,13 @@ import QtQuick
 import QtQuick.Layouts
 
 // The Settings window's contents: pages down the left, the open page on the
-// right. It is not a window of its own -- the control panel grows into it
-// (see ControlPanel.qml), which is why it has a way back as well as a way
-// out.
+// right. It is not a window of its own -- the control panel grows into it (see
+// ControlPanel.qml), which is why it has a way back as well as a way out.
+//
+// Monochrome: one accent, the shell's own light grey, for everything chosen
+// or filled -- the same language as the control panel's toggles. Pages tell
+// themselves apart by their icons, not by colour; a colour per page was tried
+// and the colours did not sit together.
 //
 // Only pages with something real behind them. Every control here drives a
 // script that changes the machine; none of them is there to fill the list.
@@ -19,14 +23,20 @@ Item {
 
     readonly property var nav: [
         { group: "Display", items: [
-            { id: "displays", label: "Displays", icon: "\u{F0379}",
-              title: "Displays", subtitle: "Arrangement, resolution and refresh rate for each screen" },
-            { id: "colour", label: "Colour", icon: "\u{F03D8}",
-              title: "Colour", subtitle: "Saturation, temperature, brightness and gamma" }
+            { id: "displays", label: "Displays", icon: "\u{F037A}", tint: Theme.accent,
+              subtitle: "Where your screens sit, and how they draw", file: "SettingsPageDisplays.qml" },
+            { id: "colour", label: "Colour", icon: "\u{F03D8}", tint: Theme.accent,
+              subtitle: "Saturation and tone", file: "SettingsPageColour.qml" }
+        ] },
+        { group: "Hyprland", items: [
+            { id: "look", label: "Look", icon: "\u{F05B2}", tint: Theme.accent,
+              subtitle: "Applied live · checked · saved to git", file: "SettingsPageLook.qml" },
+            { id: "input", label: "Input", icon: "\u{F037D}", tint: Theme.accent,
+              subtitle: "Applied live · checked · saved to git", file: "SettingsPageInput.qml" }
         ] },
         { group: "System", items: [
-            { id: "power", label: "Power & idle", icon: "\u{F0241}",
-              title: "Power & idle", subtitle: "Performance, and what happens when you step away" }
+            { id: "power", label: "Power & idle", icon: "\u{F0241}", tint: Theme.accent,
+              subtitle: "Performance, and stepping away", file: "SettingsPagePower.qml" }
         ] }
     ]
 
@@ -37,6 +47,9 @@ Item {
         return view.nav[0].items[0]
     }
 
+    Component.onCompleted: AppState.refreshHypr()
+    onPageChanged: if (view.page === "look" || view.page === "input") AppState.refreshHypr()
+
     RowLayout {
         anchors.fill: parent
         spacing: 0
@@ -44,24 +57,22 @@ Item {
         // ── Pages ────────────────────────────────────────────────────────
         ColumnLayout {
             // Pinned: a layout whose children fill their width fills its own
-            // too, whatever its preferred width says -- and this one took the
-            // whole window, leaving the page a sliver at the edge.
+            // too, whatever its preferred width says.
             Layout.fillWidth: false
-            Layout.preferredWidth: 210
-            Layout.minimumWidth: 210
-            Layout.maximumWidth: 210
+            Layout.preferredWidth: 212
+            Layout.minimumWidth: 212
+            Layout.maximumWidth: 212
             Layout.fillHeight: true
             Layout.topMargin: 14
-            Layout.bottomMargin: 14
+            Layout.bottomMargin: 12
             Layout.leftMargin: 12
             Layout.rightMargin: 10
-            spacing: 4
+            spacing: 3
 
             RowLayout {
                 Layout.fillWidth: true
-                Layout.bottomMargin: 18
-                Layout.leftMargin: 2
-                spacing: 10
+                Layout.bottomMargin: 16
+                spacing: 8
 
                 // Back to the control panel this grew out of.
                 Rectangle {
@@ -83,10 +94,18 @@ Item {
                     }
                 }
 
-                IconGlyph {
-                    text: "\u{F385}"
-                    size: Theme.iconLarge
-                    color: Theme.textPrimary
+                Rectangle {
+                    Layout.preferredWidth: 34
+                    Layout.preferredHeight: 34
+                    radius: 17
+                    color: Theme.accent
+
+                    IconGlyph {
+                        anchors.centerIn: parent
+                        text: "\u{F385}"
+                        size: Theme.iconMedium
+                        color: Theme.accentText
+                    }
                 }
 
                 ColumnLayout {
@@ -121,16 +140,17 @@ Item {
                     required property var modelData
                     required property int index
                     Layout.fillWidth: true
-                    spacing: 2
+                    spacing: 3
 
                     Text {
-                        Layout.leftMargin: 14
-                        Layout.topMargin: navGroup.index > 0 ? 16 : 0
-                        Layout.bottomMargin: 4
+                        Layout.leftMargin: 12
+                        Layout.topMargin: navGroup.index > 0 ? 14 : 0
+                        Layout.bottomMargin: 3
                         text: navGroup.modelData.group
                         color: Theme.textMuted
-                        font.pixelSize: 10
-                        font.letterSpacing: 1.2
+                        font.pixelSize: 9
+                        font.bold: true
+                        font.letterSpacing: 1.4
                         font.capitalization: Font.AllUppercase
                         font.family: Theme.fontMono
                     }
@@ -144,37 +164,23 @@ Item {
                             readonly property bool chosen: view.page === navItem.modelData.id
 
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 42
-                            radius: 21
-                            color: navItem.chosen ? Theme.alpha(Theme.accent, 0.16) : "transparent"
+                            Layout.preferredHeight: 44
+                            radius: 14
+                            color: navItem.chosen ? Theme.alpha(navItem.modelData.tint, 0.14)
+                                 : navState.hovered ? Theme.surfaceContainer : "transparent"
 
                             Behavior on color { ColorAnimation { duration: Theme.durShort } }
 
-                            // The chosen page gets a bar in the accent at its
-                            // start as well as the fill: the fill alone is a
-                            // light grey over glass, easy to lose.
-                            Rectangle {
-                                anchors.left: parent.left
-                                anchors.leftMargin: 6
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: 3
-                                height: navItem.chosen ? 18 : 0
-                                radius: 1.5
-                                color: Theme.accent
-
-                                Behavior on height { NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic } }
-                            }
-
                             RowLayout {
                                 anchors.fill: parent
-                                anchors.leftMargin: 18
-                                anchors.rightMargin: 12
-                                spacing: 12
+                                anchors.leftMargin: 7
+                                anchors.rightMargin: 10
+                                spacing: 11
 
-                                IconGlyph {
-                                    text: navItem.modelData.icon
-                                    size: Theme.iconMedium
-                                    color: navItem.chosen ? Theme.textPrimary : Theme.textSecondary
+                                TintBadge {
+                                    icon: navItem.modelData.icon
+                                    tint: navItem.modelData.tint
+                                    box: 30
                                 }
 
                                 Text {
@@ -186,9 +192,18 @@ Item {
                                     font.family: Theme.fontMono
                                     elide: Text.ElideRight
                                 }
+
+                                Rectangle {
+                                    visible: navItem.chosen
+                                    Layout.preferredWidth: 6
+                                    Layout.preferredHeight: 6
+                                    radius: 3
+                                    color: navItem.modelData.tint
+                                }
                             }
 
                             StateLayer {
+                                id: navState
                                 radius: navItem.radius
                                 interactive: !navItem.chosen
                                 onTapped: view.page = navItem.modelData.id
@@ -199,62 +214,43 @@ Item {
             }
 
             Item { Layout.fillHeight: true }
-
-            Text {
-                Layout.fillWidth: true
-                Layout.leftMargin: 14
-                text: "Changes apply as you make them."
-                color: Theme.textMuted
-                font.pixelSize: 10
-                font.family: Theme.fontMono
-                wrapMode: Text.WordWrap
-            }
         }
 
         // ── The open page ────────────────────────────────────────────────
         Rectangle {
+            id: pane
             Layout.fillWidth: true
             Layout.fillHeight: true
             Layout.topMargin: 10
             Layout.bottomMargin: 10
             Layout.rightMargin: 10
-            radius: 22
+            radius: 24
             color: Theme.alpha(Theme.foreground, 0.035)
 
-            // The page's title stays put; only what is under it scrolls. With
-            // the title scrolling too, the close button ended up floating over
-            // the cards.
-            Item {
+            // The page's title stays put; only what is under it scrolls.
+            RowLayout {
                 id: pageHeader
                 anchors.top: parent.top
                 anchors.left: parent.left
                 anchors.right: parent.right
-                anchors.topMargin: 24
-                anchors.leftMargin: 28
+                anchors.topMargin: 22
+                anchors.leftMargin: 26
                 anchors.rightMargin: 72
-                height: headerColumn.implicitHeight
+                spacing: 14
 
-                Column {
-                    id: headerColumn
-                    width: parent.width
-                    spacing: 4
+                TintBadge {
+                    icon: view.current.icon
+                    tint: view.current.tint
+                    box: 46
+                }
 
-                    Text {
-                        text: view.current.title
-                        color: Theme.textPrimary
-                        font.pixelSize: 22
-                        font.bold: true
-                        font.family: Theme.fontMono
-                    }
-
-                    Text {
-                        width: parent.width
-                        text: view.current.subtitle
-                        color: Theme.textMuted
-                        font.pixelSize: 12
-                        font.family: Theme.fontMono
-                        wrapMode: Text.WordWrap
-                    }
+                Text {
+                    Layout.fillWidth: true
+                    text: view.current.label
+                    color: Theme.textPrimary
+                    font.pixelSize: 22
+                    font.bold: true
+                    font.family: Theme.fontMono
                 }
             }
 
@@ -278,18 +274,16 @@ Item {
                 anchors.right: parent.right
                 anchors.topMargin: 18
                 anchors.bottomMargin: 10
-                anchors.leftMargin: 28
-                anchors.rightMargin: 28
-                contentHeight: pageLoader.height + 24
+                anchors.leftMargin: 26
+                anchors.rightMargin: 26
+                contentHeight: pageLoader.height + 70
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
 
                 Loader {
                     id: pageLoader
                     width: scroller.width
-                    source: view.page === "colour" ? "SettingsPageColour.qml"
-                          : view.page === "power" ? "SettingsPagePower.qml"
-                          : "SettingsPageDisplays.qml"
+                    source: view.current.file
 
                     onLoaded: {
                         item.width = Qt.binding(() => pageLoader.width)
@@ -297,15 +291,14 @@ Item {
                         arrive.restart()
                     }
 
-                    // Each page comes in with a short rise and fade, so
-                    // switching reads as a change of page rather than the
-                    // same card redrawing itself.
+                    // Each page comes in with a short rise and fade. The rise
+                    // is a transform: the Flickable owns this item's y.
                     transform: Translate { id: rise }
 
                     ParallelAnimation {
                         id: arrive
                         NumberAnimation { target: pageLoader; property: "opacity"; from: 0; to: 1; duration: Theme.durMedium; easing.type: Easing.OutCubic }
-                        NumberAnimation { target: rise; property: "y"; from: 10; to: 0; duration: Theme.durMedium; easing.type: Easing.OutCubic }
+                        NumberAnimation { target: rise; property: "y"; from: 12; to: 0; duration: Theme.durMedium; easing.type: Easing.OutCubic }
                     }
                 }
             }
@@ -314,7 +307,7 @@ Item {
             Rectangle {
                 anchors.top: parent.top
                 anchors.right: parent.right
-                anchors.margins: 16
+                anchors.margins: 18
                 width: 34
                 height: 34
                 radius: 17
@@ -330,6 +323,68 @@ Item {
                 StateLayer {
                     id: closeState
                     onTapped: view.closeRequested()
+                }
+            }
+
+            // ── What happened to the last Hyprland change ────────────────
+            //
+            // Applied and committed, or refused and rolled back -- said once,
+            // at the bottom, then gone.
+            Rectangle {
+                id: toast
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: toast.shown ? 18 : -height - 4
+                width: Math.min(parent.width - 40, toastRow.implicitWidth + 28)
+                height: 40
+                radius: 20
+                color: Theme.alpha(Theme.background, 0.94)
+                border.width: 1
+                border.color: Theme.alpha(toast.good ? Theme.success : Theme.error, 0.5)
+
+                property bool shown: false
+                // Not merely moved out of sight: parked below the pane it
+                // still showed through, and with no result yet it wore the
+                // error's red.
+                visible: toast.shown || toastSlide.running
+                readonly property var last: AppState.hyprLast
+                readonly property bool good: toast.last !== null && toast.last.ok === true
+
+                onLastChanged: if (toast.last) { toast.shown = true; hideToast.restart() }
+
+                Behavior on anchors.bottomMargin { NumberAnimation { id: toastSlide; duration: Theme.durMedium; easing.type: Easing.OutCubic } }
+
+                Timer {
+                    id: hideToast
+                    interval: 4200
+                    onTriggered: toast.shown = false
+                }
+
+                RowLayout {
+                    id: toastRow
+                    anchors.centerIn: parent
+                    spacing: 9
+
+                    IconGlyph {
+                        text: toast.good ? "\u{F05E0}" : "\u{F0028}"
+                        size: Theme.iconSmall
+                        color: toast.good ? Theme.success : Theme.error
+                    }
+
+                    Text {
+                        Layout.maximumWidth: pane.width - 110
+                        elide: Text.ElideRight
+                        text: {
+                            var l = toast.last
+                            if (!l) return ""
+                            if (!l.ok) return "Not applied, rolled back · " + (l.error || "")
+                            if (l.commit && l.commit.committed) return "Applied · saved as " + l.commit.hash
+                            return "Applied"
+                        }
+                        color: Theme.textPrimary
+                        font.pixelSize: 11
+                        font.family: Theme.fontMono
+                    }
                 }
             }
         }

@@ -13,6 +13,9 @@ Rectangle {
 
     property var options: []
     property var value
+    // The page's colour for the chosen segment; the accent when none is given.
+    property color tint: Theme.accent
+    readonly property color onTint: Theme.luminance(root.tint) > 0.5 ? Theme.background : "#ffffff"
     signal picked(var value)
 
     implicitHeight: 36
@@ -38,7 +41,7 @@ Rectangle {
         width: fill.target ? fill.target.width : 0
         height: root.height - 8
         radius: height / 2
-        color: Theme.accent
+        color: root.tint
 
         Behavior on x { NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic } }
         Behavior on width { NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic } }
@@ -73,7 +76,7 @@ Rectangle {
                         visible: seg.chosen
                         text: "\u{F012C}"
                         size: Theme.iconTiny
-                        color: Theme.accentText
+                        color: root.onTint
                     }
 
                     Text {
@@ -83,7 +86,7 @@ Rectangle {
                         font.pixelSize: 11
                         font.bold: seg.chosen
                         font.family: Theme.fontMono
-                        color: seg.chosen ? Theme.accentText : Theme.textSecondary
+                        color: seg.chosen ? root.onTint : Theme.textSecondary
                         Behavior on color { ColorAnimation { duration: Theme.durMedium } }
                     }
                 }

@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell.Widgets
 
 // The displays laid out the way Hyprland places them, to scale. Drag one to
 // move it: its edges snap to the edges of the others it comes near, so the
@@ -12,6 +13,8 @@ Item {
     id: map
 
     property string selected: ""
+    property color tint: Theme.accent
+    readonly property color onTint: Theme.luminance(map.tint) > 0.5 ? Theme.background : "#ffffff"
     signal picked(string name)
 
     readonly property var monitors: AppState.displayState.monitors || []
@@ -106,15 +109,46 @@ Item {
             height: Math.max(28, plate.size.h * map.fit)
             radius: 10
             z: plate.lifted ? 2 : 1
-            color: plate.chosen ? Theme.accent : Theme.surfaceContainerHigh
-            border.width: plate.chosen ? 0 : 1
-            border.color: Theme.outline
+            color: "transparent"
+            scale: plate.lifted ? 1.03 : 1
 
             Behavior on x { enabled: !plate.lifted; NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic } }
             Behavior on y { enabled: !plate.lifted; NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic } }
-            Behavior on color { ColorAnimation { duration: Theme.durShort } }
+            Behavior on scale { NumberAnimation { duration: Theme.durShort } }
 
-            readonly property color ink: plate.chosen ? Theme.accentText : Theme.textPrimary
+            readonly property color ink: Theme.textPrimary
+
+            // Each display drawn as a small screen showing the wallpaper, so
+            // the map reads as the desk rather than as a diagram of boxes.
+            // The one picked is lit; the others sit back behind a shade.
+            ClippingRectangle {
+                anchors.fill: parent
+                radius: plate.radius
+                color: Theme.background
+
+                Image {
+                    anchors.fill: parent
+                    source: AppState.wallpaperStill.length > 0 ? "file://" + AppState.wallpaperStill : ""
+                    fillMode: Image.PreserveAspectCrop
+                    asynchronous: true
+                    sourceSize.width: 480
+                }
+
+                Rectangle {
+                    anchors.fill: parent
+                    color: Qt.rgba(0, 0, 0, plate.chosen ? 0.35 : 0.62)
+                    Behavior on color { ColorAnimation { duration: Theme.durShort } }
+                }
+            }
+
+            Rectangle {
+                anchors.fill: parent
+                radius: plate.radius
+                color: "transparent"
+                border.width: plate.chosen ? 2 : 1
+                border.color: plate.chosen ? Theme.accent : Theme.alpha(Theme.foreground, 0.18)
+                Behavior on border.color { ColorAnimation { duration: Theme.durShort } }
+            }
 
             Column {
                 anchors.centerIn: parent
@@ -137,7 +171,7 @@ Item {
                     horizontalAlignment: Text.AlignHCenter
                     visible: plate.height > 60
                     text: plate.modelData.name + "  ·  " + plate.modelData.width + "×" + plate.modelData.height
-                    color: plate.chosen ? Theme.alpha(Theme.accentText, 0.65) : Theme.textMuted
+                    color: Theme.textSecondary
                     font.pixelSize: 9
                     font.family: Theme.fontMono
                     elide: Text.ElideRight

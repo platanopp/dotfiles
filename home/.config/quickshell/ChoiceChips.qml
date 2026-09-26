@@ -12,6 +12,8 @@ Flow {
 
     property var options: []
     property var value
+    property color tint: Theme.accent
+    readonly property color onTint: Theme.luminance(root.tint) > 0.5 ? Theme.background : "#ffffff"
     signal picked(var value)
 
     spacing: 6
@@ -27,7 +29,7 @@ Flow {
             width: chipRow.implicitWidth + 24
             height: 32
             radius: height / 2
-            color: chip.chosen ? Theme.accent : Theme.alpha(Theme.background, 0.45)
+            color: chip.chosen ? root.tint : Theme.alpha(Theme.background, 0.45)
 
             Behavior on color { ColorAnimation { duration: Theme.durShort } }
 
@@ -41,7 +43,7 @@ Flow {
                     visible: chip.chosen
                     text: "\u{F012C}"
                     size: Theme.iconTiny
-                    color: Theme.accentText
+                    color: root.onTint
                 }
 
                 Text {
@@ -50,7 +52,7 @@ Flow {
                     font.pixelSize: 11
                     font.bold: chip.chosen
                     font.family: Theme.fontMono
-                    color: chip.chosen ? Theme.accentText : Theme.textSecondary
+                    color: chip.chosen ? root.onTint : Theme.textSecondary
                 }
             }
 

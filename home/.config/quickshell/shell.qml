@@ -256,18 +256,21 @@ Scope {
             StatusWidget {
                 id: statusWidget
                 bar: bar
+                covered: controlPanelWidget.settingsOpen
                 rightMargin: bar.pillLeftOf(controlPanelWidget)
             }
 
             TrayWidget {
                 id: trayWidget
                 bar: bar
+                covered: controlPanelWidget.settingsOpen
                 rightMargin: bar.pillLeftOf(statusWidget)
             }
 
             NotesWidget {
                 id: notesWidget
                 bar: bar
+                covered: controlPanelWidget.settingsOpen
                 leftMargin: bar.pillRightOf(clockWidget)
             }
 

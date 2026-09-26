@@ -24,7 +24,11 @@ PanelWindow {
     // concerned. Open, the mask comes off and the whole screen reports to
     // us -- which is the only way a click landing outside the panel can be
     // noticed at all, there being no focus grab to lean on.
-    mask: bar.barHidden ? blankMask
+    // Hidden under the Settings window while it is open (see the same flag
+    // on the tray and status pills).
+    property bool covered: false
+
+    mask: bar.barHidden || covered ? blankMask
         : notesItem.panelOpen ? null
         : pillMask
 
@@ -128,7 +132,7 @@ PanelWindow {
 
         Item {
             id: contentArea
-            visible: !bar.barHidden
+            visible: !bar.barHidden && !notesItem.covered
             anchors.fill: parent
             anchors.margins: 12
 
