@@ -1,0 +1,10 @@
+-- Written by the shell's Settings window (Hyprland page), through
+-- ~/.config/quickshell/scripts/hypr_settings.py. Not meant to be
+-- edited by hand: the next change made in the window rewrites it from
+-- gui-settings.json. hyprland.lua runs this last, so these values win.
+
+hl.config({
+    decoration = {
+        rounding = 24,
+    },
+})
