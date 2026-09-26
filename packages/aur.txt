@@ -6,4 +6,3 @@ ripdrag
 rose-pine-hyprcursor
 spicetify-cli
 spotify
-veila-bin

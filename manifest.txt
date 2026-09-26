@@ -10,6 +10,9 @@
 # ── Shell ────────────────────────────────────────────────────────────────
 .zshrc
 .zprofile
+# Read by greetd, which starts the session with /bin/sh rather than zsh --
+# the session's PATH comes from here.
+.profile
 .config/zsh
 .config/starship.toml
 .config/fish
@@ -17,7 +20,6 @@
 # ── Compositor and the shell that runs on it ─────────────────────────────
 .config/hypr
 .config/quickshell
-.config/veila
 .config/fuzzel
 
 # ── Terminal and editors ─────────────────────────────────────────────────

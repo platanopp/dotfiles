@@ -11,8 +11,19 @@
 # libpulse      pactl, for the per-application volume list
 # xdg-utils     opening the vault from the notes widget
 # fontconfig    fc-cache, so newly installed fonts are seen
+# hypridle      screens off and the lock after idle (hypr/hypridle.conf)
+# wlopm         powers the panels off and on (hypr/scripts/idle-screens.sh)
+# ddcutil       switches the side display off over DDC in the same script;
+#               needs the i2c-dev module loaded (modules-load.d)
+# ffmpeg        stills of the video wallpapers (scripts/video_wallpaper.py)
+# python-pillow thumbnails for the wallpaper carousel (scripts/wallpaper_thumbs.py)
 imagemagick
 lua
 libpulse
 xdg-utils
 fontconfig
+hypridle
+wlopm
+ddcutil
+ffmpeg
+python-pillow
