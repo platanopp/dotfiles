@@ -52,6 +52,19 @@ PanelWindow {
         // The inner fades run on durMedium; the margin covers the frame the
         // Behavior needs to get going.
         interval: Theme.durMedium + 80
+
+        // Recentre here rather than the moment `open` goes false.
+        //
+        // `visible` above keeps the surface mapped for this whole interval so
+        // the fade-out can play, which means that at close time the view is
+        // still on screen and mid-animation -- exactly the state the comment
+        // on centerOnCurrent says desynchronises the row from its index. By
+        // the time this fires the window really is gone, and the carousel can
+        // take as long as it likes to travel.
+        onTriggered: {
+            overlay.section = overlay.sectionInUse()
+            overlay.centerOnCurrent()
+        }
     }
 
     Connections {
@@ -83,6 +96,49 @@ PanelWindow {
         id: blankMask
         width: 0
         height: 0
+    }
+
+    // ── Sections ─────────────────────────────────────────────────────────
+    //
+    // Images and videos share the folder and the carousel, and differ only in
+    // what applying one does: an image goes through the cropper to hyprpaper,
+    // a video to mpvpaper. So the row is one view over whichever list is
+    // selected rather than two views -- everything below reads `files` and
+    // `current` and never has to know which kind it is showing.
+    property string section: "images"
+
+    readonly property bool videos: overlay.section === "videos"
+
+    readonly property var files: overlay.videos ? AppState.videoWallpaperFiles
+                                                : AppState.wallpaperFiles
+
+    // What is in use in this section. With a video playing, no image is: the
+    // one underneath is only there for when the video stops, and ringing it
+    // would say it is on screen when it is not.
+    readonly property string current: overlay.videos
+        ? AppState.activeVideoWallpaper
+        : (AppState.activeVideoWallpaper === "" ? AppState.selectedWallpaper : "")
+
+    function thumbFor(path) {
+        return overlay.videos ? AppState.videoWallpaperThumb(path)
+                              : AppState.wallpaperThumb(path)
+    }
+
+    // Opens on the section holding what is in use, so the picker lands on it
+    // the same way it always has for images.
+    function sectionInUse() {
+        return AppState.activeVideoWallpaper !== "" ? "videos" : "images"
+    }
+
+    function showSection(name) {
+        if (overlay.section === name) return
+        overlay.framing = false
+        overlay.section = name
+        // After the model swap has landed, not in the same breath: the view
+        // resets its index when the model changes, and setting one on a view
+        // that is mid-rebuild is what the comment on centerOnCurrent warns
+        // leaves the row and the caption a slot apart.
+        Qt.callLater(overlay.centerOnCurrent)
     }
 
     // ── Geometry ─────────────────────────────────────────────────────────
@@ -130,13 +186,77 @@ PanelWindow {
     // straddles the centre and the highlight has nowhere to land.
     readonly property int slotCount: {
         var fits = Math.floor(overlay.width / Math.max(1, slotWidth))
-        var capped = Math.min(fits, 7, AppState.wallpaperFiles.length)
+        var capped = Math.min(fits, 7, overlay.files.length)
         if (capped <= 1) return 1
         return capped % 2 === 0 ? capped - 1 : capped
     }
 
+    // ── The panel at rest opens out ──────────────────────────────────────
+    //
+    // Once the row comes to rest, the panel in the middle widens to the
+    // screen's own shape and shows the wallpaper whole, the way it will sit
+    // on the desktop; its neighbours step aside to make room. The moment the
+    // row moves again it folds back to a panel like the others.
+    //
+    // The width it opens to: the screen's aspect at the panel's height,
+    // capped so a very wide screen does not push the row off its edges.
+    readonly property int expandedWidth: Math.min(
+        Math.round(overlay.width * 0.8),
+        Math.round(overlay.panelHeight * overlay.width / Math.max(1, overlay.height)))
+    readonly property int expandExtra: Math.max(0, overlay.expandedWidth - overlay.panelWidth)
+
+    // Which panel is open, by index -- deliberately not "the current one".
+    // The arrow keys change currentIndex at once and animate the row after,
+    // so a panel that followed isCurrent would snap shut and its successor
+    // would appear already wide. This one is only handed on once the old
+    // panel has finished folding back.
+    property int expandedIndex: -1
+    property bool wantExpanded: false
+
+    // 0 folded, 1 open. The one number every panel reads, animated here once
+    // rather than per panel.
+    property real expansion: overlay.wantExpanded && overlay.open && !overlay.framing ? 1 : 0
+
+    Behavior on expansion {
+        NumberAnimation { duration: Theme.durLong; easing.type: Easing.OutCubic }
+    }
+
+    // Anything that moves the row folds the panel and starts the wait over;
+    // the panel opens again once nothing has moved for a moment. Longer than
+    // the fold itself, so by the time it fires the old panel is fully shut
+    // and handing the index on cannot make anything jump.
+    function unsettle() {
+        overlay.wantExpanded = false
+        settleTimer.restart()
+    }
+
+    Timer {
+        id: settleTimer
+        interval: Theme.durLong + 60
+        onTriggered: {
+            if (!overlay.open || overlay.framing) return
+            overlay.expandedIndex = carousel.currentIndex
+            overlay.wantExpanded = true
+        }
+    }
+
+    // Opens out a beat after the picker itself has faded in, rather than
+    // arriving already wide.
+    Connections {
+        target: overlay
+        function onOpenChanged() {
+            if (overlay.open) overlay.unsettle()
+            else overlay.wantExpanded = false
+        }
+    }
+
     function close() {
         AppState.wallpapersOpen = false
+    }
+
+    // A click on a panel away from the middle: bring it there.
+    function bringToCentre(index) {
+        carousel.currentIndex = index
     }
 
     // ── Framing ──────────────────────────────────────────────────────────
@@ -154,7 +274,9 @@ PanelWindow {
     property real focusY: 0.5
 
     function startFraming() {
-        var path = AppState.wallpaperFiles[carousel.currentIndex]
+        // Videos are covered by mpv's own panscan; there is nothing to frame.
+        if (overlay.videos) return
+        var path = overlay.files[carousel.currentIndex]
         if (!path) return
         overlay.framingPath = path
         overlay.framing = true
@@ -201,9 +323,10 @@ PanelWindow {
 
     function apply() {
         if (carousel.currentIndex < 0) return
-        var path = AppState.wallpaperFiles[carousel.currentIndex]
+        var path = overlay.files[carousel.currentIndex]
         if (!path) return
-        AppState.setWallpaper(path)
+        if (overlay.videos) AppState.setVideoWallpaper(path)
+        else AppState.setWallpaper(path)
         overlay.close()
     }
 
@@ -218,13 +341,13 @@ PanelWindow {
     property string pendingFocus: ""
 
     function centerOnCurrent() {
-        overlay.pendingFocus = AppState.selectedWallpaper
+        overlay.pendingFocus = overlay.current
         overlay.restoreFocus()
     }
 
     function restoreFocus() {
         if (overlay.pendingFocus === "") return
-        var i = AppState.wallpaperFiles.indexOf(overlay.pendingFocus)
+        var i = overlay.files.indexOf(overlay.pendingFocus)
         if (i < 0) return
         carousel.currentIndex = i
 
@@ -246,9 +369,12 @@ PanelWindow {
     onOpenChanged: {
         if (overlay.open) return
         overlay.framing = false
+        // Centring is left to unmapDelay, once the surface is actually down.
+    }
+    Component.onCompleted: {
+        overlay.section = overlay.sectionInUse()
         overlay.centerOnCurrent()
     }
-    Component.onCompleted: overlay.centerOnCurrent()
 
     // Both of these land after the shell starts, and either can be the one
     // that finally makes the wallpaper in use findable in the list.
@@ -259,6 +385,16 @@ PanelWindow {
         }
         function onSelectedWallpaperChanged() {
             if (!overlay.open) overlay.centerOnCurrent()
+        }
+        function onVideoWallpaperFilesChanged() {
+            if (!overlay.open) overlay.centerOnCurrent()
+        }
+        // The remembered video arrives a moment after the shell starts, and
+        // is what says the picker should open on the video section at all.
+        function onActiveVideoWallpaperChanged() {
+            if (overlay.open) return
+            overlay.section = overlay.sectionInUse()
+            overlay.centerOnCurrent()
         }
     }
 
@@ -279,8 +415,26 @@ PanelWindow {
 
         // Same stepping back as Escape, so clicking away from the editor
         // does not throw out the whole picker along with the framing.
+        //
+        // Not for a click that lands in the carousel's band, though. The
+        // panels let a press through so a drag can reach the view (see their
+        // gesturePolicy), and a press that is let through is also seen here:
+        // a click on a panel at the side used to close the picker in the same
+        // breath as it asked to be brought to the middle -- and closing
+        // recentres the row, so it looked as if the click did nothing. By
+        // height and not by the band's rectangle, because an opened-out
+        // middle panel pushes its neighbours past the carousel's own edges.
         TapHandler {
-            onTapped: overlay.framing ? overlay.cancelFraming() : overlay.close()
+            onTapped: eventPoint => {
+                if (overlay.framing) {
+                    overlay.cancelFraming()
+                    return
+                }
+                var p = carouselArea.mapFromItem(null, eventPoint.scenePosition.x,
+                                                 eventPoint.scenePosition.y)
+                if (carouselArea.visible && p.y >= 0 && p.y < carouselArea.height) return
+                overlay.close()
+            }
         }
     }
 
@@ -305,6 +459,8 @@ PanelWindow {
                                             : carousel.decrementCurrentIndex()
         Keys.onRightPressed: overlay.framing ? overlay.nudgeFraming(0.02, 0)
                                              : carousel.incrementCurrentIndex()
+        Keys.onTabPressed: if (!overlay.framing)
+            overlay.showSection(overlay.videos ? "images" : "videos")
         Keys.onUpPressed: if (overlay.framing) overlay.nudgeFraming(0, -0.02)
         Keys.onDownPressed: if (overlay.framing) overlay.nudgeFraming(0, 0.02)
     }
@@ -313,6 +469,42 @@ PanelWindow {
 
     Item {
         anchors.fill: parent
+
+        // The wheel turns the carousel wherever the pointer is. It used to
+        // work only over the row itself, a strip across the middle of a
+        // full-screen picker that is easy to miss.
+        //
+        // One step per notch, not per event. A classic wheel sends 120 units
+        // a notch in one event; a high-resolution one -- the Logitech here --
+        // or a touchpad sends the same 120 in several small events, and
+        // stepping on each of them made one flick of the finger run half the
+        // row. So the deltas are summed and a step is taken per 120.
+        WheelHandler {
+            id: wheel
+            target: null
+            enabled: overlay.open && !overlay.framing
+
+            property real pending: 0
+
+            onWheel: event => {
+                // Up or left goes back; down or right goes forward. Vertical
+                // wins when both are present, as it does on a mouse.
+                var d = event.angleDelta.y !== 0 ? event.angleDelta.y : -event.angleDelta.x
+                if (d === 0) return
+                // A change of direction starts afresh rather than first paying
+                // off whatever was left over going the other way.
+                if ((d > 0) !== (wheel.pending > 0)) wheel.pending = 0
+                wheel.pending += d
+                while (wheel.pending >= 120) {
+                    carousel.decrementCurrentIndex()
+                    wheel.pending -= 120
+                }
+                while (wheel.pending <= -120) {
+                    carousel.incrementCurrentIndex()
+                    wheel.pending += 120
+                }
+            }
+        }
 
         opacity: overlay.open ? 1 : 0
         visible: opacity > 0
@@ -350,19 +542,120 @@ PanelWindow {
                 NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic }
             }
 
-            Text {
+            // The section switch, in the title's place. Two segments in one
+            // pill, the selected one filled -- the same shape the control
+            // panel uses for its choices, so it reads as a choice and not as
+            // two buttons that happen to sit together.
+            Rectangle {
+                id: sectionSwitch
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: "Wallpaper"
-                color: Theme.textPrimary
-                font.pixelSize: 18
-                font.bold: true
-                font.family: Theme.fontMono
+                width: sectionRow.implicitWidth + 8
+                height: 40
+                radius: height / 2
+                color: Theme.surfaceContainer
+                border.width: 1
+                border.color: Theme.outline
+
+                // The fill slides between the two rather than blinking from one
+                // to the other, so the switch says which way it went.
+                Rectangle {
+                    y: 4
+                    height: parent.height - 8
+                    radius: height / 2
+                    color: Theme.accent
+                    x: 4 + (overlay.videos ? imagesTab.width : 0)
+                    width: overlay.videos ? videosTab.width : imagesTab.width
+
+                    Behavior on x {
+                        NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic }
+                    }
+                    Behavior on width {
+                        NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic }
+                    }
+                }
+
+                Row {
+                    id: sectionRow
+                    x: 4
+                    anchors.verticalCenter: parent.verticalCenter
+
+                    Repeater {
+                        model: [
+                            { name: "images", label: "Images", glyph: "\u{F02E9}",
+                              count: AppState.wallpaperFiles.length },
+                            { name: "videos", label: "Videos", glyph: "\u{F0567}",
+                              count: AppState.videoWallpaperFiles.length }
+                        ]
+
+                        Item {
+                            id: tab
+                            required property var modelData
+                            required property int index
+                            readonly property bool selected: overlay.section === tab.modelData.name
+
+                            width: tabRow.implicitWidth + 32
+                            height: sectionSwitch.height - 8
+
+                            Component.onCompleted: {
+                                if (tab.index === 0) imagesTab.width = Qt.binding(() => tab.width)
+                                else videosTab.width = Qt.binding(() => tab.width)
+                            }
+
+                            Row {
+                                id: tabRow
+                                anchors.centerIn: parent
+                                spacing: 8
+
+                                IconGlyph {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: tab.modelData.glyph
+                                    size: Theme.iconSmall
+                                    color: tab.selected ? Theme.accentText : Theme.textSecondary
+                                    Behavior on color { ColorAnimation { duration: Theme.durMedium } }
+                                }
+
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: tab.modelData.label
+                                    font.pixelSize: 13
+                                    font.bold: tab.selected
+                                    font.family: Theme.fontMono
+                                    color: tab.selected ? Theme.accentText : Theme.textSecondary
+                                    Behavior on color { ColorAnimation { duration: Theme.durMedium } }
+                                }
+
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: tab.modelData.count
+                                    font.pixelSize: 11
+                                    font.family: Theme.fontMono
+                                    color: tab.selected ? Theme.alpha(Theme.accentText, 0.6) : Theme.textMuted
+                                    Behavior on color { ColorAnimation { duration: Theme.durMedium } }
+                                }
+                            }
+
+                            StateLayer {
+                                radius: height / 2
+                                interactive: !tab.selected
+                                onTapped: overlay.showSection(tab.modelData.name)
+                            }
+                        }
+                    }
+                }
+
+                // Widths of the two segments, for the sliding fill. Filled in by
+                // the delegates themselves; a Repeater's items are not reachable
+                // by id from outside it.
+                QtObject { id: imagesTab; property real width: 0 }
+                QtObject { id: videosTab; property real width: 0 }
             }
 
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
-                visible: AppState.wallpaperFiles.length === 0
-                text: "No images in ~/Pictures/Wallpapers"
+                visible: overlay.files.length === 0
+                text: overlay.videos
+                    ? "No videos in ~/Pictures/Wallpapers  (.mp4 .webm .mkv .mov)"
+                    : "No images in ~/Pictures/Wallpapers"
                 color: Theme.textMuted
                 font.pixelSize: 13
                 font.family: Theme.fontMono
@@ -386,7 +679,7 @@ PanelWindow {
             Item {
                 id: carouselArea
                 anchors.horizontalCenter: parent.horizontalCenter
-                visible: AppState.wallpaperFiles.length > 0
+                visible: overlay.files.length > 0
 
                 width: Math.min(overlay.width, overlay.slotCount * overlay.slotWidth)
                 height: overlay.panelHeight + 48
@@ -395,7 +688,7 @@ PanelWindow {
                     id: carousel
                     anchors.fill: parent
 
-                    model: AppState.wallpaperFiles
+                    model: overlay.files
                     pathItemCount: overlay.slotCount
                     // Enough to hold the whole folder, not a window around
                     // the visible seven.
@@ -411,7 +704,7 @@ PanelWindow {
                     // shell runs: these decode to about 2.8 MB each at the
                     // size the panels draw them, so the ceiling is roughly
                     // 55 MB for a very large folder and 39 MB for this one.
-                    cacheItemCount: Math.min(AppState.wallpaperFiles.length,
+                    cacheItemCount: Math.min(overlay.files.length,
                                              overlay.maxWarmPanels)
 
                     snapMode: PathView.SnapToItem
@@ -426,17 +719,22 @@ PanelWindow {
                     // index gets reset out from under the picker.
                     onCountChanged: overlay.restoreFocus()
 
-                    // A mouse has no fling. Without this the carousel could only
-                    // be driven by dragging it, which is the one input a picker
-                    // like this will rarely get.
-                    WheelHandler {
-                        onWheel: event => {
-                            if (event.angleDelta.y > 0 || event.angleDelta.x < 0)
-                                carousel.decrementCurrentIndex()
-                            else
-                                carousel.incrementCurrentIndex()
-                        }
-                    }
+                    // Both, because they do not always come together: a click
+                    // on a far panel changes the index and then animates, a
+                    // drag moves the offset without touching the index until
+                    // it snaps. Offset changes every frame of the travel, so
+                    // the settle wait only starts counting once it stops.
+                    onCurrentIndexChanged: overlay.unsettle()
+                    onOffsetChanged: overlay.unsettle()
+
+                    // Grab anywhere on the row, not only near the path.
+                    //
+                    // PathView takes a drag only if the press lands within
+                    // dragMargin of its path, and the path is a single
+                    // horizontal line at half height -- so with the default of
+                    // 0, a drag had to start on that line to do anything, and
+                    // most of every panel was dead to it.
+                    dragMargin: carousel.height / 2
 
                     // Two attributes ride the path. "depth" is the z-order that
                     // brings the middle item to the front. "shift" is where along
@@ -464,14 +762,35 @@ PanelWindow {
                         required property int index
 
                         readonly property bool isCurrent: PathView.isCurrentItem
-                        readonly property bool isActive: card.modelData === AppState.selectedWallpaper
+                        readonly property bool isActive: card.modelData === overlay.current
 
                         // Position along the row, -1 to 1. Undefined for an item
                         // that is off the path and not being drawn.
                         readonly property real shift: PathView.shift ?? 0
 
+                        // Open, this panel widens by the full extra; everyone
+                        // else steps half of it away, left or right, so the
+                        // row stays symmetric around the wide one.
+                        readonly property bool isExpanded: card.index === overlay.expandedIndex
+
                         width: overlay.panelWidth
                         height: overlay.panelHeight
+
+                        // How far to step aside, as a fraction of half the
+                        // extra. Continuous rather than a sign: a panel crossing
+                        // the middle while the fold is still running would
+                        // otherwise jump from one side to the other. Adjacent
+                        // panels sit 2/n apart in shift, so they reach the full
+                        // step and everything further out does too.
+                        readonly property real side: {
+                            var n = overlay.slotCount
+                            if (card.isExpanded || n <= 1) return 0
+                            return Math.max(-1, Math.min(1, card.shift * n / 2))
+                        }
+
+                        transform: Translate {
+                            x: card.side * overlay.expandExtra / 2 * overlay.expansion
+                        }
 
                         z: PathView.depth ?? 0
 
@@ -509,117 +828,178 @@ PanelWindow {
                             NumberAnimation { duration: Theme.durLong; easing.type: Easing.OutCubic }
                         }
 
-                        // Mask only. Nothing is ever cast from this rectangle
-                        // now, so its colour is arbitrary -- a mask is read for
-                        // its alpha. It used to double as the shadow's source,
-                        // and since a MultiEffect draws its source as well as
-                        // its shadow, the plate itself kept showing: first as a
-                        // grey halo, then, painted black to hide it, as a black
-                        // outline standing between the photo and its edge.
-                        Rectangle {
-                            id: cardMask
-                            anchors.fill: parent
-                            radius: 12
-                            color: "#000000"
-                            visible: false
-                            layer.enabled: true
-                        }
-
-                        // Stands in until the image decodes, so the carousel has
-                        // something with the right shape to lay out and animate.
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: cardMask.radius
-                            color: Theme.surfaceContainerHigh
-                            visible: thumb.status !== Image.Ready
-                        }
-
-                        // Shadow under the middle panel, cast from the plate
-                    // above rather than from the photo.
-                    //
-                    // The plate is static, which is the point: a layer only
-                    // renders when its item does, and an item that is off the
-                    // path is scaled to nothing and never drawn. A photo that
-                    // finishes loading in that state leaves its layer holding
-                    // the empty texture it was given, and the panel comes back
-                    // blank -- which is exactly what happened once the whole
-                    // folder was kept warm off-path. A solid rectangle has
-                    // nothing to arrive late.
-                    MultiEffect {
-                        anchors.fill: parent
-                        source: cardMask
-                        shadowEnabled: true
-                        shadowColor: "#000000"
-                        shadowBlur: 0.9
-                        shadowVerticalOffset: 10
-                        autoPaddingEnabled: true
-                        shadowOpacity: card.isCurrent ? 0.55 : 0
-
-                        Behavior on shadowOpacity {
-                            NumberAnimation { duration: Theme.durLong; easing.type: Easing.OutCubic }
-                        }
-                    }
-
-                    // The parallax. The panel is a narrow window; the photo
-                    // behind it is over twice as wide and slides the other way
-                    // as the panel travels, so it covers less ground than its
-                    // own frame does. That lag is the whole effect -- something
-                    // moving slower than the thing in front of it reads as
-                    // further away.
-                    //
-                    // ClippingRectangle rounds the corners by clipping, with no
-                    // layer and no mask, so the photo is drawn straight and
-                    // there is no texture to be captured at the wrong moment.
-                    ClippingRectangle {
-                        anchors.fill: parent
-                        radius: cardMask.radius
-                        color: "transparent"
-                        visible: thumb.status === Image.Ready
-
-                        Image {
-                            id: thumb
-                            width: parent.width + overlay.parallaxRange * 2
+                        // The panel's face: everything the panel draws, and the
+                        // part that opens out.
+                        //
+                        // The delegate itself keeps the panel's width and never
+                        // changes it. PathView places a delegate by where its
+                        // centre lands on the path when it lays the row out, and
+                        // nothing says it lays the row out again because a
+                        // delegate got wider -- a panel widening itself could
+                        // just as well grow off to the right. Centred inside a
+                        // box of fixed size, the face widens both ways by
+                        // construction.
+                        Item {
+                            id: face
+                            anchors.centerIn: parent
+                            width: overlay.panelWidth
+                                + (card.isExpanded ? overlay.expandExtra * overlay.expansion : 0)
                             height: parent.height
 
-                            // Centred at rest, hard left at one end of the row
-                            // and hard right at the other.
-                            x: -overlay.parallaxRange * (1 + card.shift)
+                            // Holds the corner radius the rest of the panel reads.
+                            // It used to be the mask a MultiEffect cast the shadow
+                            // from, with a layer under it -- see the shadow below
+                            // for why that went.
+                            Rectangle {
+                                id: cardMask
+                                anchors.fill: parent
+                                radius: 12
+                                color: "transparent"
+                                visible: false
+                            }
 
-                            source: "file://" + card.modelData
-                            fillMode: Image.PreserveAspectCrop
-                            asynchronous: true
+                            // Stands in until the image decodes, so the carousel has
+                            // something with the right shape to lay out and animate.
+                            Rectangle {
+                                anchors.fill: parent
+                                radius: cardMask.radius
+                                color: Theme.surfaceContainerHigh
+                                visible: thumb.status !== Image.Ready
+                            }
 
-                            // The panel is a tall crop of a wide picture, so
-                            // height is what sets the decode -- a dozen of
-                            // these are live at once.
-                            sourceSize.height: Math.round(overlay.panelHeight * 1.3)
-                        }
-                    }
+                            // Shadow under the middle panel.
+                            //
+                            // RectangularShadow and not a MultiEffect over a layered
+                            // mask. A layer is rendered only when its item is drawn,
+                            // and panels get built while the picker is shut -- which
+                            // is every time the section flips to videos, since that
+                            // happens before it opens. The layer then held a texture
+                            // that was never painted, and the shadow came out as a
+                            // hard block of pure black under the panel. This draws
+                            // the shape itself, analytically, with no texture to go
+                            // stale.
+                            RectangularShadow {
+                                anchors.fill: parent
+                                radius: cardMask.radius
+                                offset.y: 10
+                                blur: 28
+                                color: "#000000"
+                                opacity: card.isCurrent ? 0.55 : 0
 
-                    // Ring on the wallpaper that is currently up, so the one
-                        // in the middle is not mistaken for the one in use.
-                        Rectangle {
+                                Behavior on opacity {
+                                    NumberAnimation { duration: Theme.durLong; easing.type: Easing.OutCubic }
+                                }
+                            }
+
+                        // The parallax. The panel is a narrow window; the photo
+                        // behind it is over twice as wide and slides the other way
+                        // as the panel travels, so it covers less ground than its
+                        // own frame does. That lag is the whole effect -- something
+                        // moving slower than the thing in front of it reads as
+                        // further away.
+                        //
+                        // ClippingRectangle rounds the corners by clipping, with no
+                        // layer and no mask, so the photo is drawn straight and
+                        // there is no texture to be captured at the wrong moment.
+                        ClippingRectangle {
                             anchors.fill: parent
                             radius: cardMask.radius
                             color: "transparent"
-                            border.width: 2
-                            border.color: Theme.accent
-                            opacity: card.isActive ? 1 : 0
+                            visible: thumb.status === Image.Ready
 
-                            Behavior on opacity {
-                                NumberAnimation { duration: Theme.durMedium }
+                            Image {
+                                id: thumb
+
+                                // The slack the parallax slides through, gone once
+                                // the panel is open: opened out, the frame is already
+                                // the screen's shape, and any extra width would only
+                                // make the cover crop zoom in and cut the top and
+                                // bottom off the picture it is meant to show whole.
+                                readonly property real slack: overlay.parallaxRange
+                                    * (card.isExpanded ? 1 - overlay.expansion : 1)
+
+                                width: parent.width + thumb.slack * 2
+                                height: parent.height
+
+                                // Centred at rest, hard left at one end of the row
+                                // and hard right at the other.
+                                x: -thumb.slack * (1 + card.shift)
+
+                                // The cached thumbnail, not the original: see
+                                // AppState.buildWallpaperThumbs. The framing editor
+                                // below still opens the full file, because judging a
+                                // crop wants every pixel.
+                                source: {
+                                    var t = overlay.thumbFor(card.modelData)
+                                    return t.length > 0 ? "file://" + t : ""
+                                }
+                                fillMode: Image.PreserveAspectCrop
+                                asynchronous: true
+
+                                // The panel is a tall crop of a wide picture, so
+                                // height is what sets the decode -- a dozen of
+                                // these are live at once.
+                                sourceSize.height: Math.round(overlay.panelHeight * 1.3)
                             }
                         }
 
-                        // Clicking the middle card applies it; clicking any other
-                        // brings it to the middle first. Applying straight from
-                        // the edge of the row would mean setting a wallpaper the
-                        // user has only seen shrunk behind another one.
-                        StateLayer {
-                            radius: cardMask.radius
-                            onTapped: {
-                                if (card.isCurrent) overlay.apply()
-                                else carousel.currentIndex = card.index
+                        // Ring on the wallpaper that is currently up, so the one
+                            // in the middle is not mistaken for the one in use.
+                            Rectangle {
+                                anchors.fill: parent
+                                radius: cardMask.radius
+                                color: "transparent"
+                                border.width: 2
+                                border.color: Theme.accent
+                                opacity: card.isActive ? 1 : 0
+
+                                Behavior on opacity {
+                                    NumberAnimation { duration: Theme.durMedium }
+                                }
+                            }
+
+                            // Marks a panel as a video, since the still in it looks
+                            // exactly like an image. Bottom left, clear of the ring.
+                            Rectangle {
+                                visible: overlay.videos
+                                anchors.left: parent.left
+                                anchors.bottom: parent.bottom
+                                anchors.margins: 10
+                                width: 28
+                                height: 28
+                                radius: 14
+                                color: Theme.alpha(Theme.background, 0.7)
+
+                                IconGlyph {
+                                    anchors.centerIn: parent
+                                    // Nudged right: a triangle's visual centre sits
+                                    // left of its box's.
+                                    anchors.horizontalCenterOffset: 1
+                                    text: "\u{F040A}"
+                                    size: Theme.iconSmall
+                                    color: Theme.textPrimary
+                                }
+                            }
+
+                            // Clicking the middle card applies it; clicking any other
+                            // brings it to the middle first. Applying straight from
+                            // the edge of the row would mean setting a wallpaper the
+                            // user has only seen shrunk behind another one.
+                            StateLayer {
+                                radius: cardMask.radius
+                                // Let a drag through to the carousel. The default
+                                // policy holds the press for itself until release,
+                                // which is right for a button and meant a drag that
+                                // started on a panel -- where anyone grabs a
+                                // carousel -- never reached the view.
+                                gesturePolicy: TapHandler.DragThreshold
+                                onTapped: {
+                                    if (card.isCurrent) {
+                                        overlay.apply()
+                                        return
+                                    }
+                                    overlay.bringToCentre(card.index)
+                                }
                             }
                         }
                     }
@@ -641,7 +1021,9 @@ PanelWindow {
                     // beside it to borrow context from.
                     color: Theme.surfaceContainerHigh
                     iconColor: Theme.textPrimary
-                    interactive: AppState.wallpaperFiles.length > 0
+                    interactive: overlay.files.length > 0
+                    // No framing for a video: mpv covers the screen itself.
+                    visible: !overlay.videos
                     onTapped: overlay.startFraming()
                 }
             }
@@ -650,7 +1032,7 @@ PanelWindow {
 
             Column {
                 anchors.horizontalCenter: parent.horizontalCenter
-                visible: AppState.wallpaperFiles.length > 0
+                visible: overlay.files.length > 0
                 spacing: 6
 
                 Text {
@@ -662,7 +1044,7 @@ PanelWindow {
                     horizontalAlignment: Text.AlignHCenter
                     elide: Text.ElideMiddle
                     text: {
-                        var path = AppState.wallpaperFiles[carousel.currentIndex] || ""
+                        var path = overlay.files[carousel.currentIndex] || ""
                         return path.split("/").pop()
                     }
                     color: Theme.textSecondary
@@ -672,9 +1054,10 @@ PanelWindow {
 
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: (carousel.currentIndex + 1) + " / " + AppState.wallpaperFiles.length
-                        + "   ·   " + (AppState.wallpaperFiles[carousel.currentIndex] === AppState.selectedWallpaper
+                    text: (carousel.currentIndex + 1) + " / " + overlay.files.length
+                        + "   ·   " + (overlay.files[carousel.currentIndex] === overlay.current
                                        ? "in use" : "Enter to apply")
+                        + "   ·   Tab for " + (overlay.videos ? "images" : "videos")
                         + "   ·   Esc to close"
                     color: Theme.textMuted
                     font.pixelSize: 11

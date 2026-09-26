@@ -106,7 +106,7 @@ PanelWindow {
         id: pillArea
         x: notesItem.leftMargin
         y: 0
-        width: notesItem.panelOpen ? 340 : 64
+        width: notesItem.panelOpen ? 340 : notesIcon.width + 24 + Theme.pillPaddingH * 2
         height: notesItem.panelOpen ? Math.min(panelColumn.implicitHeight + 56, 560) : 64
 
         Behavior on x {

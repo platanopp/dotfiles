@@ -63,7 +63,17 @@ PanelWindow {
     readonly property int leftMargin: screen ? Math.round((screen.width - implicitWidth) / 2) : 0
     margins.left: leftMargin
 
-    implicitWidth: panelOpen ? panelWidth : compactRow.implicitWidth + 40
+    // Breathing room between the text and the edge of the pill.
+    //
+    // Named rather than folded into the width below, because the arithmetic is
+    // not obvious: the window is wider than the pill by the 12px inset on each
+    // side of the Item that holds it. So the window has to carry 24 of chrome
+    // plus twice this value, and a bare number here reads as if it were the
+    // padding when it is not.
+    readonly property int compactPaddingH: Theme.pillPaddingH
+
+    implicitWidth: panelOpen ? panelWidth
+                             : compactRow.implicitWidth + 24 + compactPaddingH * 2
     implicitHeight: panelOpen ? panelColumn.implicitHeight + 56 : 64
 
     Behavior on implicitWidth {

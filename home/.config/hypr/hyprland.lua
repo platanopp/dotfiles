@@ -7,6 +7,7 @@ hl.monitor({
 
 local terminal = "kitty"
 local fileManager = "kitty --class yazi -e yazi"
+local browser = "zen-browser"
 local mainMod = "SUPER"
 
 hl.env("QT_QPA_PLATFORMTHEME", "qt6ct")
@@ -18,40 +19,34 @@ hl.on("hyprland.start", function()
     -- Un solo arranque para toda la sesion grafica.
     --
     -- Antes esto decia `start graphical-session.target`, y fallaba en silencio
-    -- en cada login: ese target tiene RefuseManualStart=yes. sunshine,
-    -- gamepad-mode y veilad quedaban enabled y nunca active. hyprland-session
-    -- .target existe solo para arrastrarlo como dependencia, que si esta
-    -- permitido -- ver el comentario en ese archivo.
-    --
-    -- veilad ya no se lanza suelto aca. Lo hace veilad.service, que cuelga de
-    -- graphical-session.target; dejar los dos daba un binario suelto quedandose
-    -- con el recurso y el servicio reiniciandose en bucle contra el.
+    -- en cada login: ese target tiene RefuseManualStart=yes. sunshine y
+    -- gamepad-mode quedaban enabled y nunca active. hyprland-session.target
+    -- existe solo para arrastrarlo como dependencia, que si esta permitido --
+    -- ver el comentario en ese archivo.
     hl.exec_cmd("systemctl --user start hyprland-session.target")
     hl.timer(function()
      hl.exec_cmd("nvibrant 300 0 0 600")
       end, { timeout = 2000, type = "oneshot" })
+    -- First of the lot, and for one reason: on a cold boot the shell puts the
+    -- lock up on the first frame it can, and nothing has asked for a password
+    -- before that -- greetd hands the seat over already logged in. Everything
+    -- below takes a second or two to draw, and every one of those seconds
+    -- would be desktop on screen with no lock over it. Behind the lock they
+    -- can take as long as they like.
+    hl.exec_cmd("quickshell")
     hl.exec_cmd("kitty")
     -- Chat and the game client, parked on workspace 2 by the rules further
     -- down so they come up behind the terminal instead of over it.
     hl.exec_cmd("discord")
     hl.exec_cmd("steam")
-    hl.exec_cmd("quickshell")
     hl.exec_cmd("hyprpaper")
-    -- Panels off after ten idle minutes; rules in hypridle.conf next door.
-    hl.exec_cmd("hypridle")
+    -- Panels off after fifteen idle minutes and a lock at twenty; rules in
+    -- hypridle.conf next door. Its output goes to a log rather than nowhere:
+    -- when the timeout does not fire, what it says about inhibits is the only
+    -- account of why, and it used to be thrown away.
+    hl.exec_cmd("hypridle > $HOME/.local/state/hypridle.log 2>&1")
     hl.exec_cmd("systemctl --user start hyprpolkitagent")
     hl.exec_cmd("gsettings set org.gnome.desktop.interface color-scheme prefer-dark")
-    -- Take the virtual display back out of the layout once the real panels
-    -- have enumerated. The monitor rule below has to bring DP-1 up enabled --
-    -- a login with every panel switched off has nowhere else to draw -- but
-    -- with panels attached it is just a phantom screen the pointer can wander
-    -- onto. detach only fires when something else is enabled, so the headless
-    -- case keeps it. Delayed for the same reason nvibrant is: at this point
-    -- the outputs are not necessarily up yet.
-    hl.timer(function()
-        hl.exec_cmd("$HOME/.config/quickshell/scripts/virtual-display.sh detach")
-    end, { timeout = 3000, type = "oneshot" })
-
     -- Tailscale's tray icon: tailnet state and a connect/disconnect toggle
     -- without a terminal.
     --
@@ -166,6 +161,13 @@ hl.config({
         kb_model   = "",
         kb_options = "",
         kb_rules   = "",
+        -- Repeticion de tecla: tras repeat_delay ms aguantando, repite
+        -- repeat_rate veces por segundo. Los defaults de Hyprland (600/25)
+        -- se sienten lentos al borrar. Afecta a todas las aplicaciones,
+        -- no solo al terminal: lo fija el compositor y lo reparte por
+        -- wl_keyboard.repeat_info.
+        repeat_delay = 400,
+        repeat_rate  = 40,
         follow_mouse = 1,
         sensitivity = 0,
         touchpad = {
@@ -185,14 +187,15 @@ hl.device({
     sensitivity = -0.5,
 })
 
-hl.bind(mainMod .. " + Q", hl.dsp.exec_cmd(terminal))
-local closeWindowBind = hl.bind(mainMod .. " + C", hl.dsp.window.close())
+hl.bind(mainMod .. " + T", hl.dsp.exec_cmd(terminal))
+local closeWindowBind = hl.bind(mainMod .. " + Q", hl.dsp.window.close())
+hl.bind(mainMod .. " + C", hl.dsp.exec_cmd(browser))
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager))
 hl.bind(mainMod .. " + V", hl.dsp.window.float({ action = "toggle" }))
 -- Handled inside the shell, which registers the name over Hyprland's
 -- global-shortcuts protocol -- see the GlobalShortcut in shell.qml.
--- Locking is in there too so the screen can fade out before veila's lock
--- surface arrives and fade back in once it lets go.
+-- Locking is in there too, because the lock surface is one quickshell draws
+-- itself: LockEngine and LockScreen. Nothing outside the shell to run.
 hl.bind(mainMod .. " + L", hl.dsp.global("quickshell:lock"))
 hl.bind(mainMod .. " + space", hl.dsp.global("quickshell:launcher"))
 hl.bind(mainMod .. " + F", hl.dsp.global("quickshell:keybinds"))
@@ -285,6 +288,21 @@ hl.window_rule({
 -- focused when their window finally maps, and Steam maps a splash first and
 -- its real window second. `silent` places them without dragging focus along,
 -- so a login that starts on workspace 1 stays there.
+-- ── World of Warcraft fullscreen ──────────────────────────────────
+--
+-- The gxWindow "0" CVar in Config.wtf is not enough: under XWayland the
+-- client asks, Hyprland tiles it anyway, and the window lands inset by the
+-- gaps and the bar. Forcing it here wins regardless of what the game asks.
+--
+-- Matched on title as well as class, because everything umu launches shares
+-- the class "steam_app_default" -- on class alone this would also catch
+-- every other Battle.net and Lutris game.
+hl.window_rule({
+    name       = "wow-fullscreen",
+    match      = { class = "^steam_app_default$", title = "^World of Warcraft$" },
+    fullscreen = true,
+})
+
 hl.window_rule({
     name      = "discord-on-2",
     match     = { class = "^discord$" },
@@ -453,6 +471,20 @@ hl.config({
     misc = {
         disable_hyprland_logo = true,
         disable_splash_rendering = true,
+
+        -- If the lock client dies while it is holding the screen, Hyprland
+        -- keeps the session locked and there is no client left to type into:
+        -- the only way back is killing the compositor from a TTY, which takes
+        -- the whole session with it. With this on, a freshly started locker is
+        -- allowed to adopt the orphaned lock instead, so `quickshell` coming
+        -- back up puts a field back on the screen.
+        allow_session_lock_restore = true,
+
+        -- What fills the gap at boot between Hyprland taking the display and
+        -- quickshell drawing the lock over it -- the moment of "monitor sin
+        -- nada". The default is black; this is the shell's own background, so
+        -- the handover reads as one screen rather than two.
+        background_color = "rgb(101014)",
     },
 })
 
@@ -482,52 +514,14 @@ hl.monitor({
     cm = "srgb",
 })
 
--- The virtual display, for streaming with the real panels switched off.
---
--- There is no monitor on this port. DP-1 is force-enabled by the kernel with
--- a canned EDID (video=DP-1:e drm.edid_firmware=..., set in
--- /etc/default/limine), so the GPU has an output from boot whether or not
--- anything physical is powered on. That is the whole point: Hyprland cannot
--- come up with zero enabled outputs, and a monitor that is merely switched
--- off drops off the bus like an unplugged one.
---
--- So it stays enabled, always. Disabling it here and turning it on only to
--- stream would put back exactly the hole it exists to fill.
---
--- The EDID's preferred mode is 3840x2160@60, which is a lot of pixels to
--- render for a screen nobody is looking at. Pinned to 1600x900 instead: the
--- client on the other end is a phone, and 1080p arrives there scaled down to
--- something too small to read. The same EDID carries 1280x720 if that is still
--- too much, and 1920x1080 and 2560x1440 at 120 going the other way.
-hl.monitor({
-    output = "DP-1",
-    disabled = false,
-    -- Exactly as the EDID spells it: a mode string that matches nothing is
-    -- silently dropped and the output falls back to the preferred 4K60. That
-    -- is why 1080p had to be asked for as 119.88 and not 120.00. Below 1080p
-    -- this EDID only carries 60Hz, which costs nothing here -- Sunshine asks
-    -- for 60fps anyway.
-    mode = "1600x900@60.00Hz",
-    -- Right of HDMI-A-1, which is where Hyprland's catch-all rule was putting
-    -- it anyway. Written down so it stops depending on enumeration order.
-    position = "2560x0",
-    scale = 1,
-})
-
--- Which workspace lands on which of the two. Left to itself Hyprland gives
--- workspace 1 to the output it enumerates first -- HDMI-A-1, at 0x0 -- and
--- pushes 2 onto DP-2; that is backwards. Work belongs on the 240Hz DP-2, so
--- 1 is pinned there and 2, where Discord and Steam open, sits on the HDMI
--- panel. `default` is what makes each monitor come up on its own workspace
--- at start rather than only honouring the pin once the workspace is used.
+-- Que workspace cae en cada monitor. Por su cuenta Hyprland le da el 1 al
+-- monitor que enumera primero -- HDMI-A-1, en 0x0 -- y empuja el 2 al DP-2,
+-- que es al reves de lo util: el trabajo va en el DP-2 de 240Hz, y el 2,
+-- donde abren Discord y Steam, en el panel HDMI. `default` hace que cada
+-- monitor arranque ya en su workspace, en vez de respetar el anclaje solo
+-- cuando ese workspace se usa por primera vez.
 hl.workspace_rule({ workspace = "1", monitor = "DP-2",     default = true })
 hl.workspace_rule({ workspace = "2", monitor = "HDMI-A-1", default = true })
-
--- 3 is the remote desktop, and only that. Hyprland was already landing it on
--- DP-1 by enumeration order; pinning it means the windows left on it stay
--- together when DP-1 comes and goes with a stream, instead of being scattered
--- onto whichever panel is up at the time.
-hl.workspace_rule({ workspace = "3", monitor = "DP-1", default = true })
 
 -- ── Shell fit-up ─────────────────────────────────────────────────────────
 --
@@ -565,6 +559,24 @@ hl.config({
 -- that would quietly stop matching. And the per-field spellings
 -- (opacity_override, opacity_inactive) are not keys this schema knows: they
 -- land in `hyprctl configerrors` instead of stopping the reload.
+-- ── NIKKE: a game is not a decoration either ─────────────────────────────
+--
+-- Same reasoning as Zen below, with one difference: both states are
+-- overridden here. Zen deliberately leaves the inactive value as a factor so
+-- it tracks the global, but a game showing the wallpaper through it while
+-- unfocused is just as wrong as while focused -- and it is watched unfocused
+-- often, in the background of something else.
+--
+-- Matched on the Steam appid class, which is specific to this game. The
+-- generic "steam_app_default" that umu hands out would catch every other
+-- Lutris and Battle.net title too.
+hl.window_rule({
+    name = "nikke-opaque",
+    match = { class = "^steam_app_3741011882$" },
+    -- active, then inactive. Single spaces: the parser rejects anything else.
+    opacity = "1.0 override 1.0 override",
+})
+
 hl.window_rule({
     name = "zen-opaque",
     match = { class = "^zen$" },

@@ -76,7 +76,7 @@ PanelWindow {
         return "󰤟"
     }
 
-    readonly property int compactWidth: compactRow.implicitWidth + 48
+    readonly property int compactWidth: compactRow.implicitWidth + 24 + Theme.pillPaddingH * 2
 
     implicitWidth: expandedPanel !== "" ? 324 : compactWidth
 

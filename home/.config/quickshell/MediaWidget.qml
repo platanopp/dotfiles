@@ -138,7 +138,7 @@ PanelWindow {
         return "󰑗"
     }
 
-    implicitWidth: panelOpen ? 396 : mediaWidgetRow.implicitWidth + 44
+    implicitWidth: panelOpen ? 396 : mediaWidgetRow.implicitWidth + 24 + Theme.pillPaddingH * 2
     implicitHeight: panelOpen ? Math.min(mediaContentColumn.implicitHeight + 60, 640) : 64
 
     Behavior on implicitWidth {

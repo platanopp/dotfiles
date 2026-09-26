@@ -17,6 +17,10 @@ Singleton {
     property real volumePercent: 50
     property var wallpaperFiles: []
     property string selectedWallpaper: ""
+    // The crop hyprpaper is showing for selectedWallpaper -- the picture at
+    // the framing the user chose, cut to the screen's shape. Empty until the
+    // first answer arrives. See wallpaperStill.
+    property string renderedWallpaper: ""
     // Kept as aliases onto Theme so existing bindings recolor with the
     // wallpaper; new code should read Theme directly.
     readonly property string themeAccent: Theme.accent
@@ -134,14 +138,22 @@ Singleton {
         Quickshell.env("HOME") + "/.config/quickshell/scripts/wallpaper_crop.py"
 
     function setWallpaper(path) {
+        root.stopVideoWallpaper()
         root.selectedWallpaper = path
+        // The old crop belongs to the old picture; until the new one is
+        // rendered, the original is the closer answer.
+        root.renderedWallpaper = ""
         // No focus given: keep whatever framing this wallpaper already has.
         wallpaperCropProc.command = ["python3", root.wallpaperCropScript, "apply", path]
         wallpaperCropProc.running = true
     }
 
     function setWallpaperFraming(path, focusX, focusY) {
+        root.stopVideoWallpaper()
         root.selectedWallpaper = path
+        // The old crop belongs to the old picture; until the new one is
+        // rendered, the original is the closer answer.
+        root.renderedWallpaper = ""
         wallpaperCropProc.command = ["python3", root.wallpaperCropScript, "apply", path,
                                      String(focusX), String(focusY)]
         wallpaperCropProc.running = true
@@ -571,6 +583,21 @@ Singleton {
         }
     }
 
+    // The crop in use, for the lock screen, read at startup the same way the
+    // wallpaper itself is: nothing re-renders it just because the shell came
+    // back up.
+    Process {
+        id: renderedWallpaperProc
+        running: true
+        command: ["python3", Quickshell.env("HOME") + "/.config/quickshell/scripts/wallpaper_crop.py", "rendered"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var path = text.trim()
+                if (path.length > 0) root.renderedWallpaper = path
+            }
+        }
+    }
+
     Process {
         id: wallpaperListProc
         // Read at startup, not only when something asks. The picker centres
@@ -591,8 +618,159 @@ Singleton {
                         && files.join("\n") === root.wallpaperFiles.join("\n"))
                     return
                 root.wallpaperFiles = files
+                root.buildWallpaperThumbs()
             }
         }
+    }
+
+    // ── Wallpaper thumbnails ─────────────────────────────────────────────
+    //
+    // The carousel keeps a dozen panels alive and each was decoding its own
+    // full-size original; the 8K PNG in that folder costs ~380ms by itself,
+    // and the whole folder is two seconds. Qt's sourceSize caps the output,
+    // not the work, so the panels sat on their placeholder long enough to
+    // read as a black gap.
+    //
+    // Cached JPEGs at carousel height decode 34x faster (2107ms -> 62ms for
+    // the folder). Rebuilt whenever the file list changes; the script keys on
+    // mtime and size, so it only does work for what actually changed.
+    property var wallpaperThumbs: ({})
+
+    function buildWallpaperThumbs() {
+        wallpaperThumbsProc.running = true
+    }
+
+    // Falls back to the original: a file the script could not read still
+    // shows, just slowly, rather than leaving a hole in the carousel.
+    function wallpaperThumb(path) {
+        return root.wallpaperThumbs[path] || path
+    }
+
+    Process {
+        id: wallpaperThumbsProc
+        running: false
+        // nice + ionice: the pass costs a few seconds of CPU and a burst of
+        // reads the first time it sees a folder, and it runs at shell startup
+        // when everything else is also competing. Nothing waits on it -- the
+        // carousel falls back to originals until the map arrives -- so it can
+        // afford to go last.
+        command: ["nice", "-n", "19", "ionice", "-c", "3", "python3",
+                  Quickshell.env("HOME") + "/.config/quickshell/scripts/wallpaper_thumbs.py",
+                  "build"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    root.wallpaperThumbs = JSON.parse(text)
+                } catch (e) {
+                    root.wallpaperThumbs = ({})
+                }
+            }
+        }
+    }
+
+    // ── Video wallpapers ─────────────────────────────────────────────────
+    //
+    // Played by mpvpaper, on the layer above hyprpaper's; the image wallpaper
+    // stays set underneath and is what shows again when the video stops. See
+    // scripts/video_wallpaper.py, which owns the process and remembers which
+    // video is up across sessions.
+    readonly property string videoWallpaperScript:
+        Quickshell.env("HOME") + "/.config/quickshell/scripts/video_wallpaper.py"
+
+    // Paths, in the order the picker shows them.
+    property var videoWallpaperFiles: []
+    // path -> { thumb, poster }: a still at carousel height for the picker,
+    // and one at full size for the lock screen.
+    property var videoWallpaperFrames: ({})
+    // The video playing as the wallpaper, or "" when it is an image.
+    property string activeVideoWallpaper: ""
+
+    function refreshVideoWallpapers() {
+        if (!videoListProc.running) videoListProc.running = true
+    }
+
+    function videoWallpaperThumb(path) {
+        var f = root.videoWallpaperFrames[path]
+        return f && f.thumb ? f.thumb : ""
+    }
+
+    function setVideoWallpaper(path) {
+        root.activeVideoWallpaper = path
+        videoControlProc.command = ["python3", root.videoWallpaperScript, "apply", path]
+        videoControlProc.running = true
+    }
+
+    function stopVideoWallpaper() {
+        if (root.activeVideoWallpaper === "") return
+        root.activeVideoWallpaper = ""
+        videoControlProc.command = ["python3", root.videoWallpaperScript, "stop"]
+        videoControlProc.running = true
+    }
+
+    // A still of whatever the wallpaper is, for things that draw it behind
+    // themselves -- the lock screen, mostly. With a video up that is its
+    // poster frame: a lock surface has no business playing a video behind a
+    // password field, and the image underneath would be the wrong picture.
+    //
+    // For an image it is the rendered crop, not the user's own file. The
+    // lock covers its screen, so handed the original it cropped it again at
+    // the centre -- and a wallpaper framed off-centre in the picker showed a
+    // different part of itself on the lock than on the desktop.
+    readonly property string wallpaperStill: {
+        if (root.activeVideoWallpaper !== "") {
+            var f = root.videoWallpaperFrames[root.activeVideoWallpaper]
+            if (f && f.poster) return f.poster
+        }
+        return root.renderedWallpaper !== "" ? root.renderedWallpaper
+                                             : root.selectedWallpaper
+    }
+
+    Process {
+        id: videoListProc
+        // At startup as well as on open, for the same reason as the image
+        // list: the picker centres on what is in use, and it needs the list
+        // and the current video to do that. It is also where the remembered
+        // video comes back from, so the ring is right after a restart.
+        running: true
+        command: ["nice", "-n", "19", "python3",
+                  Quickshell.env("HOME") + "/.config/quickshell/scripts/video_wallpaper.py", "list"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var data
+                try {
+                    data = JSON.parse(text)
+                } catch (e) {
+                    return
+                }
+                var files = [], frames = {}
+                for (var i = 0; i < data.videos.length; i++) {
+                    var v = data.videos[i]
+                    files.push(v.path)
+                    frames[v.path] = { thumb: v.thumb, poster: v.poster }
+                }
+                root.videoWallpaperFrames = frames
+                // Same reason as the image list: an equal list assigned again
+                // is still a new array, and it would reset the carousel.
+                if (files.join("\n") !== root.videoWallpaperFiles.join("\n"))
+                    root.videoWallpaperFiles = files
+                root.activeVideoWallpaper = data.current || ""
+            }
+        }
+    }
+
+    // Brings the remembered video back when a session starts. Safe to run on
+    // every shell reload: the script leaves a video that is already playing
+    // alone instead of restarting it from the top.
+    Process {
+        id: videoRestoreProc
+        running: true
+        command: ["python3", Quickshell.env("HOME") + "/.config/quickshell/scripts/video_wallpaper.py",
+                  "restore"]
+    }
+
+    Process {
+        id: videoControlProc
+        running: false
     }
 
     Process {
@@ -628,6 +806,7 @@ Singleton {
                     rendered = ""
                 }
                 if (rendered.length === 0) return
+                root.renderedWallpaper = rendered
                 wallpaperSetProc.command = ["bash", "-lc", "P=\"$1\"; hyprctl hyprpaper preload \"$P\" >/dev/null 2>&1; hyprctl hyprpaper wallpaper \",$P,cover\"; printf 'splash = false\\nwallpaper {\\n    monitor =\\n    path = %s\\n    fit_mode = cover\\n}\\n' \"$P\" > \"$HOME/.config/hypr/hyprpaper.conf\"", "_", rendered]
                 wallpaperSetProc.running = true
             }
@@ -941,6 +1120,7 @@ Singleton {
         // Cheap, and it means a file dropped into the folder while the shell
         // was running is there the first time the picker is opened.
         root.refreshWallpaperList()
+        root.refreshVideoWallpapers()
     }
 
     function toggleWallpapers() {
@@ -1049,6 +1229,281 @@ Singleton {
                   "toggle"]
     }
 
+
+
+    // ── Display settings ─────────────────────────────────────────────────
+    //
+    // Everything the Settings window's Displays and Colour pages show comes
+    // from one script, because the three things it drives speak three
+    // different languages: hyprctl for modes and layout, nvibrant for
+    // saturation, hyprsunset for the colour matrix. Each command returns the
+    // whole snapshot, so the UI never has to ask twice.
+    property var displayState: ({
+        monitors: [], vibrance: ({}),
+        colour: ({ temperature: 6000, brightness: 100, gamma: 1.0 }),
+        colour_active: false, vrr: 0
+    })
+
+    readonly property string displayScript:
+        Quickshell.env("HOME") + "/.config/quickshell/scripts/display_control.py"
+
+    // Queued, because there is one process and a command given while it is
+    // still busy used to be dropped without a word: setting `running` on a
+    // Process that is already running does nothing. Picking a resolution and
+    // then a scale straight after lost the scale.
+    property var displayQueue: []
+
+    function displayCmd(args) {
+        root.displayQueue = root.displayQueue.concat([args])
+        root.displayNext()
+    }
+
+    function displayNext() {
+        if (displayProc.running || root.displayQueue.length === 0) return
+        var next = root.displayQueue[0]
+        root.displayQueue = root.displayQueue.slice(1)
+        displayProc.command = ["python3", root.displayScript].concat(next)
+        displayProc.running = true
+    }
+
+    function refreshDisplay()                  { displayCmd(["list"]) }
+
+    // Focus the monitor the pointer is on. Used before spawning anything from
+    // the launcher: follow_mouse cannot do it while a layer surface holds the
+    // keyboard, so the first window would land on the previously focused
+    // screen. Fire-and-forget, on its own process so it never blocks the UI.
+    function focusCursorMonitor() {
+        focusCursorProc.command = ["python3", root.displayScript, "focus-cursor-monitor"]
+        focusCursorProc.running = true
+    }
+
+    Process {
+        id: focusCursorProc
+        running: false
+    }
+    function setDisplayMode(out, mode)         { displayCmd(["set-mode", out, mode]) }
+    function setDisplayScale(out, s)           { displayCmd(["set-scale", out, String(s)]) }
+    function setDisplayVrr(v)                  { displayCmd(["set-vrr", String(v)]) }
+    function setDisplayVibrance(out, v)        { displayCmd(["set-vibrance", out, String(Math.round(v))]) }
+    function setDisplayTemperature(k)          { displayCmd(["set-temperature", String(Math.round(k))]) }
+    function setDisplayBrightness(b)           { displayCmd(["set-brightness", String(Math.round(b))]) }
+    // An exponent, not a percentage: must not be rounded to an integer.
+    function setDisplayGamma(g)                { displayCmd(["set-gamma", g.toFixed(3)]) }
+    function setDisplayPosition(out, x, y) {
+        displayCmd(["set-position", out, String(Math.round(x)), String(Math.round(y))])
+    }
+
+    // ── Keep or revert ───────────────────────────────────────────────────
+    //
+    // A resolution or scale the screen cannot show leaves it black, and then
+    // there is no way to reach the control that would undo it. So those two
+    // are applied on approval: the new setting goes on at once, and unless it
+    // is kept within fifteen seconds the old one comes back -- the same
+    // safety every desktop's display settings have.
+    //
+    // Lives here rather than in the Settings page so the countdown survives
+    // the page, or the whole window, being closed with the question open.
+    property var displayRevert: null      // { name, mode, scale }
+    property int displayRevertLeft: 0
+
+    function monitorByName(name) {
+        var ms = root.displayState.monitors || []
+        for (var i = 0; i < ms.length; i++)
+            if (ms[i].name === name) return ms[i]
+        return null
+    }
+
+    function remembrance(m) {
+        return { name: m.name, mode: m.width + "x" + m.height + "@" + m.refresh, scale: m.scale }
+    }
+
+    function proposeDisplayMode(name, mode) {
+        var m = root.monitorByName(name)
+        if (!m) return
+        // Only the first change of a run is remembered: reverting should go
+        // back to what worked, not to the previous experiment.
+        if (!root.displayRevert || root.displayRevert.name !== name)
+            root.displayRevert = root.remembrance(m)
+        root.setDisplayMode(name, mode)
+        root.displayRevertLeft = 15
+        displayRevertTimer.restart()
+    }
+
+    function proposeDisplayScale(name, scale) {
+        var m = root.monitorByName(name)
+        if (!m) return
+        if (!root.displayRevert || root.displayRevert.name !== name)
+            root.displayRevert = root.remembrance(m)
+        root.setDisplayScale(name, scale)
+        root.displayRevertLeft = 15
+        displayRevertTimer.restart()
+    }
+
+    function keepDisplayChanges() {
+        displayRevertTimer.stop()
+        root.displayRevert = null
+        root.displayRevertLeft = 0
+    }
+
+    function revertDisplayChanges() {
+        displayRevertTimer.stop()
+        var r = root.displayRevert
+        root.displayRevert = null
+        root.displayRevertLeft = 0
+        if (!r) return
+        root.setDisplayMode(r.name, r.mode)
+        root.setDisplayScale(r.name, r.scale)
+    }
+
+    Timer {
+        id: displayRevertTimer
+        interval: 1000
+        repeat: true
+        onTriggered: {
+            root.displayRevertLeft -= 1
+            if (root.displayRevertLeft <= 0) root.revertDisplayChanges()
+        }
+    }
+
+    function parseDisplay(text) {
+        try {
+            root.displayState = JSON.parse(text)
+        } catch (e) {
+            // A failed command still leaves the last good snapshot on screen,
+            // which beats blanking the panel on one bad parse.
+        }
+    }
+
+    Process {
+        id: displayProc
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: root.parseDisplay(text)
+        }
+        onExited: root.displayNext()
+    }
+
+    // ── Idle and lock timing ─────────────────────────────────────────────
+    //
+    // For the Settings window's Power & idle page. The numbers live in
+    // hypridle.conf and idle-screens.sh, where they always did; the script
+    // only reads and rewrites them.
+    property var idleSettings: ({ screensOff: 900, lock: 1200, xiaomiMode: "ddc-off" })
+
+    readonly property string idleScript:
+        Quickshell.env("HOME") + "/.config/quickshell/scripts/idle_settings.py"
+
+    property var idleQueue: []
+
+    function idleCmd(args) {
+        root.idleQueue = root.idleQueue.concat([args])
+        root.idleNext()
+    }
+
+    function idleNext() {
+        if (idleProc.running || root.idleQueue.length === 0) return
+        var next = root.idleQueue[0]
+        root.idleQueue = root.idleQueue.slice(1)
+        idleProc.command = ["python3", root.idleScript].concat(next)
+        idleProc.running = true
+    }
+
+    function refreshIdle() { root.idleCmd(["get"]) }
+
+    // The lock is set as a delay after the screens go off, but hypridle times
+    // every listener from the last input -- so it is stored as their sum, and
+    // moving the screens-off time carries the lock along with it.
+    function setScreensOff(seconds) {
+        var delay = Math.max(0, root.idleSettings.lock - root.idleSettings.screensOff)
+        root.idleCmd(["set-screens-off", String(seconds)])
+        root.idleCmd(["set-lock", String(seconds + delay)])
+    }
+
+    function setLockDelay(seconds) {
+        root.idleCmd(["set-lock", String(root.idleSettings.screensOff + seconds)])
+    }
+
+    function setXiaomiMode(mode) { root.idleCmd(["set-xiaomi-mode", mode]) }
+
+    Process {
+        id: idleProc
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    root.idleSettings = JSON.parse(text)
+                } catch (e) {
+                }
+            }
+        }
+        onExited: root.idleNext()
+    }
+
+    // ── Power profile ────────────────────────────────────────────────────
+    //
+    // power-profiles-daemon is the counterpart of Windows' power plans, but it
+    // comes up on "balanced" every boot. The script next door remembers the
+    // choice and re-applies it; this side only reads and asks.
+    //
+    // The active profile is read back from the daemon rather than assumed to
+    // be whatever the bar last asked for: powerprofilesctl is also used from a
+    // terminal, and the daemon can degrade the profile on its own.
+    property string powerProfile: ""
+    property string powerProfileLabel: ""
+    property string powerProfileIcon: "\uf0fc5"
+    property var powerProfiles: []
+
+    readonly property string powerProfileScript:
+        Quickshell.env("HOME") + "/.config/quickshell/scripts/power_profile.py"
+
+    function refreshPowerProfiles() {
+        powerProfilesProc.command = ["python3", root.powerProfileScript, "list"]
+        powerProfilesProc.running = true
+    }
+
+    function setPowerProfile(name) {
+        if (name === root.powerProfile) return
+        powerProfilesProc.command = ["python3", root.powerProfileScript, "set", name]
+        powerProfilesProc.running = true
+    }
+
+    // On shell start: re-apply the last choice and pick the state up in one
+    // pass, since "restore" returns the listing too.
+    function restorePowerProfile() {
+        powerProfilesProc.command = ["python3", root.powerProfileScript, "restore"]
+        powerProfilesProc.running = true
+    }
+
+    function parsePowerProfiles(text) {
+        try {
+            var d = JSON.parse(text)
+            root.powerProfile = d.active || ""
+            root.powerProfileLabel = d.label || d.active || ""
+            root.powerProfileIcon = d.icon || "\uf0fc5"
+            root.powerProfiles = d.profiles || []
+        } catch (e) {
+            root.powerProfiles = []
+        }
+    }
+
+    Process {
+        id: powerProfilesProc
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: root.parsePowerProfiles(text)
+        }
+    }
+
+    // Once, on shell start. Delayed because the daemon may not be on the bus
+    // yet when quickshell comes up with the session, and a set against an
+    // absent bus fails silently.
+    Timer {
+        running: true
+        interval: 1500
+        repeat: false
+        onTriggered: root.restorePowerProfile()
+    }
+
     FileView {
         id: gamepadStateFile
         path: root.gamepadStatePath
@@ -1063,111 +1518,73 @@ Singleton {
         onLoadFailed: root.gamepadMode = "stopped"
     }
 
-    // ── Lock transition ──────────────────────────────────────────────────
+    // ── Lock ─────────────────────────────────────────────────────────────
     //
-    // Phases, in order: "" idle, "closing" while the screen fades to black
-    // with the lock request in flight, "locked" while veila holds the screen,
-    // "opening" while the fade comes back off. LockOverlay draws all of it.
+    // The lock is a surface this shell draws itself now -- see LockEngine and
+    // LockScreen -- so there is nothing left to fade around it.
     //
-    // Everything that locks comes through here rather than running `veila
-    // lock` for itself -- the Hyprland bind, the control panel's button, its
-    // suspend -- because the fade has to be finished before veila is asked,
-    // and a caller that shells out directly gets the hard cut back.
-    property string lockPhase: ""
-
-    // Set when the lock is on the way to a suspend, so the machine only goes
-    // down once the screen is actually covered. The old bind slept 0.3s and
-    // hoped; this waits for veila to say it is up.
-    property bool suspendAfterLock: false
-
+    // What used to be here was a curtain and a script. veila's lock came up
+    // through ext-session-lock, which the compositor swaps in whole and draws
+    // above every layer quickshell can reach: there was no frame with both the
+    // desktop and the lock on screen, so the change was a hard cut in both
+    // directions and veila had no setting that softened it. LockOverlay covered
+    // the cut with a black window, and scripts/lock_session.sh watched logind's
+    // LockedHint to find the two edges of a lock it could not see. A surface
+    // this shell owns animates itself, and reports its own edges, so the
+    // curtain, the script, the phase machine and their three timers all went.
+    //
+    // Everything that locks still comes through here rather than calling
+    // LockEngine straight: the Hyprland bind, the control panel's button and
+    // its suspend all want one entry point.
     function lockSession() {
-        if (root.lockPhase !== "") return
-        root.lockPhase = "closing"
-        lockRequestDelay.restart()
-        lockWatchdog.restart()
+        LockEngine.lock()
     }
 
+    // Screens under a black cover instead of powered off -- see BlankOverlay.
+    // Written by the `screens` ipc target in shell.qml.
+    property var blankedScreens: []
+
+    // Set while a lock is on its way to a suspend, so the machine only goes
+    // down once the screen is actually covered -- otherwise a moment of the
+    // desktop is the last thing on the panels, and on the way back up the lock
+    // arrives late over a session that is already visible.
+    property bool suspendAfterLock: false
+
     function suspendSession() {
-        // Already covered: nothing left to fade, so go straight down.
-        if (root.lockPhase === "locked") {
+        // Already covered: nothing to wait for.
+        if (LockEngine.secured) {
             suspendProc.running = true
             return
         }
-        // Mid-transition in either direction: dropped rather than queued
-        // behind it. lockSession() would no-op and leave the flag set, and a
-        // flag left set suspends the machine the next time anything locks.
-        if (root.lockPhase !== "") return
         root.suspendAfterLock = true
-        root.lockSession()
+        LockEngine.lock()
     }
 
-    // Every way out of the transition, including the ones that are not an
-    // orderly unlock. A lock that never came up must not leave the screen
-    // black, so this is reachable from more than one direction on purpose and
-    // is safe to call twice.
-    function endLockTransition() {
-        if (root.lockPhase === "" || root.lockPhase === "opening") return
-        lockWatchdog.stop()
-        root.suspendAfterLock = false
-        root.lockPhase = "opening"
-        lockSettle.restart()
-    }
+    // `secured` and not `locked`: the second is only the request this shell
+    // made, while the first is the compositor answering that the surface is
+    // really in front of the session. Suspending on the request would race the
+    // frame the lock is drawn on.
+    Connections {
+        target: LockEngine
 
-    // veila is asked only once the curtain is opaque. Asking first lands its
-    // surface over a half-faded screen, which is the cut being removed.
-    Timer {
-        id: lockRequestDelay
-        interval: Theme.durLong
-        onTriggered: lockProc.running = true
-    }
-
-    // The fade out has no natural end -- the script exited before it started
-    // -- so idle is restored on a timer matched to it, slightly long so input
-    // comes back after the last frame rather than during it.
-    Timer {
-        id: lockSettle
-        interval: Theme.durExtraLong + 60
-        onTriggered: root.lockPhase = ""
-    }
-
-    // `veila lock --wait-ready` blocks until the lock is up, and a daemon
-    // that never gets there would otherwise hold a black screen with no lock
-    // behind it.
-    Timer {
-        id: lockWatchdog
-        interval: 8000
-        onTriggered: root.endLockTransition()
-    }
-
-    Process {
-        id: lockProc
-        running: false
-        command: ["bash", Quickshell.env("HOME") + "/.config/quickshell/scripts/lock_session.sh"]
-
-        stdout: SplitParser {
-            onRead: function(line) {
-                if (line === "locked") {
-                    lockWatchdog.stop()
-                    root.lockPhase = "locked"
-                    if (root.suspendAfterLock) {
-                        root.suspendAfterLock = false
-                        suspendProc.running = true
-                    }
-                } else if (line === "unlocked" || line === "failed") {
-                    root.endLockTransition()
-                }
-            }
+        function onSecuredChanged() {
+            if (!LockEngine.secured) return
+            if (!root.suspendAfterLock) return
+            root.suspendAfterLock = false
+            suspendProc.running = true
         }
 
-        // The script exits with the cycle, so this catches a cycle that ended
-        // without saying so: killed, or never started at all.
-        onExited: root.endLockTransition()
+        // A lock that let go without ever suspending must not leave the flag
+        // set -- it would put the machine down the next time anything locked.
+        function onLockedChanged() {
+            if (!LockEngine.locked) root.suspendAfterLock = false
+        }
     }
 
     Process {
         id: suspendProc
         running: false
-        command: ["bash", "-lc", "systemctl suspend"]
+        command: ["systemctl", "suspend"]
     }
 
     function refreshHyprBinds() {

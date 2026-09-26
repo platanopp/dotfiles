@@ -2,6 +2,7 @@ import Quickshell
 import Quickshell.Wayland
 import Quickshell.Hyprland
 import Quickshell.Io
+import Quickshell.Widgets
 import QtQuick
 import QtQuick.Effects
 import QtQuick.Layouts
@@ -36,6 +37,13 @@ PanelWindow {
 
     WlrLayershell.namespace: "quickshell:bar-blur"
     WlrLayershell.layer: WlrLayer.Overlay
+    // Never the keyboard, Settings included. Asking for it while the panel is
+    // open -- so Escape could step back from Settings -- ends the Hyprland
+    // focus grab below, and the panel shut the instant Settings was opened.
+    // Holding it all the time would work, but then every click on the bar
+    // button would take the keyboard away from the window being typed in.
+    // Back, the close button and a click outside do the job instead.
+    WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
     exclusionMode: ExclusionMode.Ignore
 
     anchors {
@@ -52,6 +60,46 @@ PanelWindow {
 
     property bool panelOpen: false
 
+    // ── Settings ─────────────────────────────────────────────────────────
+    //
+    // The panel grows into the Settings window instead of opening a second
+    // one: the same glass widens and drops from the corner it already hangs
+    // from, and the contents cross over. Back returns to the panel; closing
+    // the panel closes both.
+    property bool settingsOpen: false
+    property string settingsPage: "displays"
+
+    onPanelOpenChanged: if (!panelOpen) settingsOpen = false
+    onSettingsOpenChanged: {
+        if (!settingsOpen) return
+        AppState.refreshDisplay()
+        AppState.refreshIdle()
+        AppState.refreshPowerProfiles()
+    }
+
+    // Wide enough for a list of pages and a page, never so wide that it
+    // reaches the clock: the clock sits in the middle of the bar and is drawn
+    // above this window, so on the 1920px Samsung the width stops short of
+    // the centre. On the 2560px Xiaomi it gets the full thousand.
+    readonly property int settingsWidth: Math.min(1000, Math.round(settingsItem.screen.width / 2 - 170))
+    readonly property int settingsHeight: Math.min(720, settingsItem.screen.height - 110)
+
+    // What the pills to the left park off (see pillLeftOf in shell.qml). With
+    // Settings open it stays at the panel's width, so the tray and the status
+    // pill hold still under the Settings window instead of being shoved along
+    // into the clock.
+    readonly property real rowWidth: settingsItem.settingsOpen ? 372 : settingsItem.width
+
+    // Small uppercase heading over a group of controls, in place of the rules
+    // and full-size titles that used to split the panel into strips.
+    component SectionLabel: Text {
+        color: Theme.textMuted
+        font.pixelSize: 10
+        font.letterSpacing: 1.2
+        font.capitalization: Font.AllUppercase
+        font.family: Theme.fontMono
+    }
+
     function runPowerAction(action) {
         settingsItem.panelOpen = false
         // Both go through AppState so the button gets the same fade the
@@ -62,7 +110,9 @@ PanelWindow {
         else if (action === "shutdown") shutdownProc.running = true
     }
 
-    implicitWidth: panelOpen ? 372 : settingsText.implicitWidth + 64
+    implicitWidth: settingsOpen ? settingsWidth
+                 : panelOpen ? 372
+                 : settingsText.implicitWidth + 24 + Theme.pillPaddingH * 2
 
     // Content-driven rather than a fixed 664; chrome is the 12px inset plus
     // the flickable's 16px margins.
@@ -77,9 +127,9 @@ PanelWindow {
     // bottom, so it stops short of the screen instead of running into it. The
     // flickable underneath stays: it is the fallback for content that outgrows
     // even the screen, which an expanded list on a short display still can.
-    implicitHeight: panelOpen
-        ? Math.min(panelColumn.implicitHeight + 56,
-                   settingsItem.screen.height - 48)
+    implicitHeight: settingsOpen ? settingsHeight
+        : panelOpen ? Math.min(panelColumn.implicitHeight + 56,
+                               settingsItem.screen.height - 48)
         : 64
 
     Behavior on implicitWidth {
@@ -95,11 +145,15 @@ PanelWindow {
         visible: !bar.barHidden
         anchors.fill: parent
         anchors.margins: 12
+        // The Settings view is laid out at its full size from the first frame
+        // and uncovered as the glass grows -- clipped here so the part not yet
+        // uncovered does not draw past the glass's edge.
+        clip: settingsItem.settingsOpen || settingsLoader.visible
 
     Rectangle {
         id: panelGlass
         anchors.fill: parent
-        radius: settingsItem.panelOpen ? 26 : 20
+        radius: settingsItem.settingsOpen ? 28 : settingsItem.panelOpen ? 26 : 20
         color: Theme.glass
         visible: false
         layer.enabled: true
@@ -125,7 +179,11 @@ PanelWindow {
         anchors.centerIn: parent
         visible: !settingsItem.panelOpen
         opacity: !settingsItem.panelOpen ? 1 : 0
-        text: "󰢻"
+        // The CachyOS logo rather than a gear: the panel is the way into the
+        // whole machine, not a settings page. Nerd Font's linux-cachyos glyph,
+        // so it is sized and coloured by IconGlyph like every other icon on
+        // the bar.
+        text: "\u{F385}"
         color: Theme.textPrimary
         size: Theme.iconLarge
 
@@ -149,600 +207,651 @@ PanelWindow {
         onCleared: settingsItem.panelOpen = false
     }
 
-                                    // Collapsed, this used to keep drawing: the
-                                    // panel shrinks to the 64px button, and the
-                                    // Wi-Fi tile -- a light accent fill -- stayed
-                                    // clipped to a sliver at the centre, reading
-                                    // as a white line struck through the gear.
-                                    Flickable {
-                                        visible: settingsItem.panelOpen
-                                        opacity: settingsItem.panelOpen ? 1 : 0
-                                        anchors.fill: parent
-                                        anchors.margins: 16
-                                        contentHeight: panelColumn.height
-                                        clip: true
-                                        boundsBehavior: Flickable.StopAtBounds
-
-                                        Behavior on opacity {
-                                            NumberAnimation { duration: 200 }
-                                        }
-
-                                        Column {
-                                            id: panelColumn
-                                            width: parent.width
-                                            spacing: 14
-
-                                            Text {
-                                                text: "Control panel"
-                                                color: Theme.textPrimary
-                                                font.pixelSize: 16
-                                                font.bold: true
-                                                font.family: Theme.fontMono
-                                            }
-
-                                            GridLayout {
-                                                width: parent.width
-                                                columns: 2
-                                                columnSpacing: 8
-                                                rowSpacing: 8
-
-                                                ToggleTile {
-                                                    Layout.fillWidth: true
-                                                    icon: "󰤨"
-                                                    label: "Wi-Fi"
-                                                    active: AppState.wifiRadioEnabled
-                                                    detail: !AppState.wifiRadioEnabled ? "Off"
-                                                          : AppState.wifiSsid.length > 0 ? AppState.wifiSsid
-                                                          : "Not connected"
-                                                    onTapped: AppState.toggleWifiRadio()
-                                                }
-
-                                                ToggleTile {
-                                                    Layout.fillWidth: true
-                                                    icon: "󰂯"
-                                                    label: "Bluetooth"
-                                                    active: AppState.btEnabled
-                                                    detail: !AppState.btEnabled ? "Off"
-                                                          : AppState.btConnectedCount === 0 ? "No devices"
-                                                          : AppState.btConnectedCount === 1 ? "1 connected"
-                                                          : AppState.btConnectedCount + " connected"
-                                                    onTapped: AppState.toggleBluetoothPower()
-                                                }
-
-                                                ToggleTile {
-                                                    Layout.fillWidth: true
-                                                    icon: AppState.micMuted ? "󰍭" : "󰍬"
-                                                    label: "Microphone"
-                                                    active: !AppState.micMuted
-                                                    detail: AppState.micMuted ? "Muted" : "Live"
-                                                    onTapped: AppState.toggleMicMute()
-                                                }
-
-                                                ToggleTile {
-                                                    Layout.fillWidth: true
-                                                    icon: "󰂛"
-                                                    label: "Do not disturb"
-                                                    active: AppState.dndEnabled
-                                                    detail: AppState.dndEnabled ? "Silenced" : "Showing"
-                                                    onTapped: AppState.toggleDnd()
-                                                }
-
-                                                // Full width on its own row: it
-                                                // is the fifth of four paired
-                                                // tiles, and a half-width one
-                                                // beside a gap reads as a tile
-                                                // that failed to load.
-                                                ToggleTile {
-                                                    Layout.fillWidth: true
-                                                    icon: AppState.gamepadConnected ? "󰊴" : "󰺵"
-                                                    label: "Controller"
-                                                    active: AppState.gamepadModeActive
-                                                    detail: AppState.gamepadMode === "stopped" ? "Service off"
-                                                          : !AppState.gamepadConnected ? "Not connected"
-                                                          : AppState.gamepadModeActive ? "Driving the desktop"
-                                                          : "Gamepad only"
-                                                    onTapped: AppState.toggleGamepadMode()
-                                                }
-
-                                                ToggleTile {
-                                                    Layout.fillWidth: true
-                                                    icon: "󰷋"
-                                                    label: "Tablet"
-                                                    active: AppState.otdRunning
-                                                    // Apagarlo deja el lapiz sin
-                                                    // funcionar: la regla de udev
-                                                    // hace que el compositor ignore
-                                                    // el dispositivo del kernel, asi
-                                                    // que no hay modo de respaldo.
-                                                    detail: AppState.otdRunning ? "Driver on"
-                                                                                : "No pen"
-                                                    onTapped: AppState.toggleOtd()
-                                                }
-                                            }
-
-                                            Rectangle {
-                                                width: parent.width
-                                                height: 1
-                                                color: Theme.outline
-                                            }
-
-                                            Column {
-                                                width: parent.width
-                                                spacing: 6
-
-                                                Text {
-                                                    text: "Wallpaper"
-                                                    color: Theme.textPrimary
-                                                    font.pixelSize: 13
-                                                    font.family: Theme.fontMono
-                                                }
-
-                                                Text {
-                                                    visible: AppState.wallpaperFiles.length === 0
-                                                    text: "No images in ~/Pictures/Wallpapers"
-                                                    color: Theme.textMuted
-                                                    font.pixelSize: 11
-                                                    font.family: Theme.fontMono
-                                                }
-
-                                                // Opens the picker instead of being one: the strip
-                                                // that used to sit here drew every wallpaper at
-                                                // 56x40, too small to tell two photos apart.
-                                                Rectangle {
-                                                    visible: AppState.wallpaperFiles.length > 0
-                                                    width: parent.width
-                                                    height: 56
-                                                    radius: 12
-                                                    color: Theme.surfaceContainer
-
-                                                    RowLayout {
-                                                        anchors.fill: parent
-                                                        anchors.leftMargin: 8
-                                                        anchors.rightMargin: 12
-                                                        spacing: 10
-
-                                                        Item {
-                                                            Layout.preferredWidth: 64
-                                                            Layout.preferredHeight: 40
-
-                                                            Rectangle {
-                                                                id: currentThumbMask
-                                                                anchors.fill: parent
-                                                                radius: 8
-                                                                color: Theme.surfaceContainerHigh
-                                                                visible: false
-                                                                layer.enabled: true
-                                                            }
-
-                                                            Rectangle {
-                                                                anchors.fill: parent
-                                                                radius: currentThumbMask.radius
-                                                                color: Theme.surfaceContainerHigh
-                                                                visible: currentThumb.status !== Image.Ready
-                                                            }
-
-                                                            Image {
-                                                                id: currentThumb
-                                                                anchors.fill: parent
-                                                                source: AppState.selectedWallpaper.length > 0
-                                                                    ? "file://" + AppState.selectedWallpaper : ""
-                                                                fillMode: Image.PreserveAspectCrop
-                                                                asynchronous: true
-                                                                visible: status === Image.Ready
-                                                                sourceSize.width: 128
-                                                                layer.enabled: true
-                                                                layer.effect: MultiEffect {
-                                                                    maskEnabled: true
-                                                                    maskSource: currentThumbMask
-                                                                }
-                                                            }
-                                                        }
-
-                                                        Text {
-                                                            Layout.fillWidth: true
-                                                            text: {
-                                                                var path = AppState.selectedWallpaper
-                                                                return path.length > 0 ? path.split("/").pop() : "Choose"
-                                                            }
-                                                            color: Theme.textSecondary
-                                                            font.pixelSize: 11
-                                                            font.family: Theme.fontMono
-                                                            elide: Text.ElideMiddle
-                                                        }
-
-                                                        IconGlyph {
-                                                            text: "󰅂"
-                                                            color: Theme.textMuted
-                                                            size: Theme.iconSmall
-                                                        }
-                                                    }
-
-                                                    StateLayer {
-                                                        onTapped: {
-                                                            settingsItem.panelOpen = false
-                                                            AppState.wallpapersOpen = true
-                                                        }
-                                                    }
-                                                }
-                                            }
-
-                                            Rectangle {
-                                                width: parent.width
-                                                height: 1
-                                                color: Theme.outline
-                                            }
-
-                                            Column {
-                                                width: parent.width
-                                                spacing: 10
-
-                                                Text {
-                                                    text: "System resources"
-                                                    color: Theme.textPrimary
-                                                    font.pixelSize: 13
-                                                    font.family: Theme.fontMono
-                                                }
-
-                                                GridLayout {
-                                                    width: parent.width
-                                                    columns: 3
-                                                    columnSpacing: 8
-                                                    rowSpacing: 8
-
-                                                    Rectangle {
-                                                        Layout.fillWidth: true
-                                                        Layout.preferredHeight: 64
-                                                        radius: 14
-                                                        color: Theme.surfaceContainer
-
-                                                        Column {
-                                                            anchors.fill: parent
-                                                            anchors.margins: 10
-                                                            spacing: 6
-
-                                                            Text {
-                                                                text: "CPU"
-                                                                color: Theme.textSecondary
-                                                                font.pixelSize: 10
-                                                                font.family: Theme.fontMono
-                                                            }
-
-                                                            Text {
-                                                                text: Math.round(AppState.cpuPercent) + "%"
-                                                                color: Theme.textPrimary
-                                                                font.pixelSize: 16
-                                                                font.bold: true
-                                                                font.family: Theme.fontMono
-                                                            }
-
-                                                            Rectangle {
-                                                                width: parent.width
-                                                                height: 4
-                                                                radius: 2
-                                                                color: Theme.track
-
-                                                                Rectangle {
-                                                                    width: parent.width * (AppState.cpuPercent / 100)
-                                                                    height: parent.height
-                                                                    radius: 2
-                                                                    color: AppState.themeAccent
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-
-                                                    Rectangle {
-                                                        Layout.fillWidth: true
-                                                        Layout.preferredHeight: 64
-                                                        radius: 14
-                                                        color: Theme.surfaceContainer
-
-                                                        Column {
-                                                            anchors.fill: parent
-                                                            anchors.margins: 10
-                                                            spacing: 6
-
-                                                            Text {
-                                                                text: "RAM"
-                                                                color: Theme.textSecondary
-                                                                font.pixelSize: 10
-                                                                font.family: Theme.fontMono
-                                                            }
-
-                                                            Text {
-                                                                text: Math.round(AppState.ramPercent) + "%"
-                                                                color: Theme.textPrimary
-                                                                font.pixelSize: 16
-                                                                font.bold: true
-                                                                font.family: Theme.fontMono
-                                                            }
-
-                                                            Rectangle {
-                                                                width: parent.width
-                                                                height: 4
-                                                                radius: 2
-                                                                color: Theme.track
-
-                                                                Rectangle {
-                                                                    width: parent.width * (AppState.ramPercent / 100)
-                                                                    height: parent.height
-                                                                    radius: 2
-                                                                    color: AppState.themeAccent
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-
-                                                    Rectangle {
-                                                        Layout.fillWidth: true
-                                                        Layout.preferredHeight: 64
-                                                        radius: 14
-                                                        color: Theme.surfaceContainer
-
-                                                        Column {
-                                                            anchors.fill: parent
-                                                            anchors.margins: 10
-                                                            spacing: 6
-
-                                                            Text {
-                                                                text: "Disk"
-                                                                color: Theme.textSecondary
-                                                                font.pixelSize: 10
-                                                                font.family: Theme.fontMono
-                                                            }
-
-                                                            Text {
-                                                                text: Math.round(AppState.diskPercent) + "%"
-                                                                color: Theme.textPrimary
-                                                                font.pixelSize: 16
-                                                                font.bold: true
-                                                                font.family: Theme.fontMono
-                                                            }
-
-                                                            Rectangle {
-                                                                width: parent.width
-                                                                height: 4
-                                                                radius: 2
-                                                                color: Theme.track
-
-                                                                Rectangle {
-                                                                    width: parent.width * (AppState.diskPercent / 100)
-                                                                    height: parent.height
-                                                                    radius: 2
-                                                                    color: AppState.themeAccent
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-
-                                                RowLayout {
-                                                    width: parent.width
-
-                                                    IconGlyph {
-                                                        text: "󰔏"
-                                                        color: Theme.textPrimary
-                                                        size: Theme.iconSmall
-                                                    }
-
-                                                    Text {
-                                                        text: "Temperature"
-                                                        color: Theme.textPrimary
-                                                        font.pixelSize: 13
-                                                        font.family: Theme.fontMono
-                                                        Layout.fillWidth: true
-                                                        Layout.leftMargin: 4
-                                                    }
-
-                                                    Text {
-                                                        text: Math.round(AppState.tempCelsius) + "°C"
-                                                        color: AppState.tempCelsius >= 80 ? Theme.error : Theme.textSecondary
-                                                        font.pixelSize: 12
-                                                        font.family: Theme.fontMono
-                                                    }
-                                                }
-
-                                                Rectangle {
-                                                    width: parent.width
-                                                    height: 5
-                                                    radius: 3
-                                                    color: Theme.track
-
-                                                    Rectangle {
-                                                        width: parent.width * Math.min(AppState.tempCelsius / 100, 1)
-                                                        height: parent.height
-                                                        radius: 3
-                                                        color: AppState.tempCelsius >= 80 ? Theme.error : AppState.themeAccent
-                                                    }
-                                                }
-                                            }
-
-                                            Rectangle {
-                                                width: parent.width
-                                                height: 1
-                                                color: Theme.outline
-                                            }
-
-                                            // Opens the overlay rather than
-                                            // unfolding here: thirty-odd rows
-                                            // in a 372px column is a scroll
-                                            // with no end, and the same list
-                                            // reads in two columns full-screen.
-                                            Rectangle {
-                                                id: bindsButton
-                                                width: parent.width
-                                                height: 46
-                                                radius: 14
-                                                color: bindsState.hovered ? Theme.surfaceContainerHigh
-                                                                          : Theme.surfaceContainer
-
-                                                Behavior on color { ColorAnimation { duration: Theme.durShort } }
-
-                                                RowLayout {
-                                                    anchors.fill: parent
-                                                    anchors.leftMargin: 14
-                                                    anchors.rightMargin: 14
-                                                    spacing: 10
-
-                                                    IconGlyph {
-                                                        text: "󰌌"
-                                                        color: Theme.textPrimary
-                                                        size: Theme.iconMedium
-                                                    }
-
-                                                    Column {
-                                                        Layout.fillWidth: true
-                                                        spacing: 1
-
-                                                        Text {
-                                                            text: "Keyboard shortcuts"
-                                                            color: Theme.textPrimary
-                                                            font.pixelSize: 13
-                                                            font.family: Theme.fontMono
-                                                        }
-
-                                                        Text {
-                                                            text: AppState.hyprBindsError.length > 0
-                                                                  ? "Config unread"
-                                                                  : AppState.hyprBindCount + " in Hyprland"
-                                                            color: AppState.hyprBindsError.length > 0 ? Theme.error
-                                                                                                      : Theme.textMuted
-                                                            font.pixelSize: 10
-                                                            font.family: Theme.fontMono
-                                                        }
-                                                    }
-
-                                                    // Read back out of the config rather than
-                                                    // written in here, so it still tells the
-                                                    // truth after the bind is moved.
-                                                    Rectangle {
-                                                        visible: AppState.hyprOverlayKeys.length > 0
-                                                        Layout.preferredWidth: overlayKeyLabel.implicitWidth + 12
-                                                        Layout.preferredHeight: overlayKeyLabel.implicitHeight + 6
-                                                        radius: 6
-                                                        color: Theme.alpha(Theme.foreground, 0.10)
-
-                                                        Text {
-                                                            id: overlayKeyLabel
-                                                            anchors.centerIn: parent
-                                                            text: AppState.hyprOverlayKeys
-                                                            color: Theme.textSecondary
-                                                            font.pixelSize: 10
-                                                            font.family: Theme.fontMono
-                                                        }
-                                                    }
-                                                }
-
-                                                StateLayer {
-                                                    id: bindsState
-                                                    onTapped: {
-                                                        settingsItem.panelOpen = false
-                                                        AppState.keybindsOpen = true
-                                                    }
-                                                }
-                                            }
-
-                                            Rectangle {
-                                                width: parent.width
-                                                height: 1
-                                                color: Theme.outline
-                                            }
-
-                                            RowLayout {
-                                                id: powerRow
-                                                width: parent.width
-                                                spacing: 8
-
-                                                // Reboot and shutdown need a second tap to fire, so a
-                                                // stray click in the panel cannot kill the session.
-                                                property string armed: ""
-
-                                                Timer {
-                                                    id: disarmTimer
-                                                    interval: 3000
-                                                    onTriggered: powerRow.armed = ""
-                                                }
-
-                                                Repeater {
-                                                    model: [
-                                                        { action: "lock",     icon: "󰌾", label: "Lock",  danger: false },
-                                                        { action: "suspend",  icon: "󰖔", label: "Suspend", danger: false },
-                                                        { action: "reboot",   icon: "󰜉", label: "Restart", danger: true },
-                                                        { action: "shutdown", icon: "󰐥", label: "Shut down",    danger: true }
-                                                    ]
-
-                                                    Rectangle {
-                                                        id: powerButton
-                                                        required property var modelData
-
-                                                        readonly property bool isArmed: powerRow.armed === modelData.action
-                                                        readonly property bool danger: modelData.danger
-
-                                                        Layout.fillWidth: true
-                                                        Layout.preferredHeight: 60
-                                                        radius: 16
-
-                                                        // Reboot and shutdown carry a red cast before they are
-                                                        // touched, not only once armed: the warning is worth more
-                                                        // ahead of the first tap than after it.
-                                                        color: isArmed ? Theme.alpha(Theme.error, 0.24)
-                                                             : danger ? Theme.alpha(Theme.error, powerState.hovered ? 0.18 : 0.09)
-                                                             : powerState.hovered ? Theme.surfaceContainerHigh
-                                                             : Theme.alpha(Theme.foreground, 0.05)
-
-                                                        scale: powerState.pressed ? 0.95 : 1.0
-                                                        transformOrigin: Item.Center
-
-                                                        Behavior on color { ColorAnimation { duration: Theme.durShort } }
-                                                        Behavior on scale {
-                                                            NumberAnimation { duration: Theme.durShort; easing.type: Easing.OutQuad }
-                                                        }
-
-                                                        Column {
-                                                            anchors.centerIn: parent
-                                                            spacing: 3
-
-                                                            IconGlyph {
-                                                                anchors.horizontalCenter: parent.horizontalCenter
-                                                                text: powerButton.modelData.icon
-                                                                color: powerButton.isArmed ? Theme.error
-                                                                     : powerButton.danger ? Theme.alpha(Theme.error, 0.9)
-                                                                     : Theme.textPrimary
-                                                                size: Theme.iconLarge
-
-                                                                Behavior on color { ColorAnimation { duration: Theme.durShort } }
-                                                            }
-
-                                                            Text {
-                                                                anchors.horizontalCenter: parent.horizontalCenter
-                                                                text: powerButton.isArmed ? "Sure?" : powerButton.modelData.label
-                                                                color: powerButton.isArmed ? Theme.error
-                                                                     : powerButton.danger ? Theme.textSecondary
-                                                                     : Theme.textMuted
-                                                                font.pixelSize: 10
-                                                                font.family: Theme.fontMono
-
-                                                                Behavior on color { ColorAnimation { duration: Theme.durShort } }
-                                                            }
-                                                        }
-
-                                                        StateLayer {
-                                                            id: powerState
-                                                            onTapped: {
-                                                                if (powerButton.modelData.danger && !powerButton.isArmed) {
-                                                                    powerRow.armed = powerButton.modelData.action
-                                                                    disarmTimer.restart()
-                                                                    return
-                                                                }
-                                                                powerRow.armed = ""
-                                                                settingsItem.runPowerAction(powerButton.modelData.action)
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
+    // Host and uptime for the header. Read when the panel opens and once a
+    // minute while it stays open -- nothing else in the shell wants them.
+    property string hostName: ""
+    property int uptimeSecs: 0
+
+    Process {
+        id: sysInfoProc
+        running: false
+        command: ["sh", "-c", "cat /proc/uptime; cat /etc/hostname 2>/dev/null || uname -n"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var lines = text.trim().split("\n")
+                contentArea.uptimeSecs = Math.floor(parseFloat(lines[0]) || 0)
+                if (lines.length > 1) contentArea.hostName = lines[1].trim()
+            }
+        }
+    }
+
+    Timer {
+        running: settingsItem.panelOpen
+        interval: 60000
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: sysInfoProc.running = true
+    }
+
+    function uptimeText(s) {
+        var d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60)
+        if (d > 0) return "up " + d + "d " + h + "h"
+        if (h > 0) return "up " + h + "h " + m + "m"
+        return "up " + m + "m"
+    }
+
+    Loader {
+        id: settingsLoader
+        anchors.top: parent.top
+        anchors.right: parent.right
+        width: settingsItem.settingsWidth - 24
+        height: settingsItem.settingsHeight - 24
+        active: settingsItem.settingsOpen || settingsFade.running
+        opacity: settingsItem.settingsOpen ? 1 : 0
+        visible: opacity > 0
+
+        Behavior on opacity {
+            NumberAnimation { id: settingsFade; duration: 260; easing.type: Easing.OutCubic }
+        }
+
+        sourceComponent: SettingsView {
+            page: settingsItem.settingsPage
+            hostName: contentArea.hostName
+            onPageChanged: settingsItem.settingsPage = page
+            onBackRequested: settingsItem.settingsOpen = false
+            onCloseRequested: settingsItem.panelOpen = false
+        }
+    }
+
+    // Collapsed, this used to keep drawing: the panel shrinks to the 64px
+    // button, and a light accent fill stayed clipped to a sliver at the
+    // centre, reading as a white line struck through the icon.
+    Flickable {
+        visible: settingsItem.panelOpen && opacity > 0
+        opacity: settingsItem.panelOpen && !settingsItem.settingsOpen ? 1 : 0
+        anchors.fill: parent
+        anchors.margins: 16
+        contentHeight: panelColumn.height
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+
+        Behavior on opacity {
+            NumberAnimation { duration: 200 }
+        }
+
+        Column {
+            id: panelColumn
+            width: parent.width
+            spacing: 16
+
+            // ── Header ───────────────────────────────────────────────────
+            //
+            // Who, where and how long. The power actions are the last row of
+            // the panel; their state lives here because it is this header's
+            // second line that asks for the confirming tap.
+            RowLayout {
+                id: powerRow
+                width: parent.width
+                spacing: 8
+
+                // Restart and shut down need a second tap, so a stray click
+                // cannot end the session. While one is waiting, the line under
+                // the name says so.
+                property string armed: ""
+                readonly property var actions: [
+                    { action: "lock",     icon: "\u{F033E}", label: "Lock",      danger: false },
+                    { action: "suspend",  icon: "\u{F0594}", label: "Suspend",   danger: false },
+                    { action: "reboot",   icon: "\u{F0709}", label: "Restart",   danger: true },
+                    { action: "shutdown", icon: "\u{F0425}", label: "Shut down", danger: true }
+                ]
+
+                Timer {
+                    id: disarmTimer
+                    interval: 3000
+                    onTriggered: powerRow.armed = ""
+                }
+
+                Rectangle {
+                    Layout.preferredWidth: 38
+                    Layout.preferredHeight: 38
+                    radius: 19
+                    color: Theme.surfaceContainerHigh
+
+                    IconGlyph {
+                        anchors.centerIn: parent
+                        text: "\u{F385}"
+                        color: Theme.textPrimary
+                        size: Theme.iconLarge
+                    }
+                }
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 1
+
+                    Text {
+                        Layout.fillWidth: true
+                        // Host on the line below: user@host beside four
+                        // buttons ran out of room and was cut to "gone@naruka…".
+                        text: Quickshell.env("USER")
+                        color: Theme.textPrimary
+                        font.pixelSize: 13
+                        font.bold: true
+                        font.family: Theme.fontMono
+                        elide: Text.ElideRight
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: {
+                            for (var i = 0; i < powerRow.actions.length; i++)
+                                if (powerRow.actions[i].action === powerRow.armed)
+                                    return "Tap again to " + powerRow.actions[i].label.toLowerCase()
+                            var up = contentArea.uptimeText(contentArea.uptimeSecs)
+                            return contentArea.hostName.length > 0 ? contentArea.hostName + " · " + up : up
+                        }
+                        color: powerRow.armed !== "" ? Theme.error : Theme.textMuted
+                        font.pixelSize: 10
+                        font.family: Theme.fontMono
+                        elide: Text.ElideRight
+                    }
+                }
+
+            }
+
+            // ── Quick toggles ────────────────────────────────────────────
+            GridLayout {
+                width: parent.width
+                columns: 2
+                columnSpacing: 8
+                rowSpacing: 8
+
+                ToggleTile {
+                    Layout.fillWidth: true
+                    icon: "\u{F05A9}"
+                    label: "Wi-Fi"
+                    active: AppState.wifiRadioEnabled
+                    detail: !AppState.wifiRadioEnabled ? "Off"
+                          : AppState.wifiSsid.length > 0 ? AppState.wifiSsid
+                          : "Not connected"
+                    onTapped: AppState.toggleWifiRadio()
+                }
+
+                ToggleTile {
+                    Layout.fillWidth: true
+                    icon: "\u{F00AF}"
+                    label: "Bluetooth"
+                    active: AppState.btEnabled
+                    detail: !AppState.btEnabled ? "Off"
+                          : AppState.btConnectedCount === 0 ? "No devices"
+                          : AppState.btConnectedCount === 1 ? "1 connected"
+                          : AppState.btConnectedCount + " connected"
+                    onTapped: AppState.toggleBluetoothPower()
+                }
+
+                ToggleTile {
+                    Layout.fillWidth: true
+                    icon: AppState.micMuted ? "\u{F036D}" : "\u{F036C}"
+                    label: "Microphone"
+                    active: !AppState.micMuted
+                    detail: AppState.micMuted ? "Muted" : "Live"
+                    onTapped: AppState.toggleMicMute()
+                }
+
+                ToggleTile {
+                    Layout.fillWidth: true
+                    icon: "\u{F009B}"
+                    label: "Do not disturb"
+                    active: AppState.dndEnabled
+                    detail: AppState.dndEnabled ? "Silenced" : "Showing"
+                    onTapped: AppState.toggleDnd()
+                }
+
+                ToggleTile {
+                    Layout.fillWidth: true
+                    icon: AppState.gamepadConnected ? "\u{F0274}" : "\u{F0EB5}"
+                    label: "Controller"
+                    active: AppState.gamepadModeActive
+                    detail: AppState.gamepadMode === "stopped" ? "Service off"
+                          : !AppState.gamepadConnected ? "Not connected"
+                          : AppState.gamepadModeActive ? "Drives desktop"
+                          : "Gamepad only"
+                    onTapped: AppState.toggleGamepadMode()
+                }
+
+                ToggleTile {
+                    Layout.fillWidth: true
+                    icon: "\u{F0DCB}"
+                    label: "Tablet"
+                    active: AppState.otdRunning
+                    // Switching it off leaves the pen dead: a udev rule has the
+                    // compositor ignore the kernel's own device, so there is no
+                    // fallback underneath.
+                    detail: AppState.otdRunning ? "Driver on" : "No pen"
+                    onTapped: AppState.toggleOtd()
+                }
+            }
+
+            // ── Wallpaper ────────────────────────────────────────────────
+            //
+            // The picture itself, the way the desktop shows it -- the framed
+            // crop, or a video's poster frame -- rather than a file name next
+            // to a stamp-sized thumbnail. Opens the picker.
+            Rectangle {
+                id: wallpaperCard
+                width: parent.width
+                height: 96
+                radius: 16
+                color: Theme.surfaceContainer
+
+                readonly property bool isVideo: AppState.activeVideoWallpaper !== ""
+                readonly property string name: {
+                    var p = wallpaperCard.isVideo ? AppState.activeVideoWallpaper
+                                                  : AppState.selectedWallpaper
+                    return p.length > 0 ? p.split("/").pop().replace(/\.[^.]+$/, "") : "Choose a wallpaper"
+                }
+
+                ClippingRectangle {
+                    anchors.fill: parent
+                    radius: wallpaperCard.radius
+                    color: "transparent"
+
+                    Image {
+                        anchors.fill: parent
+                        source: AppState.wallpaperStill.length > 0 ? "file://" + AppState.wallpaperStill : ""
+                        fillMode: Image.PreserveAspectCrop
+                        asynchronous: true
+                        sourceSize.width: 640
+                    }
+
+                    // Keeps the caption readable over any picture.
+                    Rectangle {
+                        anchors.fill: parent
+                        gradient: Gradient {
+                            orientation: Gradient.Horizontal
+                            GradientStop { position: 0.0; color: Theme.alpha(Theme.background, 0.82) }
+                            GradientStop { position: 0.7; color: Theme.alpha(Theme.background, 0.05) }
+                        }
+                    }
+                }
+
+                Column {
+                    anchors.left: parent.left
+                    anchors.bottom: parent.bottom
+                    anchors.leftMargin: 14
+                    anchors.bottomMargin: 12
+                    width: parent.width - 110
+                    spacing: 2
+
+                    Text {
+                        text: wallpaperCard.isVideo ? "WALLPAPER · VIDEO" : "WALLPAPER"
+                        color: Theme.textSecondary
+                        font.pixelSize: 9
+                        font.letterSpacing: 1.2
+                        font.family: Theme.fontMono
+                    }
+
+                    Text {
+                        width: parent.width
+                        text: wallpaperCard.name
+                        color: Theme.textPrimary
+                        font.pixelSize: 12
+                        font.bold: true
+                        font.family: Theme.fontMono
+                        elide: Text.ElideRight
+                    }
+                }
+
+                Rectangle {
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    anchors.margins: 10
+                    width: changeRow.implicitWidth + 20
+                    height: 26
+                    radius: 13
+                    color: Theme.alpha(Theme.background, 0.7)
+
+                    Row {
+                        id: changeRow
+                        anchors.centerIn: parent
+                        spacing: 5
+
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "Change"
+                            color: Theme.textPrimary
+                            font.pixelSize: 10
+                            font.family: Theme.fontMono
+                        }
+
+                        IconGlyph {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "\u{F0142}"
+                            color: Theme.textPrimary
+                            size: Theme.iconTiny
+                        }
+                    }
+                }
+
+                StateLayer {
+                    radius: wallpaperCard.radius
+                    onTapped: {
+                        settingsItem.panelOpen = false
+                        AppState.wallpapersOpen = true
+                    }
+                }
+            }
+
+            // ── System ───────────────────────────────────────────────────
+            //
+            // Four gauges of one kind in one row. Temperature used to be a
+            // fifth, differently drawn thing below the other three.
+            Column {
+                width: parent.width
+                spacing: 8
+
+                SectionLabel { text: "System" }
+
+                RowLayout {
+                    width: parent.width
+                    spacing: 6
+
+                    Repeater {
+                        model: ["cpu", "ram", "disk", "temp"]
+
+                        Rectangle {
+                            id: stat
+                            required property string modelData
+
+                            readonly property real value: modelData === "cpu" ? AppState.cpuPercent
+                                : modelData === "ram" ? AppState.ramPercent
+                                : modelData === "disk" ? AppState.diskPercent
+                                : AppState.tempCelsius
+                            readonly property real fraction: Math.max(0, Math.min(1, stat.value / 100))
+                            // Worth a colour change only past the point where
+                            // something is actually wrong.
+                            readonly property bool hot: modelData === "temp" ? stat.value >= 80
+                                                                              : stat.value >= 90
+
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 64
+                            radius: 14
+                            color: Theme.surfaceContainer
+
+                            Column {
+                                anchors.fill: parent
+                                anchors.margins: 10
+                                spacing: 5
+
+                                Text {
+                                    text: stat.modelData === "temp" ? "TEMP" : stat.modelData.toUpperCase()
+                                    color: Theme.textMuted
+                                    font.pixelSize: 9
+                                    font.letterSpacing: 1.2
+                                    font.family: Theme.fontMono
+                                }
+
+                                Text {
+                                    text: Math.round(stat.value) + (stat.modelData === "temp" ? "°" : "%")
+                                    color: stat.hot ? Theme.error : Theme.textPrimary
+                                    font.pixelSize: 16
+                                    font.bold: true
+                                    font.family: Theme.fontMono
+                                }
+
+                                Rectangle {
+                                    width: parent.width
+                                    height: 3
+                                    radius: 1.5
+                                    color: Theme.track
+
+                                    Rectangle {
+                                        width: parent.width * stat.fraction
+                                        height: parent.height
+                                        radius: parent.radius
+                                        color: stat.hot ? Theme.error : Theme.accent
+
+                                        Behavior on width {
+                                            NumberAnimation { duration: Theme.durLong; easing.type: Easing.OutCubic }
                                         }
                                     }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Power mode ───────────────────────────────────────────────
+            //
+            // One choice out of three, so one row: a segmented control where
+            // the stack of three full-width rows used to be.
+            Column {
+                width: parent.width
+                spacing: 8
+                visible: AppState.powerProfiles.length > 0
+
+                SectionLabel { text: "Power mode" }
+
+                Rectangle {
+                    id: modeSwitch
+                    width: parent.width
+                    height: 42
+                    radius: height / 2
+                    color: Theme.surfaceContainer
+
+                    readonly property int count: AppState.powerProfiles.length
+                    readonly property real segment: (width - 8) / Math.max(1, count)
+                    readonly property int activeIndex: {
+                        for (var i = 0; i < AppState.powerProfiles.length; i++)
+                            if (AppState.powerProfiles[i].active) return i
+                        return -1
+                    }
+
+                    // The fill slides to the chosen mode instead of blinking.
+                    Rectangle {
+                        visible: modeSwitch.activeIndex >= 0
+                        x: 4 + modeSwitch.segment * Math.max(0, modeSwitch.activeIndex)
+                        y: 4
+                        width: modeSwitch.segment
+                        height: modeSwitch.height - 8
+                        radius: height / 2
+                        color: Theme.accent
+
+                        Behavior on x {
+                            NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic }
+                        }
+                    }
+
+                    Row {
+                        x: 4
+                        y: 4
+
+                        Repeater {
+                            model: AppState.powerProfiles
+
+                            Item {
+                                id: mode
+                                required property var modelData
+                                width: modeSwitch.segment
+                                height: modeSwitch.height - 8
+
+                                Row {
+                                    anchors.centerIn: parent
+                                    spacing: 6
+
+                                    IconGlyph {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: mode.modelData.icon
+                                        size: Theme.iconSmall
+                                        color: mode.modelData.active ? Theme.accentText : Theme.textSecondary
+                                        Behavior on color { ColorAnimation { duration: Theme.durMedium } }
+                                    }
+
+                                    Text {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: mode.modelData.label
+                                        font.pixelSize: 11
+                                        font.bold: mode.modelData.active
+                                        font.family: Theme.fontMono
+                                        color: mode.modelData.active ? Theme.accentText : Theme.textSecondary
+                                        Behavior on color { ColorAnimation { duration: Theme.durMedium } }
+                                    }
+                                }
+
+                                StateLayer {
+                                    radius: height / 2
+                                    interactive: !mode.modelData.active
+                                    onTapped: AppState.setPowerProfile(mode.modelData.name)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Elsewhere ────────────────────────────────────────────────
+            //
+            // Settings, which the panel grows into, and the shortcut sheet.
+            RowLayout {
+                width: parent.width
+                spacing: 8
+
+                Repeater {
+                    model: [
+                        { key: "settings", icon: "\u{F0493}", label: "Settings",
+                          detail: "Display, idle" },
+                        { key: "binds", icon: "\u{F030C}", label: "Shortcuts",
+                          detail: AppState.hyprBindsError.length > 0 ? "Config unread"
+                                : AppState.hyprOverlayKeys.length > 0 ? AppState.hyprOverlayKeys
+                                : AppState.hyprBindCount + " binds" }
+                    ]
+
+                    Rectangle {
+                        id: link
+                        required property var modelData
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 52
+                        radius: 16
+                        color: Theme.surfaceContainer
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 14
+                            anchors.rightMargin: 12
+                            spacing: 10
+
+                            IconGlyph {
+                                text: link.modelData.icon
+                                color: Theme.textSecondary
+                                size: Theme.iconMedium
+                            }
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 1
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: link.modelData.label
+                                    color: Theme.textPrimary
+                                    font.pixelSize: 12
+                                    font.bold: true
+                                    font.family: Theme.fontMono
+                                    elide: Text.ElideRight
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: link.modelData.detail
+                                    color: link.modelData.key === "binds" && AppState.hyprBindsError.length > 0
+                                         ? Theme.error : Theme.textMuted
+                                    font.pixelSize: 10
+                                    font.family: Theme.fontMono
+                                    elide: Text.ElideRight
+                                }
+                            }
+
+                            IconGlyph {
+                                text: "\u{F0142}"
+                                color: Theme.textMuted
+                                size: Theme.iconTiny
+                            }
+                        }
+
+                        StateLayer {
+                            radius: link.radius
+                            onTapped: {
+                                if (link.modelData.key === "settings") {
+                                    settingsItem.settingsOpen = true
+                                    return
+                                }
+                                settingsItem.panelOpen = false
+                                AppState.keybindsOpen = true
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Power ────────────────────────────────────────────────────
+            //
+            // Full width and a comfortable size. They sat in the header for a
+            // while as 28px circles, which saved height and made them fiddly to
+            // hit. Restart and shut down carry their red before they are
+            // touched, and ask for a second tap -- the header says so.
+            RowLayout {
+                width: parent.width
+                spacing: 8
+
+                Repeater {
+                    model: powerRow.actions
+
+                    Rectangle {
+                        id: powerButton
+                        required property var modelData
+                        readonly property bool isArmed: powerRow.armed === modelData.action
+
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 46
+                        radius: 16
+                        color: powerButton.isArmed ? Theme.error
+                             : modelData.danger
+                                 ? Theme.alpha(Theme.error, powerState.hovered ? 0.22 : 0.1)
+                             : powerState.hovered ? Theme.surfaceContainerHigh
+                             : Theme.surfaceContainer
+                        scale: powerState.pressed ? 0.95 : 1.0
+
+                        Behavior on color { ColorAnimation { duration: Theme.durShort } }
+                        Behavior on scale { NumberAnimation { duration: Theme.durShort } }
+
+                        IconGlyph {
+                            anchors.centerIn: parent
+                            text: powerButton.modelData.icon
+                            size: Theme.iconLarge
+                            color: powerButton.isArmed ? Theme.background
+                                 : powerButton.modelData.danger ? Theme.alpha(Theme.error, 0.95)
+                                 : Theme.textPrimary
+                        }
+
+                        StateLayer {
+                            id: powerState
+                            radius: powerButton.radius
+                            onTapped: {
+                                if (powerButton.modelData.danger && !powerButton.isArmed) {
+                                    powerRow.armed = powerButton.modelData.action
+                                    disarmTimer.restart()
+                                    return
+                                }
+                                powerRow.armed = ""
+                                settingsItem.runPowerAction(powerButton.modelData.action)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
                         Process {
                             id: rebootProc

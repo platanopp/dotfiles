@@ -66,7 +66,7 @@ PanelWindow {
         NumberAnimation { duration: 280; easing.type: Easing.OutCubic }
     }
 
-    implicitWidth: trayRow.implicitWidth + 48
+    implicitWidth: trayRow.implicitWidth + 24 + Theme.pillPaddingH * 2
     implicitHeight: 64
 
     Behavior on implicitWidth {

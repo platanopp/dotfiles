@@ -233,13 +233,34 @@ PanelWindow {
         AppState.launcherOpen = false
     }
 
+    property var pendingEntry: null
+
     function launch(entry) {
         if (!entry) return
         // Closed first: the launcher holds the keyboard exclusively while it
         // is open, and a window that maps into that grab comes up without
         // focus.
         overlay.close()
-        entry.execute()
+        // Then point the focus at whatever monitor the pointer is on, so the
+        // window opens there. follow_mouse would do this by itself, but not
+        // in the instant between the grab dropping and the spawn: the app
+        // would come up on whichever screen was focused before.
+        AppState.focusCursorMonitor()
+        overlay.pendingEntry = entry
+        spawnTimer.restart()
+    }
+
+    // Short enough to feel immediate, long enough for the focus dispatch to
+    // land before the window maps.
+    Timer {
+        id: spawnTimer
+        interval: 90
+        onTriggered: {
+            if (overlay.pendingEntry) {
+                overlay.pendingEntry.execute()
+                overlay.pendingEntry = null
+            }
+        }
     }
 
     function move(delta) {

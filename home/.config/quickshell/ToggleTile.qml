@@ -1,91 +1,81 @@
 import QtQuick
 import QtQuick.Layouts
 
-// One quick-setting toggle: name on top, live state underneath.
+// One quick toggle in the control panel.
 //
-// The four of these were copies of the same forty lines, and each filled
-// completely with the accent when on. The accent is a light grey, so "on"
-// meant a near-white block -- four of them shouted over everything else in
-// the panel. Here "on" is a tint of the accent plus a coloured icon and dot,
-// which reads clearly without taking the panel over.
+// On is a filled tile in the accent with dark text on it, off is the plain
+// surface. The accent here is a near-white grey, and the old version showed
+// "on" as that grey at 16% over dark glass plus a 6px dot -- which read as
+// barely different from off, and the dot cost the label its last few
+// characters ("Do not dist…"). A fill cannot be mistaken, and it is the same
+// on/off language the wallpaper picker's section switch speaks.
 Rectangle {
     id: root
 
     property string icon: ""
     property string label: ""
-    // What the toggle is actually doing right now: the network name, how many
-    // devices are connected. Saves opening a panel to find out.
     property string detail: ""
     property bool active: false
 
     signal tapped()
 
-    implicitHeight: 60
+    implicitHeight: 56
     radius: 16
-    color: root.active ? Theme.alpha(AppState.themeAccent, 0.16) : Theme.surfaceContainer
+    color: root.active ? Theme.accent : Theme.surfaceContainer
+
+    readonly property color ink: root.active ? Theme.accentText : Theme.textPrimary
 
     scale: tileState.pressed ? 0.96 : 1.0
     transformOrigin: Item.Center
 
-    Behavior on color { ColorAnimation { duration: Theme.durShort } }
+    Behavior on color { ColorAnimation { duration: Theme.durMedium } }
     Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutQuad } }
 
-    ColumnLayout {
+    RowLayout {
         anchors.fill: parent
         anchors.leftMargin: 14
-        anchors.rightMargin: 14
-        anchors.topMargin: 9
-        anchors.bottomMargin: 9
-        spacing: 1
+        anchors.rightMargin: 12
+        spacing: 10
 
-        RowLayout {
+        IconGlyph {
+            text: root.icon
+            color: root.active ? Theme.accentText : Theme.textSecondary
+            size: Theme.iconMedium
+            Behavior on color { ColorAnimation { duration: Theme.durMedium } }
+        }
+
+        ColumnLayout {
             Layout.fillWidth: true
-            spacing: 8
+            spacing: 1
 
-            IconGlyph {
-                text: root.icon
-                color: root.active ? AppState.themeAccent : Theme.textSecondary
-                size: Theme.iconMedium
+            Text {
+                Layout.fillWidth: true
+                text: root.label
+                color: root.ink
+                font.pixelSize: 12
+                font.bold: true
+                font.family: Theme.fontMono
+                elide: Text.ElideRight
+                Behavior on color { ColorAnimation { duration: Theme.durMedium } }
             }
 
             Text {
-                text: root.label
-                color: Theme.textPrimary
-                font.pixelSize: 12
-                font.bold: root.active
+                Layout.fillWidth: true
+                text: root.detail
+                color: root.active ? Theme.alpha(Theme.accentText, 0.62) : Theme.textMuted
+                font.pixelSize: 10
                 font.family: Theme.fontMono
                 elide: Text.ElideRight
-                Layout.fillWidth: true
+                Behavior on color { ColorAnimation { duration: Theme.durMedium } }
             }
-
-            // A dot as well as the colour: at a glance across the panel, a
-            // fill this subtle is easy to miss on its own.
-            Rectangle {
-                Layout.alignment: Qt.AlignVCenter
-                implicitWidth: 6
-                implicitHeight: 6
-                radius: 3
-                color: AppState.themeAccent
-                opacity: root.active ? 1 : 0
-
-                Behavior on opacity { NumberAnimation { duration: Theme.durShort } }
-            }
-        }
-
-        Text {
-            text: root.detail
-            color: root.active ? Theme.textSecondary : Theme.textMuted
-            font.pixelSize: 10
-            font.family: Theme.fontMono
-            elide: Text.ElideRight
-            Layout.fillWidth: true
         }
     }
 
-    // The fill is a tint now rather than a solid accent, so a light tint reads
-    // in both states and no longer has to flip with it.
     StateLayer {
         id: tileState
+        // Tinted with the text colour, so the hover shows on the filled tile
+        // as well as on the empty one.
+        tint: root.ink
         onTapped: root.tapped()
     }
 }

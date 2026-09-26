@@ -12,6 +12,12 @@ Rectangle {
     // Extra reach for small targets like icon glyphs.
     property int hitMargin: 0
 
+    // How the press is held; see the TapHandler below for why the default is
+    // what it is. Something that sits on a surface the user also drags -- a
+    // carousel panel -- sets DragThreshold instead, so a press that turns into
+    // a drag is let go to the view underneath rather than kept as a tap.
+    property int gesturePolicy: TapHandler.ReleaseWithinBounds
+
     // Exposed so callers can drive their own press/hover animations.
     readonly property bool pressed: tap.pressed
     readonly property bool hovered: hover.hovered
@@ -51,7 +57,7 @@ Rectangle {
         // spots rather than as a timing problem. Press and release inside
         // the item is a click here, whatever the pointer did in between.
         // TrayItems already does this for its right and middle buttons.
-        gesturePolicy: TapHandler.ReleaseWithinBounds
+        gesturePolicy: root.gesturePolicy
 
         onTapped: root.tapped()
     }

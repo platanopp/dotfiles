@@ -84,6 +84,14 @@ Singleton {
         return Math.max(r.width, r.height) / 100
     }
 
+    // ── Bar pills ────────────────────────────────────────────────────────
+    // Space between a pill's contents and its left and right edges, the same
+    // on every pill on the bar. Each pill's window is 24px wider than the
+    // glass it draws (a 12px inset each side), so a widget adds 24 plus twice
+    // this to its content; the workspace pill draws its glass directly and
+    // adds only the padding.
+    readonly property int pillPaddingH: 16
+
     // ── Motion ───────────────────────────────────────────────────────────
     // Material 3 duration and easing scale, so every animation in the shell
     // is picked from the same set instead of an ad-hoc magic number.

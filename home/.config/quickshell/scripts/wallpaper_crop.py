@@ -14,6 +14,7 @@ to know which axis it is. 0.5, 0.5 crops dead centre, which is what cover
 did, so a wallpaper nobody has framed looks exactly as it did before.
 
     wallpaper_crop.py current
+    wallpaper_crop.py rendered
     wallpaper_crop.py get <image>
     wallpaper_crop.py apply <image> [<focusX> <focusY>]
 """
@@ -213,12 +214,30 @@ def cmd_current():
         return
 
 
+def cmd_rendered():
+    """The crop the desktop is actually showing, for the current wallpaper.
+
+    What the lock screen should draw: the user's own file is the wrong
+    picture whenever it has been framed off-centre, because the lock would
+    crop it again at the centre and show a different part of it than the
+    desktop does. Nothing is printed if there is no crop on disk yet.
+    """
+    state = load_state()
+    current = state.get("current") or ""
+    for out in state.get("rendered", {}).get(current, []):
+        if os.path.exists(out):
+            print(out)
+            return
+
+
 def main():
     args = sys.argv[1:]
     if not args:
         sys.exit(__doc__)
     if args[0] == "current":
         cmd_current()
+    elif args[0] == "rendered":
+        cmd_rendered()
     elif args[0] == "get" and len(args) == 2:
         cmd_get(args[1])
     elif args[0] == "apply" and len(args) == 2:

@@ -2,6 +2,7 @@
 
 import "."
 import Quickshell
+import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Hyprland
 import Quickshell.Services.Mpris
@@ -121,7 +122,11 @@ Scope {
             // plain property is guaranteed to notify, so the row actually
             // follows when a neighbour moves.
             function pillLeftOf(w) {
-                return w.rightMargin + w.width + pillGap - 24
+                // rowWidth where a pill has one: the control panel keeps its
+                // place in the row at the panel's width while it grows into
+                // Settings, so its neighbours are not pushed into the clock.
+                var wide = w.rowWidth !== undefined ? w.rowWidth : w.width
+                return w.rightMargin + wide + pillGap - 24
             }
 
             // Same arithmetic the other way, for a pill that parks off the
@@ -222,7 +227,7 @@ Scope {
                 // neighbour, so it is where the left edge of the row is set.
                 anchors.leftMargin: AppState.gapLeft
                 anchors.topMargin: AppState.gapTop
-                implicitWidth: leftRow.implicitWidth + 20
+                implicitWidth: leftRow.implicitWidth + Theme.pillPaddingH * 2
                 implicitHeight: 40
                 radius: 20
                 color: Theme.glass
@@ -300,9 +305,36 @@ Scope {
                 bar: bar
             }
 
-            LockOverlay {
+            BlankOverlay {
                 bar: bar
             }
+
+        }
+    }
+
+    // The session lock. Outside Variants because WlSessionLock puts up its
+    // own surface on every screen by itself -- a per-screen copy would have
+    // each of them trying to claim the one session lock.
+    //
+    // Raised by Super + L through AppState.lockSession(), by the control
+    // panel, by `loginctl lock-session` from anywhere, and once on the first
+    // start after a boot -- see the claim in LockEngine, which is what stands
+    // in for a greeter on a seat that is handed over already logged in.
+    LockScreen {
+    }
+
+    // `qs ipc call screens blank HDMI-A-1` / `unblank`. Driven by hypridle
+    // through ~/.config/hypr/scripts/idle-screens.sh; see BlankOverlay for why
+    // some screens are covered rather than powered off.
+    IpcHandler {
+        target: "screens"
+
+        function blank(names: string): void {
+            AppState.blankedScreens = names.split(/[\s,]+/).filter(n => n.length > 0)
+        }
+
+        function unblank(): void {
+            AppState.blankedScreens = []
         }
     }
 
@@ -333,9 +365,9 @@ Scope {
         onPressed: AppState.toggleLauncher()
     }
 
-    // Routed through the shell rather than binding `veila lock` directly, so
-    // the screen can be faded out before veila's lock surface lands on it and
-    // faded back in once it lets go -- see AppState.lockSession().
+    // The lock is this shell's own surface, so the bind has to reach the shell
+    // rather than run a locker of its own -- see AppState.lockSession(), which
+    // is also where the control panel and its suspend go.
     GlobalShortcut {
         appid: "quickshell"
         name: "lock"
