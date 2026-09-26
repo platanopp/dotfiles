@@ -2,9 +2,5 @@
   "border_size": {
     "value": 0,
     "base": 0
-  },
-  "gaps_in": {
-    "value": 12,
-    "base": 15
   }
 }
