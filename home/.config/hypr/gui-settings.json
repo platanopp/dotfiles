@@ -4,7 +4,7 @@
     "base": 0
   },
   "follow_mouse": {
-    "value": 0,
+    "value": 1,
     "base": 1
   }
 }
