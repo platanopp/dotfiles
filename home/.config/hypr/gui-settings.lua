@@ -3,3 +3,8 @@
 -- edited by hand: the next change made in the window rewrites it from
 -- gui-settings.json. hyprland.lua runs this last, so these values win.
 
+hl.config({
+    general = {
+        border_size = 0,
+    },
+})

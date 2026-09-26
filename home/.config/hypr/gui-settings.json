@@ -1,1 +1,6 @@
-{}
+{
+  "border_size": {
+    "value": 0,
+    "base": 0
+  }
+}
