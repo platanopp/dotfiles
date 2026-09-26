@@ -583,3 +583,18 @@ hl.window_rule({
     -- active, then inactive. Single spaces: the parser rejects anything else.
     opacity = "1.0 override 1.0",
 })
+
+-- ── Settings made in the shell ───────────────────────────────────────────
+--
+-- The Settings window's Hyprland page writes its choices to gui-settings.lua
+-- (see ~/.config/quickshell/scripts/hypr_settings.py) and never touches this
+-- file. Run last, so what was picked there wins over the blocks above; with
+-- no such file -- a fresh machine, or every choice reset -- nothing happens.
+do
+    local path = os.getenv("HOME") .. "/.config/hypr/gui-settings.lua"
+    local f = io.open(path, "r")
+    if f then
+        f:close()
+        dofile(path)
+    end
+end
