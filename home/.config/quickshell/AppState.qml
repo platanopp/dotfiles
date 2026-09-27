@@ -144,6 +144,24 @@ Singleton {
     signal settingsRequested(string page, string screenName)
     function openSettings(page, screenName) { root.settingsRequested(page, screenName) }
 
+    // The notification centre on the focused monitor's control pill:
+    // qs ipc call notifications toggle | open | close | clear -- for a key
+    // bind, say. `clear` empties the centre without opening it.
+    signal notificationsRequested(string how, string screenName)
+
+    IpcHandler {
+        target: "notifications"
+        function toggle(): void { root.notificationsRequested("toggle", root.focusedScreenName()) }
+        function open(): void { root.notificationsRequested("open", root.focusedScreenName()) }
+        function close(): void { root.notificationsRequested("close", "") }
+        function clear(): void { Notifications.dismissAll() }
+    }
+
+    function focusedScreenName() {
+        var m = Hyprland.focusedMonitor
+        return m ? m.name : ""
+    }
+
     // qs ipc call settings open sound -- on the focused monitor.
     IpcHandler {
         target: "settings"

@@ -278,20 +278,11 @@ PanelWindow {
             RowLayout {
                 spacing: 6
 
+                // The icon alone: the network's name is in the panel it opens.
                 IconGlyph {
                     text: statusItem.networkIcon
                     color: AppState.wifiSsid.length > 0 || AppState.ethernetUp ? Theme.textPrimary : Theme.textMuted
                     size: Theme.iconLarge
-                }
-
-                Text {
-                    visible: AppState.wifiSsid.length > 0
-                    text: AppState.wifiSsid
-                    color: Theme.textPrimary
-                    font.pixelSize: 12
-                    font.family: Theme.fontMono
-                    elide: Text.ElideRight
-                    Layout.maximumWidth: 90
                 }
 
                 TapHandler {

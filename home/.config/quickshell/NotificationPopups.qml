@@ -100,7 +100,8 @@ PanelWindow {
                 Timer {
                     interval: card.lifetime
                     running: !card.sticky && !hover.hovered && !drag.active
-                    onTriggered: Notifications.dismiss(card.modelData)
+                    // Off the screen, into the centre -- not gone.
+                    onTriggered: Notifications.expire(card.modelData)
                 }
 
                 Rectangle {
@@ -166,8 +167,10 @@ PanelWindow {
                                     color: Theme.textSecondary
                                     size: Theme.iconSmall
 
+                                    // Off the screen; it stays in the centre
+                                    // (the bell), where it can be cleared.
                                     TapHandler {
-                                        onTapped: Notifications.dismiss(card.modelData)
+                                        onTapped: Notifications.expire(card.modelData)
                                     }
                                 }
                             }
@@ -251,7 +254,8 @@ PanelWindow {
                     id: hover
                 }
 
-                // Drag right past a third of the card to throw it away.
+                // Drag right past a third of the card to send it away -- into
+                // the centre, like the close button.
                 DragHandler {
                     id: drag
                     target: card
@@ -260,7 +264,7 @@ PanelWindow {
 
                     onActiveChanged: {
                         if (drag.active) return
-                        if (card.x > popups.cardWidth * 0.33) Notifications.dismiss(card.modelData)
+                        if (card.x > popups.cardWidth * 0.33) Notifications.expire(card.modelData)
                         else settleBack.start()
                     }
                 }

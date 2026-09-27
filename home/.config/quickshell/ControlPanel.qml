@@ -66,6 +66,17 @@ PanelWindow {
     margins.right: rightMargin
 
     property bool panelOpen: false
+    // The notification centre, the pill's other face: the bell beside the
+    // logo opens it, in the same glass. One or the other, never both.
+    property bool notifOpen: false
+
+    onNotifOpenChanged: {
+        Notifications.centreOpen = notifOpen
+        if (notifOpen) {
+            panelOpen = false
+            Notifications.markRead()
+        }
+    }
 
     // ── Settings ─────────────────────────────────────────────────────────
     //
@@ -76,7 +87,21 @@ PanelWindow {
     property bool settingsOpen: false
     property string settingsPage: "displays"
 
-    onPanelOpenChanged: if (!panelOpen) settingsOpen = false
+    onPanelOpenChanged: {
+        if (!panelOpen) settingsOpen = false
+        else notifOpen = false
+    }
+
+    // qs ipc call notifications toggle (see AppState): only the pill on the
+    // screen that asked answers, except to close.
+    Connections {
+        target: AppState
+        function onNotificationsRequested(how, screenName) {
+            if (how === "close") { settingsItem.notifOpen = false; return }
+            if (settingsItem.screen && screenName.length > 0 && settingsItem.screen.name !== screenName) return
+            settingsItem.notifOpen = how === "open" ? true : !settingsItem.notifOpen
+        }
+    }
 
     // The bar's own panels link to their page here (AppState.openSettings).
     // Only the panel on the screen that asked answers.
@@ -147,10 +172,12 @@ PanelWindow {
         minWindowWidth: settingsItem.settingsWidth
         minWindowHeight: Math.max(settingsItem.settingsHeight, settingsItem.screen.height - 48)
         targetWidth: settingsItem.settingsOpen ? settingsItem.settingsWidth
-                   : settingsItem.panelOpen ? 372
-                   : settingsText.implicitWidth + 24 + Theme.pillPaddingH * 2
+                   : settingsItem.panelOpen || settingsItem.notifOpen ? 372
+                   : compactRow.implicitWidth + 24 + Theme.pillPaddingH * 2
         targetHeight: settingsItem.settingsOpen ? settingsItem.settingsHeight
             : settingsItem.panelOpen ? Math.min(panelColumn.implicitHeight + 56,
+                                                settingsItem.screen.height - 48)
+            : settingsItem.notifOpen ? Math.min(notifCentre.wantedHeight + 56,
                                                 settingsItem.screen.height - 48)
             : 64
     }
@@ -185,7 +212,7 @@ PanelWindow {
     Rectangle {
         id: panelGlass
         anchors.fill: parent
-        radius: settingsItem.settingsOpen ? 28 : settingsItem.panelOpen ? 26 : 20
+        radius: settingsItem.settingsOpen ? 28 : settingsItem.panelOpen || settingsItem.notifOpen ? 26 : 20
         color: Theme.glass
         visible: false
         layer.enabled: true
@@ -206,37 +233,115 @@ PanelWindow {
         autoPaddingEnabled: true
     }
 
-    IconGlyph {
-        id: settingsText
+    // ── The pill, closed ─────────────────────────────────────────────────
+    //
+    // Two ways in, side by side in the one glass: the bell for the
+    // notification centre, the CachyOS logo for the panel. Each takes its
+    // own taps and lights up under the pointer, so it reads as two buttons.
+    Row {
+        id: compactRow
         anchors.centerIn: parent
-        visible: !settingsItem.panelOpen
-        opacity: !settingsItem.panelOpen ? 1 : 0
-        // The CachyOS logo rather than a gear: the panel is the way into the
-        // whole machine, not a settings page. Nerd Font's linux-cachyos glyph,
-        // so it is sized and coloured by IconGlyph like every other icon on
-        // the bar.
-        text: "\u{F385}"
-        color: Theme.textPrimary
-        size: Theme.iconLarge
+        spacing: 4
+        visible: opacity > 0
+        opacity: !settingsItem.panelOpen && !settingsItem.notifOpen ? 1 : 0
 
         Behavior on opacity {
             NumberAnimation { duration: 150 }
         }
+
+        Repeater {
+            model: [
+                { key: "notifications" },
+                { key: "panel" }
+            ]
+
+            Item {
+                id: compactButton
+                required property var modelData
+                readonly property bool bell: compactButton.modelData.key === "notifications"
+                width: 30
+                height: 30
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: width / 2
+                    color: Theme.foreground
+                    opacity: compactTap.pressed ? 0.16 : compactHover.hovered ? 0.09 : 0
+
+                    Behavior on opacity {
+                        NumberAnimation { duration: Theme.durShort }
+                    }
+                }
+
+                IconGlyph {
+                    anchors.centerIn: parent
+                    // The CachyOS logo rather than a gear: the panel is the way
+                    // into the whole machine, not a settings page. Nerd Font's
+                    // linux-cachyos glyph, sized and coloured like every other
+                    // icon on the bar. The bell is struck through under do not
+                    // disturb.
+                    text: !compactButton.bell ? "\u{F385}"
+                        : Notifications.dnd ? "\u{F009B}"
+                        : Notifications.unread > 0 ? "\u{F009E}" : "\u{F009C}"
+                    color: compactButton.bell && Notifications.dnd ? Theme.textMuted : Theme.textPrimary
+                    size: Theme.iconLarge
+                }
+
+                // Unread, as a dot on the bell's shoulder.
+                Rectangle {
+                    visible: compactButton.bell && Notifications.unread > 0
+                    width: 8
+                    height: 8
+                    radius: 4
+                    x: parent.width - width - 4
+                    y: 4
+                    color: Theme.accent
+                    border.width: 1.5
+                    border.color: Theme.glass
+                }
+
+                HoverHandler {
+                    id: compactHover
+                    cursorShape: Qt.PointingHandCursor
+                }
+
+                TapHandler {
+                    id: compactTap
+                    enabled: !settingsItem.panelOpen && !settingsItem.notifOpen
+                    onTapped: {
+                        if (compactButton.bell) {
+                            settingsItem.notifOpen = true
+                            return
+                        }
+                        settingsItem.panelOpen = true
+                        AppState.refreshWallpaperList()
+                    }
+                }
+            }
+        }
     }
 
-    TapHandler {
-        enabled: !settingsItem.panelOpen
-        onTapped: {
-            settingsItem.panelOpen = true
-            AppState.refreshWallpaperList()
+    // ── The notification centre ──────────────────────────────────────────
+    NotificationCentre {
+        id: notifCentre
+        anchors.fill: parent
+        anchors.margins: 16
+        visible: opacity > 0
+        opacity: settingsItem.notifOpen ? 1 : 0
+
+        Behavior on opacity {
+            NumberAnimation { duration: 200 }
         }
     }
 
     HyprlandFocusGrab {
         id: controlPanelGrab
         windows: [settingsItem]
-        active: settingsItem.panelOpen
-        onCleared: settingsItem.panelOpen = false
+        active: settingsItem.panelOpen || settingsItem.notifOpen
+        onCleared: {
+            settingsItem.panelOpen = false
+            settingsItem.notifOpen = false
+        }
     }
 
     // Host and uptime for the header. Read when the panel opens and once a

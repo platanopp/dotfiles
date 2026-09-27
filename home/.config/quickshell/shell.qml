@@ -87,7 +87,8 @@ Scope {
             // An open panel also holds it, so the bar cannot vanish from under
             // someone reading it.
             readonly property bool panelsOpen: statusWidget.expandedPanel !== ""
-                || controlPanelWidget.panelOpen || mediaWidget.panelOpen
+                || controlPanelWidget.panelOpen || controlPanelWidget.notifOpen
+                || mediaWidget.panelOpen
                 || clockWidget.panelOpen || notesWidget.panelOpen
 
             // Settings -> Shell can keep the bar up over fullscreen windows.

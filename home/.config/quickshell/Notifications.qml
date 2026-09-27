@@ -5,20 +5,53 @@ import Quickshell.Services.Notifications
 
 // Native notification daemon. Replaces the dunstctl calls the shell used to
 // make, which silently did nothing because dunst is not installed.
+//
+// Every notification goes to the centre (the bell in the control pill) and
+// stays there until it is cleared or the app withdraws it. A toast is only
+// how it arrives: when the toast times out the notification leaves the
+// screen, not the centre. Do not disturb keeps the toasts away (all but
+// Critical) and still files everything in the centre, quietly.
 Singleton {
     id: root
 
-    // Suppresses everything but Critical.
+    // No toasts but Critical; the centre still gets everything.
     property bool dnd: false
 
     readonly property int maxVisible: 4
-    readonly property int maxQueued: 20
+    // The centre's length; past it the oldest go.
+    readonly property int maxQueued: 60
 
-    // Live notifications, newest first.
+    // Every notification in the centre, newest first.
     property var list: []
 
-    readonly property var visibleList: list.slice(0, maxVisible)
+    // The ones showing as toasts right now, newest first.
+    property var visibleList: []
     readonly property int count: list.length
+    // Arrived since the centre was last looked at.
+    property int unread: 0
+
+    function _refresh() {
+        root.visibleList = root.list.filter(w => w.popup).slice(0, root.maxVisible)
+    }
+
+    // A toast that has had its time: off the screen, still in the centre.
+    function expire(wrapper) {
+        if (!wrapper || wrapper.gone || !wrapper.popup) return
+        wrapper.popup = false
+        root._refresh()
+    }
+
+    function markRead() { root.unread = 0 }
+
+    // Set while the centre is open: toasts would only repeat what is on it,
+    // on top of it -- the ones up go, and new ones arrive straight in.
+    property bool centreOpen: false
+    onCentreOpenChanged: {
+        if (!root.centreOpen) return
+        for (var i = 0; i < root.list.length; i++) root.list[i].popup = false
+        root._refresh()
+        root.unread = 0
+    }
 
     // User-initiated close. Going through the daemon makes the sending app
     // aware; onClosed then removes the wrapper.
@@ -31,6 +64,7 @@ Singleton {
     function dismissAll() {
         var copy = root.list.slice()
         for (var i = 0; i < copy.length; i++) root.dismiss(copy[i])
+        root.unread = 0
     }
 
     // Removes a wrapper whose notification is already closed.
@@ -43,6 +77,7 @@ Singleton {
             copy.splice(idx, 1)
             root.list = copy
         }
+        root._refresh()
         wrapper.destroy()
     }
 
@@ -53,6 +88,10 @@ Singleton {
 
         property var notification
         property bool gone: false
+        // Showing as a toast (see expire); false from the start under DND.
+        property bool popup: true
+        // When it arrived, for the centre's "5m ago".
+        property date time: new Date()
 
         property string summary: ""
         property string body: ""
@@ -120,20 +159,19 @@ Singleton {
         persistenceSupported: true
 
         onNotification: function (notif) {
-            if (root.dnd && notif.urgency !== NotificationUrgency.Critical) {
-                notif.dismiss()
-                return
-            }
-
             notif.tracked = true
 
-            var wrapper = notifComponent.createObject(root, { notification: notif })
+            var quiet = root.centreOpen
+                || (root.dnd && notif.urgency !== NotificationUrgency.Critical)
+            var wrapper = notifComponent.createObject(root, { notification: notif, popup: !quiet })
             if (!wrapper) return
 
             var queued = [wrapper].concat(root.list)
             // Drop the oldest past the cap so a burst cannot grow unbounded.
             var overflow = queued.slice(root.maxQueued)
             root.list = queued.slice(0, root.maxQueued)
+            if (!root.centreOpen) root.unread = Math.min(root.unread + 1, root.list.length)
+            root._refresh()
             for (var i = 0; i < overflow.length; i++) root.dismiss(overflow[i])
         }
     }
