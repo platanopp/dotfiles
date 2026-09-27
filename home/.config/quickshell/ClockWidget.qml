@@ -6,8 +6,8 @@ import QtQuick.Effects
 import QtQuick.Layouts
 
 // The bar's clock. Tapping it expands the pill in place -- the way the status
-// and control widgets behave -- into a profile header with the calendar and
-// the week's weather side by side.
+// and control widgets behave -- into today's date over the calendar and the
+// week's weather side by side.
 PanelWindow {
     id: clockItem
 
@@ -274,167 +274,32 @@ PanelWindow {
             spacing: 14
             visible: clockItem.panelOpen
 
-            // -- Profile ------------------------------------------------------
+            // -- Today --------------------------------------------------------
+            //
+            // Time and date only. Who is logged in, the machine and its load
+            // are the control panel's header, not the calendar's.
             RowLayout {
                 width: parent.width
-                spacing: 14
+                spacing: 12
 
-                Item {
-                    Layout.preferredWidth: 56
-                    Layout.preferredHeight: 56
-
-                    Rectangle {
-                        id: avatarMask
-                        anchors.fill: parent
-                        radius: width / 2
-                        visible: false
-                        layer.enabled: true
-                    }
-
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: width / 2
-                        color: "transparent"
-                        border.width: 2
-                        border.color: Theme.alpha(Theme.accent, 0.6)
-                    }
-
-                    Image {
-                        id: avatarImage
-                        anchors.fill: parent
-                        anchors.margins: 3
-                        source: AppState.avatarPath.length > 0 ? "file://" + AppState.avatarPath : ""
-                        fillMode: Image.PreserveAspectCrop
-                        asynchronous: true
-                        visible: status === Image.Ready
-                        layer.enabled: true
-                        layer.effect: MultiEffect {
-                            maskEnabled: true
-                            maskSource: avatarMask
-                        }
-                    }
-
-                    Rectangle {
-                        anchors.fill: parent
-                        anchors.margins: 3
-                        radius: width / 2
-                        color: Theme.surfaceContainerHigh
-                        visible: avatarImage.status !== Image.Ready
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: AppState.username.length > 0 ? AppState.username.charAt(0).toUpperCase() : "?"
-                            color: Theme.accent
-                            font.pixelSize: 24
-                            font.bold: true
-                            font.family: Theme.fontMono
-                        }
-                    }
+                Text {
+                    Layout.alignment: Qt.AlignBottom
+                    text: AppState.currentTime
+                    color: Theme.textPrimary
+                    font.pixelSize: 30
+                    font.bold: true
+                    font.family: Theme.fontMono
                 }
 
-                ColumnLayout {
+                Text {
+                    Layout.alignment: Qt.AlignBottom
+                    Layout.bottomMargin: 5
                     Layout.fillWidth: true
-                    spacing: 2
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 0
-
-                        Text {
-                            text: AppState.username
-                            color: Theme.textPrimary
-                            font.pixelSize: 21
-                            font.bold: true
-                            font.family: Theme.fontMono
-                        }
-
-                        Text {
-                            text: "@" + AppState.hostname
-                            color: Theme.accent
-                            font.pixelSize: 13
-                            font.family: Theme.fontMono
-                            Layout.alignment: Qt.AlignBottom
-                            Layout.bottomMargin: 2
-                        }
-
-                        Item { Layout.fillWidth: true }
-                    }
-
-                    Text {
-                        text: AppState.distro
-                        color: Theme.textMuted
-                        font.pixelSize: 10
-                        font.family: Theme.fontMono
-                        elide: Text.ElideRight
-                        Layout.fillWidth: true
-                    }
-
-                    RowLayout {
-                        Layout.topMargin: 3
-                        spacing: 6
-
-                        Repeater {
-                            model: [
-                                { icon: "󰅐", value: AppState.uptimeText },
-                                { icon: "󰍛", value: Math.round(AppState.ramPercent) + "%" },
-                                { icon: "󰻠", value: Math.round(AppState.cpuPercent) + "%" }
-                            ]
-
-                            Rectangle {
-                                id: chip
-                                required property var modelData
-
-                                visible: modelData.value.length > 0
-                                implicitWidth: chipRow.implicitWidth + 16
-                                implicitHeight: 20
-                                radius: 10
-                                color: Theme.surfaceContainer
-
-                                RowLayout {
-                                    id: chipRow
-                                    anchors.centerIn: parent
-                                    spacing: 4
-
-                                    IconGlyph {
-                                        text: chip.modelData.icon
-                                        color: Theme.accent
-                                        size: Theme.iconTiny
-                                    }
-
-                                    Text {
-                                        text: chip.modelData.value
-                                        color: Theme.textSecondary
-                                        font.pixelSize: 10
-                                        font.family: Theme.fontMono
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // There is width to spare here, so the clock gets to be the
-                // anchor it is on the bar.
-                ColumnLayout {
-                    Layout.alignment: Qt.AlignVCenter
-                    spacing: 0
-
-                    Text {
-                        Layout.alignment: Qt.AlignRight
-                        text: AppState.currentTime
-                        color: Theme.textPrimary
-                        font.pixelSize: 30
-                        font.bold: true
-                        font.family: Theme.fontMono
-                    }
-
-                    Text {
-                        Layout.alignment: Qt.AlignRight
-                        text: AppState.currentDate
-                        color: Theme.textMuted
-                        font.pixelSize: 11
-                        font.family: Theme.fontMono
-                    }
+                    text: AppState.currentDate
+                    color: Theme.textMuted
+                    font.pixelSize: 12
+                    font.family: Theme.fontMono
+                    elide: Text.ElideRight
                 }
             }
 

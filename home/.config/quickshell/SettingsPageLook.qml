@@ -207,7 +207,7 @@ Column {
         }
 
         SettingsRow {
-            visible: Math.round(gapTopSlider.shown) !== Math.round(gapOutSlider.shown)
+            visible: page.val("gaps_top", 0) !== page.val("gaps_out", 0)
             icon: "\u{F0337}"
             tint: page.tint
             title: "Same on every edge"

@@ -311,17 +311,45 @@ PanelWindow {
                     onTriggered: powerRow.armed = ""
                 }
 
-                Rectangle {
-                    Layout.preferredWidth: 38
-                    Layout.preferredHeight: 38
-                    radius: 19
-                    color: Theme.surfaceContainerHigh
+                // The user's picture (~/.face and friends, AppState.avatarPath),
+                // or their initial when there is none.
+                Item {
+                    Layout.preferredWidth: 46
+                    Layout.preferredHeight: 46
 
-                    IconGlyph {
-                        anchors.centerIn: parent
-                        text: "\u{F385}"
-                        color: Theme.textPrimary
-                        size: Theme.iconLarge
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: width / 2
+                        color: "transparent"
+                        border.width: 2
+                        border.color: Theme.alpha(Theme.foreground, 0.35)
+                    }
+
+                    ClippingRectangle {
+                        anchors.fill: parent
+                        anchors.margins: 3
+                        radius: width / 2
+                        color: Theme.surfaceContainerHigh
+
+                        Image {
+                            id: avatarImage
+                            anchors.fill: parent
+                            source: AppState.avatarPath.length > 0 ? "file://" + AppState.avatarPath : ""
+                            fillMode: Image.PreserveAspectCrop
+                            asynchronous: true
+                            sourceSize.width: 128
+                            visible: status === Image.Ready
+                        }
+
+                        Text {
+                            anchors.centerIn: parent
+                            visible: avatarImage.status !== Image.Ready
+                            text: AppState.username.length > 0 ? AppState.username.charAt(0).toUpperCase() : "?"
+                            color: Theme.textPrimary
+                            font.pixelSize: 18
+                            font.bold: true
+                            font.family: Theme.fontMono
+                        }
                     }
                 }
 
@@ -333,9 +361,9 @@ PanelWindow {
                         Layout.fillWidth: true
                         // Host on the line below: user@host beside four
                         // buttons ran out of room and was cut to "gone@naruka…".
-                        text: Quickshell.env("USER")
+                        text: AppState.username
                         color: Theme.textPrimary
-                        font.pixelSize: 13
+                        font.pixelSize: 14
                         font.bold: true
                         font.family: Theme.fontMono
                         elide: Text.ElideRight
@@ -351,6 +379,17 @@ PanelWindow {
                             return contentArea.hostName.length > 0 ? contentArea.hostName + " · " + up : up
                         }
                         color: powerRow.armed !== "" ? Theme.error : Theme.textMuted
+                        font.pixelSize: 10
+                        font.family: Theme.fontMono
+                        elide: Text.ElideRight
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        visible: text.length > 0
+                        text: AppState.distro
+                        color: Theme.textMuted
+                        opacity: 0.7
                         font.pixelSize: 10
                         font.family: Theme.fontMono
                         elide: Text.ElideRight
