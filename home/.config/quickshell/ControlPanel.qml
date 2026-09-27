@@ -107,9 +107,15 @@ PanelWindow {
     // Only the panel on the screen that asked answers.
     Connections {
         target: AppState
+        // An empty page toggles: closes Settings if it is open here, else
+        // opens it at the page it was last left on.
         function onSettingsRequested(page, screenName) {
             if (settingsItem.screen && screenName.length > 0 && settingsItem.screen.name !== screenName) return
-            settingsItem.settingsPage = page
+            if (page.length === 0 && settingsItem.settingsOpen) {
+                settingsItem.panelOpen = false
+                return
+            }
+            if (page.length > 0) settingsItem.settingsPage = page
             settingsItem.panelOpen = true
             settingsItem.settingsOpen = true
         }

@@ -367,6 +367,14 @@ Scope {
 
     GlobalShortcut {
         appid: "quickshell"
+        name: "settings"
+        description: "Open or close Settings"
+
+        onPressed: AppState.toggleSettings()
+    }
+
+    GlobalShortcut {
+        appid: "quickshell"
         name: "wallpapers"
         description: "Choose the wallpaper"
 

@@ -143,6 +143,9 @@ Singleton {
     // for the bar's own panels, which link to their fuller page.
     signal settingsRequested(string page, string screenName)
     function openSettings(page, screenName) { root.settingsRequested(page, screenName) }
+    // Open on the focused monitor at the page last seen, or close if open --
+    // Super+O (the "settings" global shortcut in shell.qml).
+    function toggleSettings() { root.settingsRequested("", root.focusedScreenName()) }
 
     // The media panel on the focused monitor: qs ipc call media toggle |
     // open | close -- for a key bind, say.
@@ -180,6 +183,7 @@ Singleton {
             var m = Hyprland.focusedMonitor
             root.openSettings(page.length > 0 ? page : "displays", m ? m.name : "")
         }
+        function toggle(): void { root.toggleSettings() }
     }
 
     function forgetBluetoothDevice(mac, name) {
