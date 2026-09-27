@@ -45,21 +45,32 @@ PanelWindow {
     readonly property bool open: AppState.launcherOpen && overlay.onOpeningScreen
 
     // Unmapped while closed, not merely drawn empty: a mapped full-screen
-    // layer is composited every frame whether or not it draws anything. The
-    // timer keeps it mapped long enough for the fade out to be seen.
+    // layer is composited every frame whether or not it draws anything.
+    // `shown` keeps it mapped until the fade out has played, and is the only
+    // thing `visible` reads. It read `open || unmapDelay.running`, and
+    // between `open` going false and the handler starting the timer that
+    // was false: the launcher unmapped, came back, and only then faded --
+    // a two-frame blink that looked like no animation at all.
     // Connections rather than an `onOpenChanged` here: the root already has
     // one, and a second on the same object is an error.
-    visible: overlay.open || unmapDelay.running
+    property bool shown: false
+    visible: overlay.shown
 
     Timer {
         id: unmapDelay
-        interval: Theme.durMedium + 80
+        interval: 170 + 60
+        onTriggered: overlay.shown = false
     }
 
     Connections {
         target: overlay
         function onOpenChanged() {
-            if (!overlay.open) unmapDelay.restart()
+            if (overlay.open) {
+                unmapDelay.stop()
+                overlay.shown = true
+            } else {
+                unmapDelay.restart()
+            }
         }
     }
 
@@ -69,8 +80,16 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Overlay
     exclusionMode: ExclusionMode.Ignore
 
-    WlrLayershell.keyboardFocus: overlay.open ? WlrKeyboardFocus.Exclusive
-                                              : WlrKeyboardFocus.None
+    // Held through the fade out when dismissed, let go at once when
+    // something is launched. Changing it mid-fade drops the surface for two
+    // frames -- the panel blinked out and came back before fading -- so a
+    // dismissal keeps it until the end. A launch cannot: the new window has
+    // to get the keyboard, so the panel hides at once instead (`launching`)
+    // and there is nothing left on screen to blink.
+    WlrLayershell.keyboardFocus: overlay.open || (overlay.shown && !overlay.launching)
+                                 ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+
+    property bool launching: false
 
     anchors {
         top: true
@@ -333,10 +352,11 @@ PanelWindow {
     }
 
     readonly property var results: {
-        // Nothing to rank while closed: the copies on the other screens, and
-        // this one between uses, would otherwise re-rank on every window
-        // title that changes.
-        if (!overlay.open) return []
+        // Nothing to rank while unmapped: the copies on the other screens,
+        // and this one between uses, would otherwise re-rank on every window
+        // title that changes. `visible` and not `open`, so the list stays
+        // through the fade out instead of emptying on its first frame.
+        if (!overlay.visible) return []
 
         var apps = DesktopEntries.applications.values.filter(function(e) {
             // NoDisplay is the entry asking not to be listed: mime handlers,
@@ -482,9 +502,10 @@ PanelWindow {
 
     function run(item) {
         if (!item) return
-        // Closed first: the launcher holds the keyboard exclusively while it
-        // is open, and a window that maps into that grab comes up without
-        // focus.
+        // Closed first, and at once (see `launching`): the launcher holds
+        // the keyboard exclusively while it is up, and a window that maps
+        // into that grab comes up without focus.
+        overlay.launching = true
         overlay.close()
 
         switch (item.kind) {
@@ -556,14 +577,16 @@ PanelWindow {
         overlay.selected = Math.max(0, Math.min(n - 1, overlay.selected + delta))
     }
 
+    // Cleared on the way in, not the way out: emptied on closing, the list
+    // and the field went blank before the fade out could show them leaving.
     onOpenChanged: {
-        overlay.query = overlay.open ? AppState.launcherPreset : ""
+        if (!overlay.open) return
+        overlay.launching = false
+        overlay.query = AppState.launcherPreset
         overlay.selected = 0
-        if (overlay.open) {
-            AppState.launcherPreset = ""
-            searchInput.forceActiveFocus()
-            searchInput.cursorPosition = searchInput.text.length
-        }
+        AppState.launcherPreset = ""
+        searchInput.forceActiveFocus()
+        searchInput.cursorPosition = searchInput.text.length
     }
 
     // ── Click-away ───────────────────────────────────────────────────────
@@ -604,8 +627,14 @@ PanelWindow {
             NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic }
         }
 
+        // Long enough both ways for leaving to read as a fade and not a cut:
+        // at 100ms OutCubic the panel was gone in about two frames. One
+        // duration for both directions -- one picked by `open` would be read
+        // in the same instant `open` flips, and could be the old one.
         Behavior on opacity {
-            NumberAnimation { duration: Theme.durShort; easing.type: Easing.OutCubic }
+            // Not when launching: the app's window is the animation then.
+            enabled: !overlay.launching
+            NumberAnimation { duration: 170; easing.type: Easing.OutQuad }
         }
 
         Behavior on scale {
@@ -618,10 +647,8 @@ PanelWindow {
             anchors.fill: parent
             radius: 26
             color: Theme.glass
-            // The hairline that keeps a translucent panel from bleeding into
-            // a busy wallpaper, with no dim behind it to separate the two.
-            border.width: 1
-            border.color: Theme.outline
+            // No outline: none of the shell's glass has one, and this one's
+            // bottom edge read as a light rim over the shadow.
             visible: false
             layer.enabled: true
         }
