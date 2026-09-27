@@ -123,18 +123,28 @@ Scope {
             // pillGap apart. Reads rightMargin rather than margins.right: a
             // plain property is guaranteed to notify, so the row actually
             // follows when a neighbour moves.
+            //
+            // A pill's width here is its box as drawn (visualWidth, which
+            // animates) rather than its window, which is sized to hold the
+            // box's whole move and so is wider mid-animation (see PillStage).
+            // The pills that follow take the value frame by frame with no
+            // animation of their own: one animation at the source, and the
+            // row moves with it instead of chasing it.
             function pillLeftOf(w) {
                 // rowWidth where a pill has one: the control panel keeps its
                 // place in the row at the panel's width while it grows into
                 // Settings, so its neighbours are not pushed into the clock.
-                var wide = w.rowWidth !== undefined ? w.rowWidth : w.width
-                return w.rightMargin + wide + pillGap - 24
+                var wide = w.rowWidth !== undefined ? w.rowWidth
+                         : w.visualWidth !== undefined ? w.visualWidth : w.width
+                return Math.round(w.rightMargin + wide + pillGap - 24)
             }
 
             // Same arithmetic the other way, for a pill that parks off the
-            // right edge of a left-anchored neighbour.
+            // right edge of a left-anchored neighbour: visualRight is where
+            // its box ends, in screen coordinates.
             function pillRightOf(w) {
-                return w.leftMargin + w.width + pillGap - 24
+                var right = w.visualRight !== undefined ? w.visualRight : w.leftMargin + w.width
+                return Math.round(right + pillGap - 24)
             }
 
             // Which MPRIS player the media widget drives.

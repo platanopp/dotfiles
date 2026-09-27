@@ -22,12 +22,19 @@ PanelWindow {
     // whenever its contents come and go) stacks itself above older ones.
     property bool covered: false
 
-    mask: bar.barHidden || covered ? blankMask : null
+    mask: bar.barHidden || covered ? blankMask : stageMask
 
     Region {
         id: blankMask
         width: 0
         height: 0
+    }
+
+    // Input only where the pill is: the window also holds the room the pill
+    // grows into (see PillStage).
+    Region {
+        id: stageMask
+        item: stage
     }
 
     // Keeps the bar up while the pointer is on it; shell.qml folds these
@@ -51,13 +58,12 @@ PanelWindow {
     // that much and the drawn edge lands exactly on Hyprland's gap.
     margins.top: Math.max(0, AppState.gapTop - 12)
 
-    // Set by shell.qml, which owns the order of the right-hand pills.
+    // Set by shell.qml, which owns the order of the right-hand pills. Not
+    // animated here: it follows the control pill's box, which already moves
+    // smoothly, and a second animation chasing that one is what made the
+    // row lag and wobble behind an opening panel.
     property int rightMargin: 50
     margins.right: rightMargin
-
-    Behavior on margins.right {
-        NumberAnimation { duration: 280; easing.type: Easing.OutCubic }
-    }
 
     property string expandedPanel: ""
 
@@ -195,25 +201,29 @@ PanelWindow {
 
     readonly property int compactWidth: compactRow.implicitWidth + 24 + Theme.pillPaddingH * 2
 
-    implicitWidth: expandedPanel !== "" ? 324 : compactWidth
-
-    // Follows the content instead of a fixed 524, which left a large empty
-    // box under short lists. Chrome is the 12px inset, the 40px compact row,
-    // and the flickable's margins; past the cap the list scrolls.
-    implicitHeight: expandedPanel !== "" ? Math.min(expandedColumn.implicitHeight + 84, 620) : 64
-
-    Behavior on implicitWidth {
-        NumberAnimation { duration: 280; easing.type: Easing.OutCubic }
+    // The pill's box, animated inside a window that is not (see PillStage).
+    PillStage {
+        id: stage
+        anchors.top: parent.top
+        anchors.right: parent.right
+        targetWidth: statusItem.expandedPanel !== "" ? 324 : statusItem.compactWidth
+        // Follows the content instead of a fixed 524, which left a large empty
+        // box under short lists. Chrome is the 12px inset, the 40px compact row,
+        // and the flickable's margins; past the cap the list scrolls.
+        targetHeight: statusItem.expandedPanel !== "" ? Math.min(expandedColumn.implicitHeight + 84, 620) : 64
     }
 
-    Behavior on implicitHeight {
-        NumberAnimation { duration: 280; easing.type: Easing.OutCubic }
-    }
+    implicitWidth: stage.windowWidth
+    implicitHeight: stage.windowHeight
+
+    // What the pills beside this one park off: the box as drawn, mid-move
+    // included, not the window around it.
+    readonly property real visualWidth: stage.width
 
     Item {
         id: contentArea
         visible: !bar.barHidden && !covered
-        anchors.fill: parent
+        anchors.fill: stage
         anchors.margins: 12
 
     Rectangle {

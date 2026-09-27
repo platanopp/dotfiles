@@ -108,14 +108,12 @@ PanelWindow {
 
     Item {
         id: pillArea
+        // Not animated: it follows the clock's box, which already moves
+        // smoothly; a second animation chasing it made this pill lag behind.
         x: notesItem.leftMargin
         y: 0
         width: notesItem.panelOpen ? 340 : notesIcon.width + 24 + Theme.pillPaddingH * 2
         height: notesItem.panelOpen ? Math.min(panelColumn.implicitHeight + 56, 560) : 64
-
-        Behavior on x {
-            NumberAnimation { duration: 280; easing.type: Easing.OutCubic }
-        }
 
         Behavior on width {
             NumberAnimation { duration: 280; easing.type: Easing.OutCubic }

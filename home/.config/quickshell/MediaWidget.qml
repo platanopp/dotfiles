@@ -18,12 +18,18 @@ PanelWindow {
     // restacks it on the way back: the full-width bar came back above the
     // pills and swallowed every click meant for them. The blur rule ignores
     // pixels below 0.3 alpha, so a surface drawing nothing leaves no band.
-    mask: bar.barHidden ? blankMask : null
+    mask: bar.barHidden ? blankMask : stageMask
 
     Region {
         id: blankMask
         width: 0
         height: 0
+    }
+
+    // Input only where the pill is (see PillStage).
+    Region {
+        id: stageMask
+        item: stage
     }
 
     // Keeps the bar up while the pointer is on it; shell.qml folds these
@@ -47,11 +53,9 @@ PanelWindow {
     // that much and the drawn edge lands exactly on Hyprland's gap.
     margins.top: Math.max(0, AppState.gapTop - 12)
     // contentArea insets by 12, so this leaves a 10px gap after the pill.
+    // Not animated here: the workspaces pill it follows animates its own
+    // width, and a second animation chasing that one only made this lag.
     margins.left: bar ? bar.leftPillRight - 2 : 50
-
-    Behavior on margins.left {
-        NumberAnimation { duration: Theme.durLong; easing.type: Easing.OutCubic }
-    }
 
     property bool panelOpen: false
     property real currentPosition: 0
@@ -138,21 +142,23 @@ PanelWindow {
         return "󰑗"
     }
 
-    implicitWidth: panelOpen ? 396 : mediaWidgetRow.implicitWidth + 24 + Theme.pillPaddingH * 2
-    implicitHeight: panelOpen ? Math.min(mediaContentColumn.implicitHeight + 60, 640) : 64
-
-    Behavior on implicitWidth {
-        NumberAnimation { duration: 280; easing.type: Easing.OutCubic }
+    // The pill's box, animated inside a window that is not (see PillStage).
+    PillStage {
+        id: stage
+        anchors.top: parent.top
+        anchors.left: parent.left
+        targetWidth: mediaWidgetItem.panelOpen ? 396
+                   : mediaWidgetRow.implicitWidth + 24 + Theme.pillPaddingH * 2
+        targetHeight: mediaWidgetItem.panelOpen ? Math.min(mediaContentColumn.implicitHeight + 60, 640) : 64
     }
 
-    Behavior on implicitHeight {
-        NumberAnimation { duration: 280; easing.type: Easing.OutCubic }
-    }
+    implicitWidth: stage.windowWidth
+    implicitHeight: stage.windowHeight
 
     Item {
         id: contentArea
         visible: !bar.barHidden
-        anchors.fill: parent
+        anchors.fill: stage
         anchors.margins: 12
 
         Rectangle {

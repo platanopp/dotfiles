@@ -33,12 +33,18 @@ PanelWindow {
     // whenever its contents come and go) stacks itself above older ones.
     property bool covered: false
 
-    mask: bar.barHidden || covered ? blankMask : null
+    mask: bar.barHidden || covered ? blankMask : stageMask
 
     Region {
         id: blankMask
         width: 0
         height: 0
+    }
+
+    // Input only where the pill is (see PillStage).
+    Region {
+        id: stageMask
+        item: stage
     }
 
     // Keeps the bar up while the pointer is on it; shell.qml folds these
@@ -64,24 +70,29 @@ PanelWindow {
     // Set by shell.qml, which owns the order of the right-hand pills. It
     // follows the status pill's live width, so an expanding panel pushes these
     // icons along instead of appearing underneath them.
+    // Not animated here: the status pill's box it follows already moves
+    // smoothly, and a second animation chasing it made the row lag.
     property int rightMargin: 0
     margins.right: rightMargin
 
-    Behavior on margins.right {
-        NumberAnimation { duration: 280; easing.type: Easing.OutCubic }
+    // An icon coming or going animates the box, not the window (PillStage).
+    PillStage {
+        id: stage
+        anchors.top: parent.top
+        anchors.right: parent.right
+        targetWidth: trayRow.implicitWidth + 24 + Theme.pillPaddingH * 2
+        targetHeight: 64
     }
 
-    implicitWidth: trayRow.implicitWidth + 24 + Theme.pillPaddingH * 2
-    implicitHeight: 64
+    implicitWidth: stage.windowWidth
+    implicitHeight: stage.windowHeight
 
-    Behavior on implicitWidth {
-        NumberAnimation { duration: 280; easing.type: Easing.OutCubic }
-    }
+    readonly property real visualWidth: stage.width
 
     Item {
         id: contentArea
         visible: !bar.barHidden && !covered
-        anchors.fill: parent
+        anchors.fill: stage
         anchors.margins: 12
 
         Rectangle {

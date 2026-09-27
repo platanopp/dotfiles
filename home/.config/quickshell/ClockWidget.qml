@@ -20,12 +20,18 @@ PanelWindow {
     // restacks it on the way back: the full-width bar came back above the
     // pills and swallowed every click meant for them. The blur rule ignores
     // pixels below 0.3 alpha, so a surface drawing nothing leaves no band.
-    mask: bar.barHidden ? blankMask : null
+    mask: bar.barHidden ? blankMask : stageMask
 
     Region {
         id: blankMask
         width: 0
         height: 0
+    }
+
+    // Input only where the pill is (see PillStage).
+    Region {
+        id: stageMask
+        item: stage
     }
 
     // Keeps the bar up while the pointer is on it; shell.qml folds these
@@ -58,9 +64,14 @@ PanelWindow {
 
     // PanelWindow anchors to edges, so centring is done by hand. Held in a
     // plain property as well as the margin: a grouped property is not
-    // guaranteed to notify, and the notes pill parks off this one.
+    // guaranteed to notify. The window is as wide as the open panel all the
+    // time (see the stage below), so this does not move as the pill grows.
     readonly property int leftMargin: screen ? Math.round((screen.width - implicitWidth) / 2) : 0
     margins.left: leftMargin
+
+    // Where the pill's box ends on screen, mid-move included: the notes pill
+    // parks off it (pillRightOf in shell.qml).
+    readonly property real visualRight: leftMargin + stage.x + stage.width
 
     // Breathing room between the text and the edge of the pill.
     //
@@ -71,17 +82,27 @@ PanelWindow {
     // padding when it is not.
     readonly property int compactPaddingH: Theme.pillPaddingH
 
-    implicitWidth: panelOpen ? panelWidth
-                             : compactRow.implicitWidth + 24 + compactPaddingH * 2
-    implicitHeight: panelOpen ? panelColumn.implicitHeight + 56 : 64
-
-    // Off while the date is folding in or out: that change is animated where
-    // it starts (revealDate below), and a second animation chasing it here
-    // made the pill grow in stutters.
-    Behavior on implicitWidth {
-        enabled: !revealAnim.running
-        NumberAnimation { duration: Theme.durLong; easing.type: Easing.OutCubic }
+    // The pill's box, centred in a window as wide as the open panel -- so
+    // neither the date folding out on hover nor the panel opening ever
+    // resizes the window sideways; only the box inside grows, both ways from
+    // the middle (see PillStage).
+    PillStage {
+        id: stage
+        anchors.top: parent.top
+        anchors.horizontalCenter: parent.horizontalCenter
+        duration: Theme.durLong
+        minWindowWidth: clockItem.panelWidth
+        targetWidth: clockItem.panelOpen ? clockItem.panelWidth
+                   : compactRow.implicitWidth + 24 + clockItem.compactPaddingH * 2
+        targetHeight: clockItem.panelOpen ? panelColumn.implicitHeight + 56 : 64
+        // Off while the date is folding in or out: that change is animated
+        // where it starts (revealDate below), and a second animation chasing
+        // it here made the pill grow in stutters.
+        animateWidth: !revealAnim.running
     }
+
+    implicitWidth: stage.windowWidth
+    implicitHeight: stage.windowHeight
 
     // ── Time only, date on hover ─────────────────────────────────────────
     //
@@ -121,10 +142,6 @@ PanelWindow {
         property: "revealDate"
         duration: Theme.durLong
         easing.type: Easing.OutCubic
-    }
-
-    Behavior on implicitHeight {
-        NumberAnimation { duration: Theme.durLong; easing.type: Easing.OutCubic }
     }
 
     // -- Calendar state ---------------------------------------------------
@@ -189,7 +206,7 @@ PanelWindow {
     Item {
         id: contentArea
         visible: !bar.barHidden
-        anchors.fill: parent
+        anchors.fill: stage
         anchors.margins: 12
 
         Rectangle {

@@ -18,12 +18,19 @@ PanelWindow {
     // restacks it on the way back: the full-width bar came back above the
     // pills and swallowed every click meant for them. The blur rule ignores
     // pixels below 0.3 alpha, so a surface drawing nothing leaves no band.
-    mask: bar.barHidden ? blankMask : null
+    mask: bar.barHidden ? blankMask : stageMask
 
     Region {
         id: blankMask
         width: 0
         height: 0
+    }
+
+    // Input only where the pill is: the window also holds the room the panel
+    // and Settings grow into (see PillStage).
+    Region {
+        id: stageMask
+        item: stage
     }
 
     // Keeps the bar up while the pointer is on it; shell.qml folds these
@@ -100,7 +107,11 @@ PanelWindow {
     // Settings open it stays at the panel's width, so the tray and the status
     // pill hold still under the Settings window instead of being shoved along
     // into the clock.
-    readonly property real rowWidth: settingsItem.settingsOpen ? 372 : settingsItem.width
+    //
+    // The box as drawn, capped at the panel's width: while Settings closes
+    // the box is still far wider than the panel, and the row would be flung
+    // left and slide back as it shrank.
+    readonly property real rowWidth: Math.min(stage.width, 372)
 
     // Small uppercase heading over a group of controls, in place of the rules
     // and full-size titles that used to split the panel into strips.
@@ -122,11 +133,26 @@ PanelWindow {
         else if (action === "shutdown") shutdownProc.running = true
     }
 
-    implicitWidth: settingsOpen ? settingsWidth
-                 : panelOpen ? 372
-                 : settingsText.implicitWidth + 24 + Theme.pillPaddingH * 2
+    // The pill's box, animated inside a window that is not (see PillStage):
+    // the window takes the panel's or Settings' full size at the start of
+    // the move and gives it back at the end, and the glass grows in between.
+    PillStage {
+        id: stage
+        anchors.top: parent.top
+        anchors.right: parent.right
+        targetWidth: settingsItem.settingsOpen ? settingsItem.settingsWidth
+                   : settingsItem.panelOpen ? 372
+                   : settingsText.implicitWidth + 24 + Theme.pillPaddingH * 2
+        targetHeight: settingsItem.settingsOpen ? settingsItem.settingsHeight
+            : settingsItem.panelOpen ? Math.min(panelColumn.implicitHeight + 56,
+                                                settingsItem.screen.height - 48)
+            : 64
+    }
 
-    // Content-driven rather than a fixed 664; chrome is the 12px inset plus
+    implicitWidth: stage.windowWidth
+    implicitHeight: stage.windowHeight
+
+    // On targetHeight above: content-driven rather than a fixed 664; chrome is the 12px inset plus
     // the flickable's 16px margins.
     //
     // The ceiling is what the screen can actually give, not a number picked by
@@ -139,23 +165,11 @@ PanelWindow {
     // bottom, so it stops short of the screen instead of running into it. The
     // flickable underneath stays: it is the fallback for content that outgrows
     // even the screen, which an expanded list on a short display still can.
-    implicitHeight: settingsOpen ? settingsHeight
-        : panelOpen ? Math.min(panelColumn.implicitHeight + 56,
-                               settingsItem.screen.height - 48)
-        : 64
-
-    Behavior on implicitWidth {
-        NumberAnimation { duration: 280; easing.type: Easing.OutCubic }
-    }
-
-    Behavior on implicitHeight {
-        NumberAnimation { duration: 280; easing.type: Easing.OutCubic }
-    }
 
     Item {
         id: contentArea
         visible: !bar.barHidden
-        anchors.fill: parent
+        anchors.fill: stage
         anchors.margins: 12
         // The Settings view is laid out at its full size from the first frame
         // and uncovered as the glass grows -- clipped here so the part not yet
