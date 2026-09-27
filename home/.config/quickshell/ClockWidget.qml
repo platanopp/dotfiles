@@ -49,6 +49,17 @@ PanelWindow {
 
     property bool panelOpen: false
 
+    // Escape closes it (AppState.dismissPanels, bound while any panel is up).
+    readonly property bool escapeOpen: clockItem.panelOpen
+    readonly property string escapeKey: "clock:" + (clockItem.screen ? clockItem.screen.name : "")
+    onEscapeOpenChanged: AppState.setPanelOpen(clockItem.escapeKey, clockItem.escapeOpen)
+    Component.onDestruction: if (clockItem.escapeOpen) AppState.setPanelOpen(clockItem.escapeKey, false)
+
+    Connections {
+        target: AppState
+        function onDismissRequested() { clockItem.panelOpen = false }
+    }
+
     readonly property int panelWidth: 568
     readonly property int calendarWidth: 294
     readonly property var dateLocale: Qt.locale("en_US")

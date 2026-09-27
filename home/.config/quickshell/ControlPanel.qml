@@ -66,6 +66,17 @@ PanelWindow {
     margins.right: rightMargin
 
     property bool panelOpen: false
+
+    // Escape closes it (AppState.dismissPanels, bound while any panel is up).
+    readonly property bool escapeOpen: settingsItem.panelOpen || settingsItem.notifOpen
+    readonly property string escapeKey: "control:" + (settingsItem.screen ? settingsItem.screen.name : "")
+    onEscapeOpenChanged: AppState.setPanelOpen(settingsItem.escapeKey, settingsItem.escapeOpen)
+    Component.onDestruction: if (settingsItem.escapeOpen) AppState.setPanelOpen(settingsItem.escapeKey, false)
+
+    Connections {
+        target: AppState
+        function onDismissRequested() { settingsItem.panelOpen = false; settingsItem.notifOpen = false }
+    }
     // The notification centre, the pill's other face: the bell beside the
     // logo opens it, in the same glass. One or the other, never both.
     property bool notifOpen: false

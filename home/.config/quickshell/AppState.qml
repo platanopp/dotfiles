@@ -147,6 +147,60 @@ Singleton {
     // Super+O (the "settings" global shortcut in shell.qml).
     function toggleSettings() { root.settingsRequested("", root.focusedScreenName()) }
 
+    // ── Escape closes the bar's panels ───────────────────────────────────
+    //
+    // The pills never take the keyboard: switching a layer surface's keyboard
+    // mode while it is up clears its focus grab and shuts the panel (see
+    // ControlPanel), and a pill that kept the keyboard would leave it stuck
+    // there after closing. So Escape comes from Hyprland instead: while any
+    // panel is open, a bind for Escape is added that fires the "dismiss"
+    // global shortcut (shell.qml), and it is taken away again when the last
+    // panel closes. The rest of the keyboard and every other bind are left
+    // alone. The bind also removes itself when pressed, so even with the
+    // shell gone it can steal Escape once at most.
+    signal dismissRequested()
+    function dismissPanels() { root.dismissRequested() }
+
+    // Which panels are open, by "<widget>:<screen>".
+    property var openPanels: ({})
+    readonly property bool anyPanelOpen: Object.keys(root.openPanels).length > 0
+
+    function setPanelOpen(key, open) {
+        var next = Object.assign({}, root.openPanels)
+        if (open) next[key] = true
+        else delete next[key]
+        root.openPanels = next
+    }
+
+    onAnyPanelOpenChanged: escapeBind.sync()
+
+    QtObject {
+        id: escapeBind
+        property bool applied: false
+
+        function sync() {
+            if (escapeProc.running) { escapeRetry.restart(); return }
+            if (escapeBind.applied === root.anyPanelOpen) return
+            escapeBind.applied = root.anyPanelOpen
+            escapeProc.command = ["hyprctl", "eval", root.anyPanelOpen
+                ? 'pcall(hl.unbind, "Escape"); hl.bind("Escape", function() '
+                  + 'hl.dispatch(hl.dsp.global("quickshell:dismiss")); pcall(hl.unbind, "Escape") end)'
+                : 'pcall(hl.unbind, "Escape")']
+            escapeProc.running = true
+        }
+    }
+
+    Process {
+        id: escapeProc
+        running: false
+    }
+
+    Timer {
+        id: escapeRetry
+        interval: 60
+        onTriggered: escapeBind.sync()
+    }
+
     // The media panel on the focused monitor: qs ipc call media toggle |
     // open | close -- for a key bind, say.
     signal mediaRequested(string how, string screenName)

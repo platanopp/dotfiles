@@ -67,6 +67,16 @@ PanelWindow {
 
     property string expandedPanel: ""
 
+    // Escape closes it (AppState.dismissPanels, bound while any panel is up).
+    readonly property bool escapeOpen: statusItem.expandedPanel !== ""
+    readonly property string escapeKey: "status:" + (statusItem.screen ? statusItem.screen.name : "")
+    onEscapeOpenChanged: AppState.setPanelOpen(statusItem.escapeKey, statusItem.escapeOpen)
+
+    Connections {
+        target: AppState
+        function onDismissRequested() { statusItem.expandedPanel = "" }
+    }
+
     // A panel's heading: title, one line of state under it, and whatever
     // controls it carries on the right (a switch, refresh, settings).
     component PanelHeader: RowLayout {
@@ -386,7 +396,10 @@ PanelWindow {
     readonly property bool watchingAudioStreams: statusItem.expandedPanel === "audio"
     onWatchingAudioStreamsChanged:
         watchingAudioStreams ? AppState.watchAudioStreams() : AppState.unwatchAudioStreams()
-    Component.onDestruction: if (watchingAudioStreams) AppState.unwatchAudioStreams()
+    Component.onDestruction: {
+        if (statusItem.escapeOpen) AppState.setPanelOpen(statusItem.escapeKey, false)
+        if (watchingAudioStreams) AppState.unwatchAudioStreams()
+    }
 
     Flickable {
         visible: statusItem.expandedPanel !== ""

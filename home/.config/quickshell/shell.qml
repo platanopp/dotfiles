@@ -365,6 +365,16 @@ Scope {
         onPressed: AppState.toggleKeybinds()
     }
 
+    // Escape while a bar panel is open -- bound by AppState only for as
+    // long as one is (see escapeBind there).
+    GlobalShortcut {
+        appid: "quickshell"
+        name: "dismiss"
+        description: "Close the open panel"
+
+        onPressed: AppState.dismissPanels()
+    }
+
     GlobalShortcut {
         appid: "quickshell"
         name: "settings"

@@ -70,6 +70,17 @@ PanelWindow {
 
     property bool panelOpen: false
 
+    // Escape closes it (AppState.dismissPanels, bound while any panel is up).
+    readonly property bool escapeOpen: notesItem.panelOpen
+    readonly property string escapeKey: "notes:" + (notesItem.screen ? notesItem.screen.name : "")
+    onEscapeOpenChanged: AppState.setPanelOpen(notesItem.escapeKey, notesItem.escapeOpen)
+    Component.onDestruction: if (notesItem.escapeOpen) AppState.setPanelOpen(notesItem.escapeKey, false)
+
+    Connections {
+        target: AppState
+        function onDismissRequested() { notesItem.panelOpen = false }
+    }
+
     onPanelOpenChanged: {
         if (panelOpen) {
             AppState.refreshObsidianNotes()

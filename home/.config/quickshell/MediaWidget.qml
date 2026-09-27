@@ -60,6 +60,16 @@ PanelWindow {
 
     property bool panelOpen: false
 
+    // Escape closes it (AppState.dismissPanels, bound while any panel is up).
+    readonly property bool escapeOpen: mediaWidgetItem.panelOpen
+    readonly property string escapeKey: "media:" + (mediaWidgetItem.screen ? mediaWidgetItem.screen.name : "")
+    onEscapeOpenChanged: AppState.setPanelOpen(mediaWidgetItem.escapeKey, mediaWidgetItem.escapeOpen)
+
+    Connections {
+        target: AppState
+        function onDismissRequested() { mediaWidgetItem.panelOpen = false }
+    }
+
     // qs ipc call media toggle (see AppState): only the screen that asked.
     Connections {
         target: AppState
@@ -120,6 +130,7 @@ PanelWindow {
     onArtUrlChanged: AlbumColors.artUrl = artUrl
     onWantSpectrumChanged: wantSpectrum ? Spectrum.subscribe() : Spectrum.unsubscribe()
     Component.onDestruction: {
+        if (mediaWidgetItem.escapeOpen) AppState.setPanelOpen(mediaWidgetItem.escapeKey, false)
         if (wantSpectrum) Spectrum.unsubscribe()
         if (panelOpen) AppState.unwatchAudioStreams()
     }
