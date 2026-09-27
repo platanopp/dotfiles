@@ -688,7 +688,12 @@ PanelWindow {
                     id: carousel
                     anchors.fill: parent
 
-                    model: overlay.files
+                    // Only while the picker is up. Held for the whole session
+                    // the warm panels below were about 40 MB per monitor for
+                    // a picker opened now and then; built on opening instead,
+                    // the seven in view decode in a moment from the cached
+                    // thumbnails and the rest warm up behind them.
+                    model: overlay.visible ? overlay.files : []
                     pathItemCount: overlay.slotCount
                     // Enough to hold the whole folder, not a window around
                     // the visible seven.
@@ -700,10 +705,10 @@ PanelWindow {
                     // down. With room for every wallpaper, a panel is built
                     // once and then simply moves.
                     //
-                    // Capped, because this is memory held for as long as the
-                    // shell runs: these decode to about 2.8 MB each at the
-                    // size the panels draw them, so the ceiling is roughly
-                    // 55 MB for a very large folder and 39 MB for this one.
+                    // Capped: these decode to about 2.8 MB each at the size
+                    // the panels draw them, so the ceiling is roughly 55 MB
+                    // for a very large folder and 39 MB for this one -- while
+                    // the picker is open (see model).
                     cacheItemCount: Math.min(overlay.files.length,
                                              overlay.maxWarmPanels)
 

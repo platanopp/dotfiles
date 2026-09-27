@@ -1453,21 +1453,96 @@ Singleton {
         }
     }
 
+    // ── Network, Bluetooth and the rest of the bar's status ──────────────
+    //
+    // Read when something says it changed, not on a clock. This was one
+    // timer starting eight processes every 15 seconds -- and one of them,
+    // `nmcli dev wifi`, set off a full Wi-Fi scan each time the last was over
+    // 30 seconds old (see net_status.sh). Now NetworkManager and BlueZ are
+    // listened to, and a slow poll only catches what they do not announce:
+    // the Wi-Fi signal drifting, the tablet driver, a battery if there is one.
+    // The microphone is not here at all: pactl subscribe (below) covers it.
+    function refreshNetwork() {
+        if (!wifiProc.running) wifiProc.running = true
+        if (!wifiIpProc.running) wifiIpProc.running = true
+        if (!wifiRadioProc.running) wifiRadioProc.running = true
+    }
+
+    function refreshBluetooth() {
+        if (!btPoweredProc.running) btPoweredProc.running = true
+        if (!btConnectedProc.running) btConnectedProc.running = true
+    }
+
     Timer {
-        interval: 15000
+        interval: 60000
         running: true
         repeat: true
         triggeredOnStart: true
+        property bool first: true
         onTriggered: {
-            wifiProc.running = true
-            wifiIpProc.running = true
-            wifiRadioProc.running = true
-            btPoweredProc.running = true
-            btConnectedProc.running = true
-            micMutedProc.running = true
+            root.refreshNetwork()
+            root.refreshBluetooth()
             otdStateProc.running = true
-            batteryProc.running = true
+            // Once, and then only while a battery exists: a desktop answers
+            // "none" and there is nothing to keep asking about.
+            if (first || root.batteryPresent) batteryProc.running = true
+            if (first) micMutedProc.running = true
+            first = false
         }
+    }
+
+    // `nmcli monitor` prints a line for every change NetworkManager makes:
+    // connecting, dropping, the radio switched, a cable in.
+    Process {
+        id: networkEvents
+        running: true
+        command: ["nmcli", "monitor"]
+        stdout: SplitParser {
+            onRead: line => { if (!networkEventThrottle.running) networkEventThrottle.start() }
+        }
+        onExited: networkEventsRestart.restart()
+    }
+
+    Timer {
+        id: networkEventsRestart
+        interval: 5000
+        onTriggered: networkEvents.running = true
+    }
+
+    // Read once per burst: a connection coming up is a dozen lines.
+    Timer {
+        id: networkEventThrottle
+        interval: 400
+        onTriggered: root.refreshNetwork()
+    }
+
+    // BlueZ over D-Bus: powered on and off, devices connecting. A scan in
+    // progress streams signal updates, which the throttle holds to a read
+    // every 400ms rather than one per signal.
+    Process {
+        id: bluetoothEvents
+        running: true
+        command: ["gdbus", "monitor", "--system", "--dest", "org.bluez"]
+        stdout: SplitParser {
+            onRead: line => {
+                if (line.indexOf("Powered") === -1 && line.indexOf("Connected") === -1
+                        && line.indexOf("InterfacesRemoved") === -1) return
+                if (!bluetoothEventThrottle.running) bluetoothEventThrottle.start()
+            }
+        }
+        onExited: bluetoothEventsRestart.restart()
+    }
+
+    Timer {
+        id: bluetoothEventsRestart
+        interval: 5000
+        onTriggered: bluetoothEvents.running = true
+    }
+
+    Timer {
+        id: bluetoothEventThrottle
+        interval: 400
+        onTriggered: root.refreshBluetooth()
     }
 
     // ── Audio changes, as they happen ────────────────────────────────────

@@ -5,7 +5,14 @@ export LC_ALL=C
 ssid="" signal=-1
 # -e no: an SSID with a colon in it stays whole; it is everything after the
 # first two fields.
-line=$(nmcli -t -e no -f active,signal,ssid dev wifi 2>/dev/null | grep -m1 '^yes:')
+#
+# --rescan no: from what NetworkManager already knows. Left to its default,
+# `nmcli dev wifi` starts a full scan whenever the last is over 30 seconds
+# old -- run on the bar's poll, that was a scan of every 2.4, 5 and 6 GHz
+# channel about twice a minute, each one taking the card off its channel for
+# ~4 seconds: lag spikes in games, for a signal-bars icon. The Wi-Fi panel
+# still scans on purpose when opened.
+line=$(nmcli -t -e no -f active,signal,ssid dev wifi list --rescan no 2>/dev/null | grep -m1 '^yes:')
 if [ -n "$line" ]; then
     rest=${line#yes:}
     signal=${rest%%:*}

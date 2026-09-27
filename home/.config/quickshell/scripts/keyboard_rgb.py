@@ -54,6 +54,7 @@ import os
 import select
 import socket
 import struct
+import subprocess
 import sys
 import time
 
@@ -372,6 +373,10 @@ class Reader:
         return s
 
 
+# Seconds a server started here gets to find keyboards before it is let go.
+ORGB_DETECT = 20
+
+
 class OpenRGB:
     def __init__(self, host="127.0.0.1", port=ORGB_PORT):
         self.sock = socket.create_connection((host, port), timeout=2)
@@ -535,10 +540,17 @@ class OpenRGBKeyboard(Device):
 
 class Keyboards:
     """Every keyboard that can be lit right now, found again when one comes
-    or goes. The Wooting through its SDK; the rest through OpenRGB when a
-    server is running."""
+    or goes. The Wooting through its SDK; the rest through OpenRGB.
 
-    def __init__(self):
+    OpenRGB is started here, and only for as long as it has a keyboard. Its
+    server costs a steady quarter of a percent of CPU doing nothing, and with
+    only the Wooting plugged in (which its own SDK drives) it lit nothing at
+    all -- so it is woken when a USB device comes or goes (and once at the
+    start), given ORGB_DETECT seconds to find what is there, and shut down
+    again if none of it is a keyboard. A server someone else started, the
+    OpenRGB app say, is used and never stopped."""
+
+    def __init__(self, manage_openrgb=False):
         self.sdk = load_sdk()
         self.wooting = None
         self.orgb = None
@@ -546,6 +558,50 @@ class Keyboards:
         self.last_scan = 0.0
         self.usb = self.usb_signature()
         self.rescan_asked = 0.0
+        # Only the long-running `serve` starts and stops the server; a one-off
+        # command uses one if it is there.
+        self.manage = manage_openrgb
+        self.orgb_proc = None          # the server, when this started it
+        self.orgb_until = 0.0          # end of its detection window
+        if self.manage:
+            self.wake_openrgb()
+
+    def wake_openrgb(self):
+        """A server up for the next ORGB_DETECT seconds: one already running,
+        or one started now."""
+        if self.orgb_proc and self.orgb_proc.poll() is None:
+            self.orgb_until = time.monotonic() + ORGB_DETECT
+            return
+        try:
+            socket.create_connection(("127.0.0.1", ORGB_PORT), timeout=0.3).close()
+            return                     # someone else's; used, left alone
+        except OSError:
+            pass
+        log = open(os.path.expanduser("~/.local/state/openrgb.log"), "ab")
+        try:
+            self.orgb_proc = subprocess.Popen(
+                ["openrgb", "--server", "--noautoconnect"],
+                stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
+            self.orgb_until = time.monotonic() + ORGB_DETECT
+        except OSError:
+            self.orgb_proc = None
+        finally:
+            log.close()
+
+    def sleep_openrgb(self):
+        """Stops the server this started, once it has had its time and found
+        no keyboard."""
+        if not self.orgb_proc or self.orgb_devices or time.monotonic() < self.orgb_until:
+            return
+        if self.orgb:
+            self.orgb.close()
+            self.orgb = None
+        self.orgb_proc.terminate()
+        try:
+            self.orgb_proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            self.orgb_proc.kill()
+        self.orgb_proc = None
 
     @staticmethod
     def usb_signature():
@@ -573,6 +629,8 @@ class Keyboards:
         usb = self.usb_signature()
         if usb != self.usb:
             self.usb = usb
+            if self.manage:
+                self.wake_openrgb()
             if self.orgb:
                 try:
                     self.orgb.rescan()
@@ -590,10 +648,15 @@ class Keyboards:
             finally:
                 if self.orgb:
                     self.orgb.sock.settimeout(2)
-        if force or now - self.last_scan > 5 or (self.orgb and self.orgb.list_changed):
+        # A managed server that is not up is not looked for.
+        running = not self.manage or self.orgb or (self.orgb_proc and self.orgb_proc.poll() is None) \
+            or now < self.orgb_until
+        if running and (force or now - self.last_scan > 5 or (self.orgb and self.orgb.list_changed)):
             self.rescan_asked = 0.0
             self.last_scan = now
             self.scan_openrgb()
+        if self.manage:
+            self.sleep_openrgb()
         return before != [d.key for d in self.devices()]
 
     def scan_openrgb(self):
@@ -730,7 +793,7 @@ def serve():
     apply is, the wallpaper actually up by then. Between commands, once a
     second, the Wooting's profile is read and the keyboards are recounted.
     Leaving on end of input keeps the colours on the keys."""
-    boards = Keyboards()
+    boards = Keyboards(manage_openrgb=True)
     fd = sys.stdin.fileno()
     pending = b""
     reader = ProfileReader()
@@ -792,6 +855,10 @@ def serve():
                 batch.append(more)
         except EOFError:
             reader.close()
+            # The server goes with the shell that asked for it; the next
+            # `serve` starts its own if there is a keyboard for it.
+            if boards.orgb_proc:
+                boards.orgb_proc.terminate()
             return
 
         # Keyboards plugged in or out: the new ones get the wallpaper.

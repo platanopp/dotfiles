@@ -52,10 +52,10 @@ hl.on("hyprland.start", function()
     -- when the timeout does not fire, what it says about inhibits is the only
     -- account of why, and it used to be thrown away.
     hl.exec_cmd("hypridle > $HOME/.local/state/hypridle.log 2>&1")
-    -- OpenRGB's SDK server, headless: how the shell reaches RGB keyboards of
-    -- any brand other than Wooting (scripts/keyboard_rgb.py, which also
-    -- keeps looking for it, so the order here does not matter).
-    hl.exec_cmd("openrgb --server --noautoconnect > $HOME/.local/state/openrgb.log 2>&1")
+    -- No OpenRGB server here: scripts/keyboard_rgb.py starts one when a USB
+    -- device comes in and keeps it only while it has a keyboard to light.
+    -- Started for the whole session it cost a steady 0.25% CPU lighting
+    -- nothing, the Wooting being driven through its own SDK.
     hl.exec_cmd("systemctl --user start hyprpolkitagent")
     hl.exec_cmd("gsettings set org.gnome.desktop.interface color-scheme prefer-dark")
     -- Tailscale's tray icon: tailnet state and a connect/disconnect toggle
@@ -283,7 +283,10 @@ hl.window_rule({
 })
 hl.layer_rule({
     name  = "quickshell-xray",
-    match = { namespace = "quickshell" },
+    -- ".*": rules match the whole namespace, and "quickshell" alone matched
+    -- none of the shell's ("quickshell:bar-blur", ...). Harmless while
+    -- decoration.blur.xray is on globally, but this is what it meant.
+    match = { namespace = "^quickshell.*" },
     xray  = true,
 })
 hl.window_rule({
