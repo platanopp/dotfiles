@@ -7,7 +7,7 @@ hl.config({
     general = {
         border_size = 0,
         gaps_in = 16,
-        gaps_out = { top = 20, bottom = 36, left = 36, right = 36 },
+        gaps_out = { top = 20, bottom = 22, left = 22, right = 22 },
     },
     input = {
         follow_mouse = 1,
