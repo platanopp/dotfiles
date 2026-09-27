@@ -328,10 +328,15 @@ hl.window_rule({
 })
 hl.window_rule({
     name      = "steam-on-2",
-    -- Anything launched from Steam gets its own class (steam_app_...), so
-    -- this catches the client and its dialogs and no actual game. Not its
-    -- notification toasts: those belong where you are looking (below).
-    match     = { class = "^steam$", title = "negative:^notificationtoasts.*" },
+    -- The client's own window and its sign-in, by title, and nothing else
+    -- of class steam. Steam draws its menus, dialogs and toasts as windows
+    -- of their own (contextmenu_N_uid0, PopupWindow_..., notificationtoasts_
+    -- in its webhelper log), and on class alone every one of them was sent
+    -- here -- with Steam moved to the Samsung, a right-click menu opened on
+    -- the Xiaomi. Left alone they open by the window that asked for them.
+    -- (Games are not caught either way: they get classes of their own,
+    -- steam_app_....)
+    match     = { class = "^steam$", title = "^(Steam|Sign in to Steam)$" },
     workspace = "2 silent",
 })
 
