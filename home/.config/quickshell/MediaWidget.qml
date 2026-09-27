@@ -118,7 +118,26 @@ PanelWindow {
 
     // Only the open panel draws the slider, so only the open panel needs the
     // list kept current.
-    onPanelOpenChanged: panelOpen ? AppState.watchAudioStreams() : AppState.unwatchAudioStreams()
+    onPanelOpenChanged: {
+        panelOpen ? AppState.watchAudioStreams() : AppState.unwatchAudioStreams()
+        // The pill's own cover and title: gone at once when the panel opens;
+        // back only once it has mostly shut, so they do not fade in over the
+        // panel's cover on its way out (see compactArt).
+        if (panelOpen) {
+            compactBack.stop()
+            compactShown = false
+        } else {
+            compactBack.restart()
+        }
+    }
+
+    property bool compactShown: true
+
+    Timer {
+        id: compactBack
+        interval: mediaWidgetItem.compactDelay
+        onTriggered: mediaWidgetItem.compactShown = true
+    }
 
     // The capture helper only runs while the ring is both on screen and
     // moving, so nothing listens to the speakers in the background.
@@ -156,6 +175,12 @@ PanelWindow {
         else if (player.loopState === MprisLoopState.Playlist) player.loopState = MprisLoopState.Track
         else player.loopState = MprisLoopState.None
     }
+
+    // The compact pill's inside: its 64px box less the 12px inset each side.
+    readonly property int compactInner: 40
+    // How long the pill's own cover and title wait, when the panel closes,
+    // before fading back in (see compactArt).
+    readonly property int compactDelay: 110
 
     function loopIcon() {
         if (!player) return "󰑗"
@@ -216,12 +241,17 @@ PanelWindow {
             id: compactArt
             anchors.left: parent.left
             anchors.top: parent.top
-            anchors.bottom: parent.bottom
             // Only the pill's end: the cover has faded to nothing before the
             // title starts, so a pale cover never sits under the text.
             width: 70
+            // The pill's height, not the box's. Filling the box, the cover
+            // and the title came back at the height of the panel still
+            // closing around them: a tall stretched strip with the title
+            // riding up its middle, and the cover's layer, a frame behind
+            // the size, left hanging below the glass.
+            height: mediaWidgetItem.compactInner
             visible: opacity > 0
-            opacity: mediaWidgetItem.panelOpen ? 0 : 1
+            opacity: mediaWidgetItem.compactShown ? 1 : 0
 
             Behavior on opacity {
                 NumberAnimation { duration: 150 }
@@ -317,12 +347,13 @@ PanelWindow {
         RowLayout {
             id: mediaWidgetRow
             anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
+            // Centred on the pill (compactArt), not the box: see compactArt.
+            anchors.verticalCenter: compactArt.verticalCenter
             // The title starts where the cover has gone.
             anchors.leftMargin: 74
             spacing: 10
-            visible: !mediaWidgetItem.panelOpen
-            opacity: mediaWidgetItem.panelOpen ? 0 : 1
+            visible: opacity > 0
+            opacity: mediaWidgetItem.compactShown ? 1 : 0
 
             Behavior on opacity {
                 NumberAnimation { duration: 150 }
@@ -444,115 +475,128 @@ PanelWindow {
         // glass's rounded corners, fading down into it. The spectrum rises
         // from where it fades; the title and the rest start below, where the
         // picture has gone -- the same rule as the pill: no text on the cover.
+        // Cut to the box: closing, the box shrinks past the cover's 230px
+        // well before the cover has faded, and it hung out below the glass.
         Item {
-            id: hero
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            height: 230
-            visible: opacity > 0
-            opacity: mediaWidgetItem.panelOpen ? 1 : 0
+            height: Math.min(hero.height, parent.height)
+            clip: true
+            // hero.opacity, not hero.visible: a child's visible is false while
+            // its parent is hidden, and this would never show again.
+            visible: hero.opacity > 0
 
-            Behavior on opacity {
-                NumberAnimation { duration: 200 }
-            }
+            Item {
+                id: hero
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                height: 230
+                visible: opacity > 0
+                opacity: mediaWidgetItem.panelOpen ? 1 : 0
 
-            readonly property bool hasArt: heroImage.status === Image.Ready
-
-            Rectangle {
-                id: heroMask
-                anchors.fill: parent
-                radius: 26
-                visible: false
-                gradient: Gradient {
-                    // Gone by 0.85 -- 195px down, just above the title.
-                    GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 1) }
-                    GradientStop { position: 0.4; color: Qt.rgba(1, 1, 1, 0.9) }
-                    GradientStop { position: 0.7; color: Qt.rgba(1, 1, 1, 0.22) }
-                    GradientStop { position: 0.85; color: Qt.rgba(1, 1, 1, 0) }
-                }
-            }
-
-            Image {
-                id: heroImage
-                anchors.fill: parent
-                source: bar.trackArtUrl
-                fillMode: Image.PreserveAspectCrop
-                // The middle of a square cover, not its top edge.
-                verticalAlignment: Image.AlignVCenter
-                asynchronous: true
-                sourceSize.width: 512
-                visible: false
-            }
-
-            OpacityMask {
-                anchors.fill: parent
-                visible: hero.hasArt
-                source: heroImage
-                maskSource: heroMask
-                cached: false
-
-                layer.enabled: true
-                layer.effect: MultiEffect {
-                    brightness: bar.isPlaying ? 0 : -0.3
-                    saturation: bar.isPlaying ? 0 : -0.35
-
-                    Behavior on brightness { NumberAnimation { duration: Theme.durMedium } }
-                    Behavior on saturation { NumberAnimation { duration: Theme.durMedium } }
-                }
-            }
-
-            // No cover: the note, large, where it would be.
-            IconGlyph {
-                visible: !hero.hasArt
-                anchors.horizontalCenter: parent.horizontalCenter
-                y: 64
-                text: "󰎇"
-                color: Theme.textMuted
-                size: 44
-            }
-
-            // The spectrum: bars across the width, rising from where the
-            // cover fades out, in the album's colour. Mirrored about the
-            // middle, low bands at the centre.
-            Row {
-                id: bars
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.bottom: parent.bottom
-                anchors.bottomMargin: 34
-                spacing: 3
-                visible: mediaWidgetItem.wantSpectrum
-
-                readonly property int count: 48
-
-                function level(i) {
-                    var b = Spectrum.bands
-                    var half = bars.count / 2
-                    var band = i < half ? half - 1 - i : i - half
-                    return (band >= 0 && band < b.length) ? b[band] : 0
+                Behavior on opacity {
+                    NumberAnimation { duration: mediaWidgetItem.panelOpen ? 200 : 120 }
                 }
 
-                Repeater {
-                    model: bars.count
+                readonly property bool hasArt: heroImage.status === Image.Ready
 
-                    Rectangle {
-                        required property int index
-                        readonly property real level: bars.level(index)
-                        // Not readonly: Behavior smooths the step between the
-                        // helper's frames.
-                        property real len: 2 + level * 34
+                Rectangle {
+                    id: heroMask
+                    anchors.fill: parent
+                    radius: 26
+                    visible: false
+                    gradient: Gradient {
+                        // Gone by 0.85 -- 195px down, just above the title.
+                        GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 1) }
+                        GradientStop { position: 0.4; color: Qt.rgba(1, 1, 1, 0.9) }
+                        GradientStop { position: 0.7; color: Qt.rgba(1, 1, 1, 0.22) }
+                        GradientStop { position: 0.85; color: Qt.rgba(1, 1, 1, 0) }
+                    }
+                }
 
-                        anchors.bottom: parent.bottom
-                        width: 3
-                        height: len
-                        radius: 1.5
-                        color: Theme.alpha(AlbumColors.accent, 0.35 + level * 0.6)
+                Image {
+                    id: heroImage
+                    anchors.fill: parent
+                    source: bar.trackArtUrl
+                    fillMode: Image.PreserveAspectCrop
+                    // The middle of a square cover, not its top edge.
+                    verticalAlignment: Image.AlignVCenter
+                    asynchronous: true
+                    sourceSize.width: 512
+                    visible: false
+                }
 
-                        Behavior on len {
-                            NumberAnimation { duration: 70; easing.type: Easing.OutQuad }
-                        }
-                        Behavior on color {
-                            ColorAnimation { duration: 70 }
+                OpacityMask {
+                    anchors.fill: parent
+                    visible: hero.hasArt
+                    source: heroImage
+                    maskSource: heroMask
+                    cached: false
+
+                    layer.enabled: true
+                    layer.effect: MultiEffect {
+                        brightness: bar.isPlaying ? 0 : -0.3
+                        saturation: bar.isPlaying ? 0 : -0.35
+
+                        Behavior on brightness { NumberAnimation { duration: Theme.durMedium } }
+                        Behavior on saturation { NumberAnimation { duration: Theme.durMedium } }
+                    }
+                }
+
+                // No cover: the note, large, where it would be.
+                IconGlyph {
+                    visible: !hero.hasArt
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    y: 64
+                    text: "󰎇"
+                    color: Theme.textMuted
+                    size: 44
+                }
+
+                // The spectrum: bars across the width, rising from where the
+                // cover fades out, in the album's colour. Mirrored about the
+                // middle, low bands at the centre.
+                Row {
+                    id: bars
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.bottom: parent.bottom
+                    anchors.bottomMargin: 34
+                    spacing: 3
+                    visible: mediaWidgetItem.wantSpectrum
+
+                    readonly property int count: 48
+
+                    function level(i) {
+                        var b = Spectrum.bands
+                        var half = bars.count / 2
+                        var band = i < half ? half - 1 - i : i - half
+                        return (band >= 0 && band < b.length) ? b[band] : 0
+                    }
+
+                    Repeater {
+                        model: bars.count
+
+                        Rectangle {
+                            required property int index
+                            readonly property real level: bars.level(index)
+                            // Not readonly: Behavior smooths the step between the
+                            // helper's frames.
+                            property real len: 2 + level * 34
+
+                            anchors.bottom: parent.bottom
+                            width: 3
+                            height: len
+                            radius: 1.5
+                            color: Theme.alpha(AlbumColors.accent, 0.35 + level * 0.6)
+
+                            Behavior on len {
+                                NumberAnimation { duration: 70; easing.type: Easing.OutQuad }
+                            }
+                            Behavior on color {
+                                ColorAnimation { duration: 70 }
+                            }
                         }
                     }
                 }
