@@ -56,6 +56,10 @@ DOTFILES = backup_repo()
 SPEC = {
     "gaps_in":          ("general:gaps_in", "int", (0, 40), "Gap between windows"),
     "gaps_out":         ("general:gaps_out", "sides", (0, 80), "Gap to the screen edge"),
+    # The top edge of the same option, on a slider of its own: the bar sits
+    # in it, and the shell's pills follow it down (AppState.gapTop). Stored
+    # inside gaps_out's entry -- one option, one line in gui-settings.lua.
+    "gaps_top":         ("general:gaps_out", "top", (0, 80), "Gap to the top edge"),
     "border_size":      ("general:border_size", "int", (0, 8), "Border"),
     "layout":           ("general:layout", "enum", ("dwindle", "master", "scrolling"), "Layout"),
     "rounding":         ("decoration:rounding", "int", (0, 40), "Corner rounding"),
@@ -95,7 +99,7 @@ def live(key):
         if "css" in d:           # gaps_in comes back as "15 15 15 15"
             return int(d["css"].split()[0])
         return d.get("int")
-    if kind == "sides":
+    if kind in ("sides", "top"):
         parts = [int(p) for p in d.get("css", "0").split()]
         parts = (parts * 4)[:4] if len(parts) == 1 else parts
         if len(parts) == 2:
@@ -129,7 +133,7 @@ def coerce(key, raw):
     """The value as its option's type, or an exception. Everything written to
     Lua goes through here."""
     kind, bounds = SPEC[key][1], SPEC[key][2]
-    if kind in ("int", "sides"):
+    if kind in ("int", "sides", "top"):
         v = int(round(float(raw)))
         lo, hi = bounds
         if not lo <= v <= hi:
@@ -305,7 +309,16 @@ def cmd_get():
         v = live(key)
         if kind == "sides" and isinstance(v, dict):
             v = v["left"]
-        out[key] = {"value": v, "overridden": key in state, "type": kind, "label": label,
+        elif kind == "top" and isinstance(v, dict):
+            v = v["top"]
+        owner = "gaps_out" if kind == "top" else key
+        overridden = owner in state
+        if kind in ("sides", "top") and overridden:
+            # Each slider is overridden only on its own edges.
+            val, base = state[owner]["value"], state[owner].get("base") or {}
+            edges = ("top",) if kind == "top" else ("bottom", "left", "right")
+            overridden = isinstance(val, dict) and any(val.get(e) != base.get(e) for e in edges)
+        out[key] = {"value": v, "overridden": overridden, "type": kind, "label": label,
                     "bounds": list(bounds) if bounds else None}
     print(json.dumps({"options": out, "git": git_status()}))
 
@@ -316,6 +329,8 @@ def cmd_set(key, raw):
     value = coerce(key, raw)
     kind = SPEC[key][1]
     before = live(key)
+    if kind == "top":
+        return set_top(value, before)
 
     state = load_state()
     # Letting go of a slider where it already was is not a change: nothing
@@ -355,8 +370,76 @@ def cmd_set(key, raw):
     print(json.dumps(result))
 
 
+def set_top(value, before):
+    """gaps_top: the top edge of gaps_out, the other three kept as they are."""
+    if not isinstance(before, dict):
+        before = {e: before or 0 for e in ("top", "right", "bottom", "left")}
+    state = load_state()
+    if before["top"] == value:
+        print(json.dumps({"ok": True, "commit": {"committed": False, "reason": "unchanged"}}))
+        return
+    base = state.get("gaps_out", {}).get("base", before)
+    stored = {"top": value, "bottom": before["bottom"], "left": before["left"], "right": before["right"]}
+    state["gaps_out"] = {"value": stored, "base": base}
+    apply_state(state, "gaps_out", before,
+                f"settings(hyprland): gap to the top edge {before['top']} -> {value}")
+
+
+def apply_state(state, key, before, msg):
+    """Write, run live, roll back on failure, commit on success."""
+    saved = snapshot_files()
+    write_atomic(STATE, json.dumps(state, indent=2) + "\n")
+    write_atomic(LUA, render(state))
+    err = run_live(LUA)
+    if err:
+        restore_files(saved)
+        if os.path.exists(LUA):
+            run_live(LUA)
+        if before is not None:
+            apply_live(key, before)
+        print(json.dumps({"ok": False, "error": err}))
+        sys.exit(1)
+    print(json.dumps({"ok": True, "commit": commit(msg)}))
+
+
+def reset_edges(state, key):
+    """gaps_out and gaps_top share one entry: resetting one puts back only
+    its own edges, and drops the entry once nothing differs from the base."""
+    entry = state.get("gaps_out")
+    if not entry:
+        return None
+    base, val = entry.get("base") or {}, dict(entry["value"])
+    edges = ("top",) if key == "gaps_top" else ("bottom", "left", "right")
+    for e in edges:
+        val[e] = base.get(e, val[e])
+    before = live("gaps_out")
+    if all(val.get(e) == base.get(e) for e in ("top", "bottom", "left", "right")):
+        state.pop("gaps_out")
+        return before, base
+    state["gaps_out"] = {"value": val, "base": base}
+    return before, val
+
+
 def cmd_reset(key):
     state = load_state()
+    if key in ("gaps_out", "gaps_top"):
+        r = reset_edges(state, key)
+        if r is None:
+            print(json.dumps({"ok": True, "commit": {"committed": False, "reason": "not overridden"}}))
+            return
+        before, target = r
+        saved = snapshot_files()
+        write_atomic(STATE, json.dumps(state, indent=2) + "\n")
+        write_atomic(LUA, render(state))
+        err = run_live(LUA) or apply_live("gaps_out", target)
+        if err:
+            restore_files(saved)
+            run_live(LUA)
+            print(json.dumps({"ok": False, "error": err}))
+            sys.exit(1)
+        msg = f"settings(hyprland): {SPEC[key][3].lower()} back to the config's value"
+        print(json.dumps({"ok": True, "commit": commit(msg)}))
+        return
     if key not in state:
         print(json.dumps({"ok": True, "commit": {"committed": False, "reason": "not overridden"}}))
         return

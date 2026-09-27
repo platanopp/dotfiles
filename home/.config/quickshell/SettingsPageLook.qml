@@ -38,6 +38,7 @@ Column {
 
         readonly property real gapIn: gapInSlider.shown * preview.k
         readonly property real gapOut: gapOutSlider.shown * preview.k
+        readonly property real gapTop: gapTopSlider.shown * preview.k
         // Not "border": a Rectangle has one, and redeclaring it fails the page.
         readonly property real borderPx: borderSlider.shown
         readonly property real round: roundSlider.shown * preview.k
@@ -78,11 +79,14 @@ Column {
 
                     x: win.index === 0 ? win.areaX + preview.gapIn
                                        : win.areaX + win.areaW * win.share + preview.gapIn
-                    y: preview.gapOut + preview.gapIn
+                    y: preview.gapTop + preview.gapIn
                     width: (win.index === 0 ? win.areaW * win.share
                                             : preview.layout === "scrolling" ? win.areaW * win.share
                                             : win.areaW * (1 - win.share)) - preview.gapIn * 2
-                    height: mock.height - (preview.gapOut + preview.gapIn) * 2
+                    height: mock.height - preview.gapTop - preview.gapOut - preview.gapIn * 2
+
+                    Behavior on y { NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic } }
+                    Behavior on height { NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic } }
 
                     Behavior on x { NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic } }
                     Behavior on width { NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic } }
@@ -165,7 +169,7 @@ Column {
             stacked: true
             icon: "\u{F00CE}"
             tint: page.tint
-            title: "To the screen edge"
+            title: "Sides and bottom"
             value: Math.round(gapOutSlider.shown) + " px"
             resettable: page.opt("gaps_out").overridden
             onReset: AppState.resetHypr("gaps_out")
@@ -178,6 +182,39 @@ Column {
                 value: page.val("gaps_out", 0)
                 format: v => Math.round(v) + " px"
                 onMoved: v => AppState.setHypr("gaps_out", Math.round(v))
+            }
+        }
+
+        // The top edge apart: the bar lives in it, and the pills follow it.
+        SettingsRow {
+            stacked: true
+            icon: "\u{F0143}"
+            tint: page.tint
+            title: "Top"
+            value: Math.round(gapTopSlider.shown) + " px"
+            resettable: page.opt("gaps_top").overridden
+            onReset: AppState.resetHypr("gaps_top")
+
+            SettingsSlider {
+                id: gapTopSlider
+                width: parent.width
+                tint: page.tint
+                from: 0; to: 80; step: 1
+                value: page.val("gaps_top", 0)
+                format: v => Math.round(v) + " px"
+                onMoved: v => AppState.setHypr("gaps_top", Math.round(v))
+            }
+        }
+
+        SettingsRow {
+            visible: Math.round(gapTopSlider.shown) !== Math.round(gapOutSlider.shown)
+            icon: "\u{F0337}"
+            tint: page.tint
+            title: "Same on every edge"
+
+            PillButton {
+                text: "Match top"
+                onClicked: AppState.setHypr("gaps_top", Math.round(gapOutSlider.value))
             }
         }
 
