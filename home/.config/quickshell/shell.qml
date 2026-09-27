@@ -7,6 +7,7 @@ import Quickshell.Wayland
 import Quickshell.Hyprland
 import Quickshell.Services.Mpris
 import QtQuick
+import QtQuick.Effects
 import QtQuick.Layouts
 
 Scope {
@@ -33,17 +34,32 @@ Scope {
 	    // gap, and its height is what Hyprland reserves -- so raising the
 	    // top gap moves the bar down and the windows with it, instead of
 	    // sliding the pill out of a strip that stayed 51px tall.
-	    implicitHeight: AppState.gapTop + leftPill.implicitHeight + 3
+	    //
+	    // The window itself runs 16px deeper than that, for the workspaces
+	    // pill's shadow -- the other pills have one, and without it this one
+	    // read as flatter and shorter than the rest. The reserved space is
+	    // pinned to the strip, and so is input, so the extra room neither
+	    // moves the windows nor takes clicks from their top edge.
+	    readonly property int stripHeight: AppState.gapTop + leftPill.implicitHeight + 3
+	    implicitHeight: stripHeight + 16
+	    exclusionMode: ExclusionMode.Normal
+	    exclusiveZone: stripHeight
             color: "transparent"
 
             // See the pills: masked rather than unmapped, so the layer surface
             // keeps its place at the bottom of the overlay stack.
-            mask: bar.barHidden ? barBlankMask : null
+            mask: bar.barHidden ? barBlankMask : barStripMask
 
             Region {
                 id: barBlankMask
                 width: 0
                 height: 0
+            }
+
+            Region {
+                id: barStripMask
+                width: bar.width
+                height: bar.stripHeight
             }
 
             // This window spans the whole strip and sits under the pills, so
@@ -244,6 +260,18 @@ Scope {
                 implicitHeight: 40
                 radius: 20
                 color: Theme.glass
+
+                // The same drop shadow as every other pill (their MultiEffect).
+                RectangularShadow {
+                    anchors.fill: parent
+                    z: -1
+                    radius: parent.radius
+                    // Tuned by measurement to darken what is under it as much
+                    // as the MultiEffect shadow does under the other pills.
+                    blur: 20
+                    offset.y: 4
+                    color: Qt.rgba(0, 0, 0, 0.8)
+                }
 
                 Behavior on implicitWidth {
                     NumberAnimation { duration: 280; easing.type: Easing.OutCubic }
