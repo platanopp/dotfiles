@@ -32,5 +32,9 @@
   "active_opacity": {
     "value": 0.88,
     "base": 0.8
+  },
+  "inactive_opacity": {
+    "value": 0.74,
+    "base": 0.7
   }
 }
