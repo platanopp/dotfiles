@@ -4,6 +4,12 @@
 -- gui-settings.json. hyprland.lua runs this last, so these values win.
 
 hl.config({
+    decoration = {
+        active_opacity = 0.9,
+        shadow = {
+            enabled = false,
+        },
+    },
     general = {
         border_size = 0,
         gaps_in = 13,
@@ -11,10 +17,5 @@ hl.config({
     },
     input = {
         follow_mouse = 1,
-    },
-    decoration = {
-        shadow = {
-            enabled = false,
-        },
     },
 })

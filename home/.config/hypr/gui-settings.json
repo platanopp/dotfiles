@@ -28,5 +28,9 @@
   "gaps_in": {
     "value": 13,
     "base": 15
+  },
+  "active_opacity": {
+    "value": 0.9,
+    "base": 0.8
   }
 }
