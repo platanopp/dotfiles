@@ -5,6 +5,7 @@ import Quickshell.Widgets
 import Quickshell.Services.Mpris
 import QtQuick
 import QtQuick.Effects
+import Qt5Compat.GraphicalEffects
 import QtQuick.Layouts
 
 PanelWindow {
@@ -148,7 +149,7 @@ PanelWindow {
         anchors.top: parent.top
         anchors.left: parent.left
         targetWidth: mediaWidgetItem.panelOpen ? 396
-                   : mediaWidgetRow.implicitWidth + 24 + Theme.pillPaddingH * 2
+                   : mediaWidgetRow.implicitWidth + 24 + 62 + Theme.pillPaddingH
         targetHeight: mediaWidgetItem.panelOpen ? Math.min(mediaContentColumn.implicitHeight + 60, 640) : 64
     }
 
@@ -186,115 +187,155 @@ PanelWindow {
         }
 
         // ── Compact pill ─────────────────────────────────────────────────
-        RowLayout {
-            id: mediaWidgetRow
-            anchors.centerIn: parent
-            spacing: 10
-            visible: !mediaWidgetItem.panelOpen
+        //
+        // The cover fills the pill's left end, full height and following
+        // its rounded edge, and fades out into the glass towards the title.
+        // How far along the song is runs as a hairline along the foot.
+        // Paused, the cover steps back under a pause mark and the line dims.
+        Item {
+            id: compactArt
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            width: 112
+            visible: opacity > 0
             opacity: mediaWidgetItem.panelOpen ? 0 : 1
 
             Behavior on opacity {
                 NumberAnimation { duration: 150 }
             }
 
-            // The artwork inside a ring that fills as the track plays -- the
-            // pill says how far along the song is without a word of text.
-            // Paused, the ring dims and the cover darkens under a pause mark.
-            Item {
-                id: art
-                Layout.preferredWidth: 34
-                Layout.preferredHeight: 34
+            readonly property bool hasArt: coverImage.status === Image.Ready
 
-                readonly property real progress: mediaWidgetItem.trackLength > 0
-                    ? Math.max(0, Math.min(1, mediaWidgetItem.currentPosition / mediaWidgetItem.trackLength)) : 0
-
-                Canvas {
-                    id: progressRing
-                    anchors.fill: parent
-                    property real progress: art.progress
-                    property bool playing: bar.isPlaying
-                    onProgressChanged: requestPaint()
-                    onPlayingChanged: requestPaint()
-                    onPaint: {
-                        var ctx = getContext("2d")
-                        ctx.reset()
-                        var c = width / 2, r = c - 1.5
-                        ctx.lineWidth = 2
-                        ctx.lineCap = "round"
-                        ctx.strokeStyle = Qt.rgba(Theme.foreground.r, Theme.foreground.g, Theme.foreground.b, 0.14)
-                        ctx.beginPath(); ctx.arc(c, c, r, 0, Math.PI * 2); ctx.stroke()
-                        if (progressRing.progress > 0) {
-                            var ink = progressRing.playing ? Theme.accent : Theme.textMuted
-                            ctx.strokeStyle = Qt.rgba(ink.r, ink.g, ink.b, ink.a)
-                            ctx.beginPath()
-                            ctx.arc(c, c, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progressRing.progress)
-                            ctx.stroke()
-                        }
-                    }
+            // What the cover is cut to: the pill's left end, solid at the
+            // edge and clear by the right. Only its alpha is used.
+            Rectangle {
+                id: coverMask
+                anchors.fill: parent
+                radius: height / 2
+                visible: false
+                gradient: Gradient {
+                    orientation: Gradient.Horizontal
+                    GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 1) }
+                    GradientStop { position: 0.38; color: Qt.rgba(1, 1, 1, 0.9) }
+                    GradientStop { position: 0.72; color: Qt.rgba(1, 1, 1, 0.3) }
+                    GradientStop { position: 1.0; color: Qt.rgba(1, 1, 1, 0) }
                 }
+            }
 
-                Rectangle {
-                    id: artMask
+            Image {
+                id: coverImage
+                anchors.fill: parent
+                source: bar.trackArtUrl
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                sourceSize.width: 224
+                visible: false
+            }
+
+            // OpacityMask, not MultiEffect's mask: MultiEffect thresholds
+            // the mask, and would cut the gradient to a hard edge (or, set
+            // soft, not cut at all). This takes the gradient's alpha as it is.
+            OpacityMask {
+                anchors.fill: parent
+                visible: compactArt.hasArt
+                source: coverImage
+                maskSource: coverMask
+                cached: false
+
+                // Paused: the cover steps back.
+                layer.enabled: true
+                layer.effect: MultiEffect {
+                    brightness: bar.isPlaying ? 0 : -0.35
+                    saturation: bar.isPlaying ? 0 : -0.4
+
+                    Behavior on brightness { NumberAnimation { duration: Theme.durMedium } }
+                    Behavior on saturation { NumberAnimation { duration: Theme.durMedium } }
+                }
+            }
+
+            // No cover: a note where it would be.
+            IconGlyph {
+                visible: !compactArt.hasArt
+                x: 16
+                anchors.verticalCenter: parent.verticalCenter
+                text: "󰎇"
+                color: Theme.textSecondary
+                size: Theme.iconMedium
+            }
+
+            // Paused: a mark over the cover.
+            Rectangle {
+                x: 9
+                anchors.verticalCenter: parent.verticalCenter
+                width: 22
+                height: 22
+                radius: 11
+                color: Qt.rgba(0, 0, 0, 0.5)
+                opacity: bar.isPlaying || !compactArt.hasArt ? 0 : 1
+                visible: opacity > 0
+
+                Behavior on opacity { NumberAnimation { duration: Theme.durMedium } }
+
+                IconGlyph {
                     anchors.centerIn: parent
-                    width: 26
-                    height: 26
-                    radius: width / 2
-                    visible: false
-                    layer.enabled: true
+                    text: "\u{F03E4}"
+                    color: "#ffffff"
+                    size: Theme.iconTiny
                 }
+            }
+        }
 
-                Image {
-                    id: artImage
-                    anchors.centerIn: parent
-                    width: 26
-                    height: 26
-                    source: bar.trackArtUrl
-                    fillMode: Image.PreserveAspectCrop
-                    asynchronous: true
-                    sourceSize.width: 64
-                    visible: status === Image.Ready
-                    layer.enabled: true
-                    layer.effect: MultiEffect {
-                        maskEnabled: true
-                        maskSource: artMask
-                    }
-                }
+        // How far along: a hairline along the foot of the pill, inside its
+        // rounded ends.
+        Item {
+            id: compactProgress
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: 16
+            anchors.rightMargin: 16
+            anchors.bottomMargin: 3
+            height: 2
+            visible: opacity > 0 && progress > 0
+            opacity: mediaWidgetItem.panelOpen ? 0 : 1
 
-                Rectangle {
-                    anchors.centerIn: parent
-                    width: 26
-                    height: 26
-                    radius: width / 2
-                    color: Theme.track
-                    visible: artImage.status !== Image.Ready
+            Behavior on opacity {
+                NumberAnimation { duration: 150 }
+            }
 
-                    IconGlyph {
-                        anchors.centerIn: parent
-                        text: "󰎇"
-                        color: Theme.textPrimary
-                        size: Theme.iconTiny
-                    }
-                }
+            readonly property real progress: mediaWidgetItem.trackLength > 0
+                ? Math.max(0, Math.min(1, mediaWidgetItem.currentPosition / mediaWidgetItem.trackLength)) : 0
 
-                // Paused: the cover steps back under a pause mark.
-                Rectangle {
-                    anchors.centerIn: parent
-                    width: 26
-                    height: 26
-                    radius: width / 2
-                    color: Qt.rgba(0, 0, 0, 0.55)
-                    opacity: bar.isPlaying ? 0 : 1
-                    visible: opacity > 0
+            Rectangle {
+                anchors.fill: parent
+                radius: 1
+                color: Theme.alpha(Theme.foreground, 0.12)
+            }
 
-                    Behavior on opacity { NumberAnimation { duration: Theme.durMedium } }
+            Rectangle {
+                width: parent.width * compactProgress.progress
+                height: parent.height
+                radius: 1
+                color: Theme.alpha(Theme.foreground, bar.isPlaying ? 0.75 : 0.35)
 
-                    IconGlyph {
-                        anchors.centerIn: parent
-                        text: "\u{F03E4}"
-                        color: Theme.textPrimary
-                        size: Theme.iconTiny
-                    }
-                }
+                Behavior on width { NumberAnimation { duration: 900; easing.type: Easing.Linear } }
+                Behavior on color { ColorAnimation { duration: Theme.durMedium } }
+            }
+        }
+
+        RowLayout {
+            id: mediaWidgetRow
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            // The title starts where the cover has mostly faded.
+            anchors.leftMargin: 62
+            spacing: 10
+            visible: !mediaWidgetItem.panelOpen
+            opacity: mediaWidgetItem.panelOpen ? 0 : 1
+
+            Behavior on opacity {
+                NumberAnimation { duration: 150 }
             }
 
             Column {
@@ -378,7 +419,7 @@ PanelWindow {
         Timer {
             interval: 1000
             repeat: true
-            // The compact pill's progress ring reads it too, so it runs
+            // The compact pill's progress line reads it too, so it runs
             // whenever something is playing, not only with the panel open.
             running: bar.isPlaying && !bar.barHidden
             triggeredOnStart: true
