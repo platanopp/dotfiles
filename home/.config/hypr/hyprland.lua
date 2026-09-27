@@ -64,6 +64,11 @@ hl.on("hyprland.start", function()
     -- choosing.
     hl.timer(function()
         hl.exec_cmd("tailscale systray --theme=dark:nobg")
+        -- Wooting's background service (the AppImage, installed to
+        -- ~/.local/bin): app linking -- switching keyboard profiles by the
+        -- focused app -- and Wootility's helpers. Same wait as above, for the
+        -- same tray. Its log is kept: it says which keyboard it found.
+        hl.exec_cmd("wooting-bg-service > $HOME/.local/state/wooting-bg-service.log 2>&1")
     end, { timeout = 4000, type = "oneshot" })
 end)
 
