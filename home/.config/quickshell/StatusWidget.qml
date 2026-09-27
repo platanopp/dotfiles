@@ -147,6 +147,47 @@ PanelWindow {
         font.family: Theme.fontMono
     }
 
+    // A button in the closed pill: its icon (and number), on a disc -- a
+    // capsule when there is text -- that lights under the pointer and a
+    // little more when pressed, like the control pill's bell and logo and
+    // the tray's icons.
+    component PillButtonArea: Item {
+        id: btn
+        default property alias content: btnRow.data
+        property int rowSpacing: 6
+        signal tapped()
+
+        implicitWidth: Math.max(30, btnRow.implicitWidth + 16)
+        implicitHeight: 30
+
+        Rectangle {
+            anchors.fill: parent
+            radius: height / 2
+            color: Theme.foreground
+            opacity: btnTap.pressed ? 0.16 : btnHover.hovered ? 0.09 : 0
+
+            Behavior on opacity {
+                NumberAnimation { duration: Theme.durShort }
+            }
+        }
+
+        RowLayout {
+            id: btnRow
+            anchors.centerIn: parent
+            spacing: btn.rowSpacing
+        }
+
+        HoverHandler {
+            id: btnHover
+            cursorShape: Qt.PointingHandCursor
+        }
+
+        TapHandler {
+            id: btnTap
+            onTapped: btn.tapped()
+        }
+    }
+
     // Said plainly when there is nothing to list, and why.
     component EmptyNote: Text {
         width: parent ? parent.width : 0
@@ -209,7 +250,9 @@ PanelWindow {
         return "\u{F00AF}"
     }
 
-    readonly property int compactWidth: compactRow.implicitWidth + 24 + Theme.pillPaddingH * 2
+    // Less the 8px the first and last buttons carry inside them, so the pill's
+    // own padding is what it was.
+    readonly property int compactWidth: compactRow.implicitWidth + 24 + Theme.pillPaddingH * 2 - 16
 
     // The pill's box, animated inside a window that is not (see PillStage).
     PillStage {
@@ -276,17 +319,21 @@ PanelWindow {
         RowLayout {
             id: compactRow
             anchors.centerIn: parent
-            spacing: 14
+            // The buttons carry their own 8px either side, so the icons still
+            // sit 14 apart as before.
+            spacing: 0
 
             IconGlyph {
                 visible: AppState.dndEnabled
+                Layout.leftMargin: 8
+                Layout.rightMargin: 8
                 text: "󰂛"
                 color: AppState.themeAccent
                 size: Theme.iconLarge
             }
 
-            RowLayout {
-                spacing: 6
+            PillButtonArea {
+                onTapped: statusItem.togglePanel("wifi")
 
                 // The icon alone: the network's name is in the panel it opens.
                 IconGlyph {
@@ -294,14 +341,11 @@ PanelWindow {
                     color: AppState.wifiSsid.length > 0 || AppState.ethernetUp ? Theme.textPrimary : Theme.textMuted
                     size: Theme.iconLarge
                 }
-
-                TapHandler {
-                    onTapped: statusItem.togglePanel("wifi")
-                }
             }
 
-            RowLayout {
-                spacing: 4
+            PillButtonArea {
+                rowSpacing: 4
+                onTapped: statusItem.togglePanel("bluetooth")
 
                 IconGlyph {
                     text: !AppState.btEnabled ? "\u{F00B2}"
@@ -318,15 +362,11 @@ PanelWindow {
                     font.bold: true
                     font.family: Theme.fontMono
                 }
-
-                TapHandler {
-                    onTapped: statusItem.togglePanel("bluetooth")
-                }
             }
 
             // The wheel turns the volume up and down without opening anything.
-            RowLayout {
-                spacing: 6
+            PillButtonArea {
+                onTapped: statusItem.togglePanel("audio")
 
                 IconGlyph {
                     text: statusItem.volumeIcon(AppState.volumePercent, AppState.volumeMuted)
@@ -341,10 +381,6 @@ PanelWindow {
                     font.family: Theme.fontMono
                 }
 
-                TapHandler {
-                    onTapped: statusItem.togglePanel("audio")
-                }
-
                 WheelHandler {
                     acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
                     onWheel: event => {
@@ -354,18 +390,20 @@ PanelWindow {
                 }
             }
 
-            IconGlyph {
-                text: AppState.micMuted ? "󰍭" : "󰍬"
-                color: AppState.micMuted ? Theme.error : Theme.textPrimary
-                size: Theme.iconLarge
+            PillButtonArea {
+                onTapped: AppState.toggleMicMute()
 
-                TapHandler {
-                    onTapped: AppState.toggleMicMute()
+                IconGlyph {
+                    text: AppState.micMuted ? "󰍭" : "󰍬"
+                    color: AppState.micMuted ? Theme.error : Theme.textPrimary
+                    size: Theme.iconLarge
                 }
             }
 
             RowLayout {
                 visible: AppState.batteryPresent
+                Layout.leftMargin: 8
+                Layout.rightMargin: 8
                 spacing: 4
 
                 IconGlyph {
