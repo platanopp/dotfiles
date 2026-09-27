@@ -534,8 +534,30 @@ Singleton {
     property string avatarError: ""
     property bool avatarBusy: false
 
-    function setAvatar(path) { root.avatarCmd(["set", path]) }
+    // Framing: zoom (1: the largest square the picture holds) and the
+    // square's centre as fractions of the picture (see scripts/avatar.py).
+    function setAvatar(path, zoom, x, y) {
+        root.avatarCmd(zoom === undefined ? ["set", path]
+                                          : ["set", path, String(zoom), String(x), String(y)])
+    }
+    // Frame the picture ~/.face was cut from again.
+    function adjustAvatar(zoom, x, y) { root.avatarCmd(["adjust", String(zoom), String(x), String(y)]) }
     function removeAvatar() { root.avatarCmd(["remove"]) }
+
+    // The picture to frame and the framing in use: { path, zoom, x, y }.
+    property var avatarFraming: ({ path: "" })
+    function refreshAvatarFraming() { if (!avatarFramingProc.running) avatarFramingProc.running = true }
+
+    Process {
+        id: avatarFramingProc
+        running: true
+        command: ["python3", Quickshell.env("HOME") + "/.config/quickshell/scripts/avatar.py", "source"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try { root.avatarFraming = JSON.parse(text) } catch (e) {}
+            }
+        }
+    }
 
     function avatarCmd(args) {
         if (avatarSetProc.running) return
@@ -557,6 +579,7 @@ Singleton {
                 root.avatarPath = ""
                 root.avatarVersion++
                 avatarProc.running = true
+                root.refreshAvatarFraming()
             }
         }
     }
