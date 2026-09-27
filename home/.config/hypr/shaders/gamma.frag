@@ -10,7 +10,7 @@ precision highp float;
 varying vec2 v_texcoord;
 uniform sampler2D tex;
 
-const float GAMMA = 1.1280;
+const float GAMMA = 0.9600;
 
 void main() {
     vec4 c = texture2D(tex, v_texcoord);

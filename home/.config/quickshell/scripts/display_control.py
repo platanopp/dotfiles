@@ -252,6 +252,8 @@ def apply_gamma(value):
     value = max(0.4, min(2.5, float(value)))
     if abs(value - 1.0) < 0.005:
         hypr_eval('hl.config({ decoration = { screen_shader = "" } })')
+        # Back to redrawing only what changed -- see below.
+        hypr_eval('hl.config({ debug = { damage_tracking = 2 } })')
         return True
     try:
         src = open(SHADER).read()
@@ -264,6 +266,13 @@ def apply_gamma(value):
     # Cleared first: assigning the path Hyprland already holds is a no-op, and
     # it would keep serving the old exponent.
     hypr_eval('hl.config({ decoration = { screen_shader = "" } })')
+    # Whole frames while the shader is on. Hyprland redraws only the regions
+    # that changed, and with a full-screen shader in the way those regions
+    # and the rest of the picture fell a frame out of step: anything that
+    # updates -- the cursor, an animation, text changing -- flickered. The
+    # cost is a full redraw per frame, only when something moves, and only
+    # while gamma is off neutral.
+    hypr_eval('hl.config({ debug = { damage_tracking = 0 } })')
     return hypr_eval(f'hl.config({{ decoration = {{ screen_shader = "{SHADER}" }} }})')
 
 
