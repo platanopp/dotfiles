@@ -264,6 +264,20 @@ def key_colours(letters, others, found, brightness, seed=""):
     come as one or two soft patches -- where their own field runs high --
     blending into what surrounds them, the letters taking them more lightly.
     A little per-key variation on top keeps it a mosaic."""
+    # A dark picture gives dark colours, and a dark colour on an LED is a
+    # key that looks switched off. The palette's lightness is stretched into
+    # the band LEDs show well, keeping which colours are lighter than which.
+    everything = letters + others + found
+    lo = min(c[1] for c in everything)
+    hi = max(c[1] for c in everything)
+    span = max(hi - lo, 0.12)
+
+    def lit(c):
+        return (c[0], 0.3 + (c[1] - lo) / span * 0.3, c[2])
+
+    letters = [lit(c) for c in letters]
+    others = [lit(c) for c in others]
+    found = [lit(c) for c in found]
     pool = letters + others
     found = [harmonise(a, pool) for a in found]
     # Where the patches sit: one per accent, the first larger, apart from
