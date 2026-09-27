@@ -1757,16 +1757,14 @@ Singleton {
     // Focus the monitor the pointer is on. Used before spawning anything from
     // the launcher: follow_mouse cannot do it while a layer surface holds the
     // keyboard, so the first window would land on the previously focused
-    // screen. Fire-and-forget, on its own process so it never blocks the UI.
+    // screen. Straight to Hyprland's Lua, which knows the cursor's monitor:
+    // it went through display_control.py, and starting Python cost 80ms on
+    // every launch.
     function focusCursorMonitor() {
-        focusCursorProc.command = ["python3", root.displayScript, "focus-cursor-monitor"]
-        focusCursorProc.running = true
+        Quickshell.execDetached(["hyprctl", "eval",
+            "local m = hl.get_monitor_at_cursor(); if m then hl.dispatch(hl.dsp.focus({ monitor = m.name })) end"])
     }
 
-    Process {
-        id: focusCursorProc
-        running: false
-    }
     function setDisplayMode(out, mode)         { displayCmd(["set-mode", out, mode]) }
     function setDisplayScale(out, s)           { displayCmd(["set-scale", out, String(s)]) }
     function setDisplayVrr(v)                  { displayCmd(["set-vrr", String(v)]) }

@@ -494,15 +494,17 @@ PanelWindow {
         case "app":
             LauncherHistory.record(item.entry.id)
             // Point the focus at the monitor the pointer is on, so the window
-            // opens there: follow_mouse cannot while the grab is held.
+            // opens there: follow_mouse cannot while the grab is held. Then
+            // straight away: the dispatch lands in a few ms, and no app maps
+            // a window that fast -- it waited 90ms here for nothing.
             AppState.focusCursorMonitor()
-            overlay.pending = function() { item.entry.execute() }
-            break
+            item.entry.execute()
+            return
         case "web":
             AppState.focusCursorMonitor()
-            var url = "https://www.google.com/search?q=" + encodeURIComponent(overlay.query.trim())
-            overlay.pending = function() { Quickshell.execDetached(["xdg-open", url]) }
-            break
+            Quickshell.execDetached(["xdg-open",
+                "https://www.google.com/search?q=" + encodeURIComponent(overlay.query.trim())])
+            return
         case "window":
             // `hyprctl eval` and not `dispatch`: this Hyprland is configured
             // in Lua (see LockEngine). Focusing follows to its workspace.
@@ -522,11 +524,12 @@ PanelWindow {
         spawnTimer.restart()
     }
 
-    // Short enough to feel immediate, long enough for the grab to drop and
-    // the focus dispatch to land before anything maps.
+    // For what acts on the shell or on a window rather than starting a
+    // process: a frame or two, for the launcher's keyboard grab to be let go
+    // before focus is asked to move.
     Timer {
         id: spawnTimer
-        interval: 90
+        interval: 30
         onTriggered: {
             if (overlay.pending) {
                 var f = overlay.pending

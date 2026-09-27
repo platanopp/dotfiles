@@ -459,6 +459,15 @@ hl.layer_rule({
     xray = false,
 })
 
+-- The launcher fades itself in (100ms). Hyprland's own layer fade on top of
+-- that stretched its arrival to about 230ms from the keypress -- the slowest
+-- part of Super+Space.
+hl.layer_rule({
+    name    = "quickshell-launcher",
+    match   = { namespace = "^quickshell:launcher$" },
+    no_anim = true,
+})
+
 hl.layer_rule({
     name  = "quickshell-launcher-blur",
     match = { namespace = "^quickshell:launcher$" },
