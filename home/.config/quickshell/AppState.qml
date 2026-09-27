@@ -595,7 +595,10 @@ Singleton {
         if (paired) {
             btActionProc.command = ["bash", "-c", "bluetoothctl connect \"$1\" 2>&1", "_", mac]
         } else {
-            btActionProc.command = ["bash", "-c", "bluetoothctl pair \"$1\" 2>&1; bluetoothctl trust \"$1\" 2>&1; bluetoothctl connect \"$1\" 2>&1", "_", mac]
+            // Through scripts/bt_pair.py, which holds an agent open for the
+            // pairing: plain `bluetoothctl pair` has none to answer the device,
+            // and an encrypted-link device (an Xbox controller) is dropped.
+            btActionProc.command = ["python3", Quickshell.env("HOME") + "/.config/quickshell/scripts/bt_pair.py", mac]
         }
         btActionProc.running = true
     }
