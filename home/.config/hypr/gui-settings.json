@@ -7,10 +7,6 @@
     "value": 1,
     "base": 1
   },
-  "gaps_in": {
-    "value": 12,
-    "base": 15
-  },
   "shadow": {
     "value": false,
     "base": true
