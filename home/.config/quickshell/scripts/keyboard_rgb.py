@@ -5,7 +5,7 @@ nearest neighbours, every other key from the picture's other tones, and each
 key is mixed between two of them and moved in lightness and saturation --
 from pale to deep, the way a picture's one colour actually varies. Accents
 -- a vivid colour on a small part of the picture, like red eyes on a blue
-portrait -- are found apart (see accents()) and scattered over some keys. The
+portrait -- are found apart (see accents()) and laid in as soft patches. The
 arrangement is fixed for a given wallpaper and different for the next.
 
 Talks to the keyboard through Wooting's RGB SDK (libwooting-rgb-sdk.so, in
@@ -106,11 +106,12 @@ def palette(image_path):
     colours.sort(key=lambda c: c[1], reverse=True)
     dominant = colours[0][0]
 
-    # Nearest the dominant hue first.
-    rest = sorted((c for c, w in colours[1:] if w > 0.004),
-                  key=lambda c: hue_distance(c[0], dominant[0]))
+    # The picture's main colours only: the long tail of a quantized palette
+    # is edges and noise. Nearest the dominant hue go to the letters.
+    main = [c for c, w in colours[1:9] if w > 0.004]
+    rest = sorted(main, key=lambda c: hue_distance(c[0], dominant[0]))
     letters = [dominant] + rest[:3]
-    others = rest[3:] or rest[:]
+    others = rest[3:8] or rest[:]
     found = accents(image_path, dominant[0])
     # A picture of one colour: its own neighbours, lighter and darker.
     k = 0
@@ -210,41 +211,94 @@ def jitter(row, col, salt, seed=""):
     return (zlib.crc32(f"{seed}:{row}:{col}:{salt}".encode()) % 2001) / 1000 - 1
 
 
-def pick(pool, row, col, salt, seed, first_weight=0.0):
-    """One colour of a pool for a key; `first_weight` favours the first."""
-    u = (jitter(row, col, salt, seed) + 1) / 2
-    if first_weight and u < first_weight:
-        return pool[0]
-    return pool[int(u * 997) % len(pool)]
+def noise(row, col, salt, seed, scale=3.5):
+    """Smooth value noise over the board, 0..1: random values on a coarse
+    grid (a point every `scale` keys), eased between. Keys side by side get
+    close values, so whatever it drives changes gradually across the board
+    instead of key to key."""
+    x, y = col / scale, row / (scale * 0.6)
+    x0, y0 = int(x), int(y)
+    fx, fy = x - x0, y - y0
+    fx, fy = fx * fx * (3 - 2 * fx), fy * fy * (3 - 2 * fy)
+
+    def at(i, j):
+        return (jitter(j, i, salt, seed) + 1) / 2
+
+    top = at(x0, y0) + (at(x0 + 1, y0) - at(x0, y0)) * fx
+    bottom = at(x0, y0 + 1) + (at(x0 + 1, y0 + 1) - at(x0, y0 + 1)) * fx
+    return top + (bottom - top) * fy
+
+
+def ramp(pool, t):
+    """A colour at t (0..1) along a pool laid out as a gradient, from
+    darkest to lightest -- so a smooth t gives a smooth run of colours."""
+    ordered = sorted(pool, key=lambda c: c[1])
+    if len(ordered) == 1:
+        return ordered[0]
+    x = max(0.0, min(1.0, t)) * (len(ordered) - 1)
+    i = min(int(x), len(ordered) - 2)
+    a, b = ordered[i], ordered[i + 1]
+    # Two colours far apart in hue are not blended: halfway between orange
+    # and blue is a green the picture never had. The ramp steps instead.
+    if hue_distance(a[0], b[0]) > 45 / 360 and min(a[2], b[2]) > 0.2:
+        return a if x - i < 0.5 else b
+    return mix(a, b, x - i)
+
+
+def harmonise(accent, pool):
+    """An accent keeps its hue and meets the board halfway on lightness and
+    saturation, so it reads as part of the same picture."""
+    l = sum(c[1] for c in pool) / len(pool)
+    s = sum(c[2] for c in pool) / len(pool)
+    return (accent[0], accent[1] + (l - accent[1]) * 0.5, accent[2] + (s - accent[2]) * 0.35)
+
+
+def smoothstep(e0, e1, x):
+    t = max(0.0, min(1.0, (x - e0) / (e1 - e0)))
+    return t * t * (3 - 2 * t)
 
 
 def key_colours(letters, others, found, brightness, seed=""):
-    """found: the accents, which take about one key in five outside the
-    letters and one in ten among them -- enough to be seen, few enough to
-    stay accents."""
+    """The board as flowing gradients: a smooth field chooses where along
+    each pool's ramp a key sits, so neighbours are near each other. Accents
+    come as one or two soft patches -- where their own field runs high --
+    blending into what surrounds them, the letters taking them more lightly.
+    A little per-key variation on top keeps it a mosaic."""
+    pool = letters + others
+    found = [harmonise(a, pool) for a in found]
+    # Where the patches sit: one per accent, the first larger, apart from
+    # each other -- chosen by the wallpaper, so the same picture gives the
+    # same board.
+    centres = []
+    for k in range(len(found[:2])):
+        for attempt in range(8):
+            cr = 1 + int((jitter(k, attempt, "cr", seed) + 1) / 2 * 4.99)
+            cc = int((jitter(k, attempt, "cc", seed) + 1) / 2 * 13.99)
+            if all(abs(cc - c) + abs(cr - r) * 2 > 6 for r, c, _ in centres):
+                break
+        centres.append((cr, cc, 3.2 if k == 0 else 2.4))
     out = {}
     for row in range(1, ROWS):
         for col in range(COLS):
             letter = (row, col) in LETTERS
-            share = 0.1 if letter else 0.2
-            if found and (jitter(row, col, "accent", seed) + 1) / 2 < share:
-                h, l, s = pick(found, row, col, "which", seed, 0.5)
-                l += jitter(row, col, "l", seed) * 0.1
-                s += jitter(row, col, "s", seed) * 0.1
-                out[(row, col)] = for_leds(h, l, max(0.0, min(1.0, s)), brightness)
-                continue
+            t = noise(row, col, "base", seed)
             if letter:
-                a = pick(letters, row, col, "a", seed, 0.35)
-                b = pick(letters, row, col, "b", seed)
+                colour = ramp(letters, t)
             else:
-                a = pick(others, row, col, "a", seed)
-                b = pick(others + letters[:1], row, col, "b", seed)
-            h, l, s = mix(a, b, (jitter(row, col, "t", seed) + 1) / 2)
-            # The variety of the reference: mostly in lightness, some in
-            # saturation, a touch in hue.
-            h += jitter(row, col, "h", seed) * 0.02
-            l += jitter(row, col, "l", seed) * 0.2
-            s += jitter(row, col, "s", seed) * 0.32
+                colour = ramp(others + letters[:1], t)
+
+            for (cr, cc, radius), accent in zip(centres, found[:2]):
+                # Rows are closer together than columns are wide in the
+                # picture this makes, so distance counts them a bit more.
+                d = ((col - cc) ** 2 + ((row - cr) * 1.3) ** 2) ** 0.5
+                d += jitter(row, col, "edge", seed) * 0.6      # a ragged edge
+                w = 1 - smoothstep(radius * 0.35, radius, d)
+                colour = mix(colour, accent, w * (0.65 if letter else 0.95))
+
+            h, l, s = colour
+            h += jitter(row, col, "h", seed) * 0.01
+            l += jitter(row, col, "l", seed) * 0.08
+            s += jitter(row, col, "s", seed) * 0.12
             out[(row, col)] = for_leds(h, l, max(0.0, min(1.0, s)), brightness)
     return out
 
