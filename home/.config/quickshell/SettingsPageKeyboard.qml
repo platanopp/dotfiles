@@ -1,10 +1,10 @@
 import QtQuick
 import QtQuick.Layouts
 
-// Settings -> Keyboard: a Wooting keyboard coloured from the wallpaper. The
-// letters take the picture's dominant colour, the other keys its other
-// tones (scripts/keyboard_rgb.py). The board drawn here is a sketch of the
-// same split, in the colours last sent.
+// Settings -> Keyboard: a Wooting keyboard coloured from the wallpaper as a
+// mosaic -- letters from the picture's dominant colours, the other keys from
+// its other tones, every key its own shade (scripts/keyboard_rgb.py). The
+// board drawn here shows the colours last sent, key for key.
 Column {
     id: page
     spacing: 24
@@ -14,25 +14,20 @@ Column {
 
     Component.onCompleted: AppState.refreshKeyboardRgb()
 
-    // A 60% ISO board: [width in units, is a letter]. Letters follow the
-    // script's LETTERS set.
+    // A 60% ISO board: [width in units, matrix column] per key; the row in
+    // Wooting's matrix is the row here plus one.
     readonly property var rows: [
-        [[1,0],[1,0],[1,0],[1,0],[1,0],[1,0],[1,0],[1,0],[1,0],[1,0],[1,0],[1,0],[1,0],[2,0]],
-        [[1.5,0],[1,1],[1,1],[1,1],[1,1],[1,1],[1,1],[1,1],[1,1],[1,1],[1,1],[1,0],[1,0],[1.5,0]],
-        [[1.75,0],[1,1],[1,1],[1,1],[1,1],[1,1],[1,1],[1,1],[1,1],[1,1],[1,1],[1,0],[1,0],[1.25,0]],
-        [[1.25,0],[1,0],[1,1],[1,1],[1,1],[1,1],[1,1],[1,1],[1,1],[1,0],[1,0],[1,0],[2.75,0]],
-        [[1.25,0],[1.25,0],[1.25,0],[6.25,0],[1.25,0],[1.25,0],[1.25,0],[1.25,0]]
+        [[1,0],[1,1],[1,2],[1,3],[1,4],[1,5],[1,6],[1,7],[1,8],[1,9],[1,10],[1,11],[1,12],[2,13]],
+        [[1.5,0],[1,1],[1,2],[1,3],[1,4],[1,5],[1,6],[1,7],[1,8],[1,9],[1,10],[1,11],[1,12],[1.5,13]],
+        [[1.75,0],[1,1],[1,2],[1,3],[1,4],[1,5],[1,6],[1,7],[1,8],[1,9],[1,10],[1,11],[1,12],[1.25,13]],
+        [[1.25,0],[1,1],[1,2],[1,3],[1,4],[1,5],[1,6],[1,7],[1,8],[1,9],[1,10],[1,11],[2.75,13]],
+        [[1.25,0],[1.25,1],[1.25,2],[6.25,6],[1.25,10],[1.25,11],[1.25,12],[1.25,13]]
     ]
 
-    // The same spread as the script: the other tones across the board from
-    // left to right, a little of the row mixed in.
-    function keyColour(rowIndex, x, isLetter) {
-        if (!page.pal) return Theme.surfaceContainerHigh
-        if (isLetter) return page.pal.dominant
-        var others = page.pal.others || []
-        if (others.length === 0) return page.pal.dominant
-        var pos = (x / 15) * 0.8 + ((rowIndex + 1) / 6) * 0.2
-        return others[Math.min(others.length - 1, Math.floor(pos * others.length))]
+    // The colour the script sent to that key.
+    function keyColour(rowIndex, col) {
+        if (!page.pal || !page.pal.keys) return Theme.surfaceContainerHigh
+        return page.pal.keys[(rowIndex + 1) + "," + col] || Theme.surfaceContainerHigh
     }
 
     // ── The board ────────────────────────────────────────────────────────
@@ -68,15 +63,10 @@ Column {
                             id: key
                             required property var modelData
                             required property int index
-                            readonly property real startX: {
-                                var x = 0
-                                for (var i = 0; i < key.index; i++) x += keyRow.modelData[i][0]
-                                return x
-                            }
                             width: board.unit * key.modelData[0] + 4 * (key.modelData[0] - 1)
                             height: board.unit
                             radius: 7
-                            color: page.keyColour(keyRow.index, key.startX, key.modelData[1] === 1)
+                            color: page.keyColour(keyRow.index, key.modelData[1])
 
                             Behavior on color { ColorAnimation { duration: Theme.durLong } }
                         }

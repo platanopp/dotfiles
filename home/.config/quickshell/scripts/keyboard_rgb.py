@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
-"""Colour a Wooting keyboard from the wallpaper: the letters in the picture's
-dominant colour, every other key in its other tones, each key a shade apart
-so the board reads as a mosaic rather than flat blocks.
+"""Colour a Wooting keyboard from the wallpaper, as a mosaic: every key its
+own shade. The letters draw from the picture's dominant colour and its
+nearest neighbours, every other key from the picture's other tones, and each
+key is mixed between two of them and moved in lightness and saturation --
+from pale to deep, the way a picture's one colour actually varies. The
+arrangement is fixed for a given wallpaper and different for the next.
 
 Talks to the keyboard through Wooting's RGB SDK (libwooting-rgb-sdk.so, in
 ~/.local/lib or the system's lib). The SDK paints over the active profile
@@ -10,8 +13,8 @@ profile switch on the keyboard, or unplugging it. This script never calls
 wooting_rgb_close(), which would reset the colours on the way out.
 
   apply IMAGE [BRIGHTNESS]   paint from IMAGE; BRIGHTNESS 10-100 (default 100)
-  palette IMAGE              JSON: the colours apply would use, without
-                             touching the keyboard
+  palette IMAGE              JSON: the colours apply would use, per key,
+                             without touching the keyboard
   reset                      back to the profile's colours
   status                     JSON: whether a keyboard is there, and which
 
@@ -79,74 +82,89 @@ def hue_distance(a, b):
 
 
 def palette(image_path):
-    """The dominant colour and the others, as HLS tuples. Dominant is the
-    most common colour weighted by how colourful it is: a mostly grey
-    picture with a pink subject gives pink, not grey."""
+    """(letters, others): two pools of HLS colours. Letters get the dominant
+    colour -- the most common, weighted by how colourful it is, so a grey
+    picture with a pink subject gives pink -- and the colours nearest it in
+    hue; others get the rest. Close colours are kept, not merged: they are
+    the variety the mosaic is made of."""
     from PIL import Image
     with Image.open(image_path) as im:
         im = im.convert("RGB")
         im.thumbnail((240, 240))
-        q = im.quantize(colors=10, method=Image.Quantize.MEDIANCUT)
+        q = im.quantize(colors=16, method=Image.Quantize.MEDIANCUT)
         pal = q.getpalette()
-        counts = sorted(q.getcolors(), reverse=True)
+        counts = q.getcolors()
     total = sum(n for n, _ in counts) or 1
     colours = []
     for n, idx in counts:
-        rgb = tuple(pal[idx * 3: idx * 3 + 3])
-        h, l, s = hls(rgb)
+        h, l, s = hls(tuple(pal[idx * 3: idx * 3 + 3]))
         # Near-black and near-white say little about a picture's colour.
-        edge = 0.35 if l < 0.08 or l > 0.94 else 1.0
-        colours.append({"hls": (h, l, s), "weight": n / total * (0.25 + s) * edge})
-    colours.sort(key=lambda c: c["weight"], reverse=True)
-    dominant = colours[0]["hls"]
+        edge = 0.3 if l < 0.08 or l > 0.94 else 1.0
+        colours.append(((h, l, s), n / total * (0.2 + s) * edge))
+    colours.sort(key=lambda c: c[1], reverse=True)
+    dominant = colours[0][0]
 
-    others = []
-    for c in colours[1:]:
-        h, l, s = c["hls"]
-        # Skip what would look like the letters again.
-        if hue_distance(h, dominant[0]) < 0.03 and abs(l - dominant[1]) < 0.08:
-            continue
-        others.append(c["hls"])
-    # A picture of one colour: its neighbours, lighter and darker.
-    while len(others) < 3:
-        k = len(others)
+    # Nearest the dominant hue first.
+    rest = sorted((c for c, w in colours[1:] if w > 0.004),
+                  key=lambda c: hue_distance(c[0], dominant[0]))
+    letters = [dominant] + rest[:3]
+    others = rest[3:] or rest[:]
+    # A picture of one colour: its own neighbours, lighter and darker.
+    k = 0
+    while len(others) < 4:
         h, l, s = dominant
-        others.append(((h + (0.04 if k % 2 else -0.04)) % 1.0,
-                       min(0.8, max(0.15, l + (-0.12, 0.12, -0.2)[k])), s))
-    return dominant, others[:4]
+        others.append(((h + (0.035, -0.035, 0.07, -0.07)[k]) % 1.0,
+                       min(0.8, max(0.15, l + (-0.15, 0.15, -0.25, 0.1)[k])), s))
+        k += 1
+    return letters, others
+
+
+def mix(a, b, t):
+    """Between two HLS colours, the short way round the hue circle."""
+    dh = ((b[0] - a[0] + 0.5) % 1.0) - 0.5
+    return ((a[0] + dh * t) % 1.0, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t)
 
 
 def for_leds(h, l, s, brightness):
     """LEDs wash out: what is a soft pink on screen is nearly white on a
     key. More saturation, lightness kept in the middle, then dimmed."""
-    s = min(1.0, s * 1.4 + 0.12)
-    l = min(0.58, max(0.28, l))
+    s = min(1.0, s * 1.3 + 0.1)
+    l = min(0.62, max(0.18, l))
     r, g, b = colorsys.hls_to_rgb(h % 1.0, l, s)
     k = brightness / 100
     return tuple(int(round(c * 255 * k)) for c in (r, g, b))
 
 
-def jitter(row, col, salt):
-    """-1..1, the same for a key every time (so reapplying does not shuffle
-    the board), different from key to key."""
-    return (zlib.crc32(f"{row}:{col}:{salt}".encode()) % 2001) / 1000 - 1
+def jitter(row, col, salt, seed=""):
+    """-1..1, the same for a key and a wallpaper every time (so reapplying
+    does not shuffle the board), different from key to key."""
+    return (zlib.crc32(f"{seed}:{row}:{col}:{salt}".encode()) % 2001) / 1000 - 1
 
 
-def key_colours(dominant, others, brightness):
+def pick(pool, row, col, salt, seed, first_weight=0.0):
+    """One colour of a pool for a key; `first_weight` favours the first."""
+    u = (jitter(row, col, salt, seed) + 1) / 2
+    if first_weight and u < first_weight:
+        return pool[0]
+    return pool[int(u * 997) % len(pool)]
+
+
+def key_colours(letters, others, brightness, seed=""):
     out = {}
     for row in range(1, ROWS):
         for col in range(COLS):
             if (row, col) in LETTERS:
-                h, l, s = dominant
+                a = pick(letters, row, col, "a", seed, 0.35)
+                b = pick(letters, row, col, "b", seed)
             else:
-                # The other tones spread across the board from left to right,
-                # with a little of the row mixed in, so neighbours share one
-                # and the board still moves from one to the next.
-                pos = (col / (COLS - 1)) * 0.8 + (row / ROWS) * 0.2
-                h, l, s = others[min(len(others) - 1, int(pos * len(others)))]
-            h += jitter(row, col, "h") * 0.012
-            l += jitter(row, col, "l") * 0.07
-            s += jitter(row, col, "s") * 0.10
+                a = pick(others, row, col, "a", seed)
+                b = pick(others + letters[:1], row, col, "b", seed)
+            h, l, s = mix(a, b, (jitter(row, col, "t", seed) + 1) / 2)
+            # The variety of the reference: mostly in lightness, some in
+            # saturation, a touch in hue.
+            h += jitter(row, col, "h", seed) * 0.02
+            l += jitter(row, col, "l", seed) * 0.2
+            s += jitter(row, col, "s", seed) * 0.32
             out[(row, col)] = for_leds(h, l, max(0.0, min(1.0, s)), brightness)
     return out
 
@@ -175,9 +193,16 @@ def cmd_status():
             "model": (meta.model or b"").decode(errors="replace")}
 
 
+def describe(letters, others, keys):
+    return {"ok": True, "dominant": hex_of(*letters[0]),
+            "others": [hex_of(*o) for o in others],
+            # Full brightness, for the Settings page's picture of the board.
+            "keys": {f"{r},{c}": "#%02x%02x%02x" % rgb for (r, c), rgb in keys.items()}}
+
+
 def cmd_palette(image):
-    dominant, others = palette(image)
-    return {"ok": True, "dominant": hex_of(*dominant), "others": [hex_of(*o) for o in others]}
+    letters, others = palette(image)
+    return describe(letters, others, key_colours(letters, others, 100, image))
 
 
 def cmd_apply(image, brightness):
@@ -186,13 +211,13 @@ def cmd_apply(image, brightness):
     lib, err = connect()
     if not lib:
         return {"ok": False, "error": err}
-    dominant, others = palette(image)
+    letters, others = palette(image)
     lib.wooting_rgb_array_auto_update(False)
-    for (row, col), (r, g, b) in key_colours(dominant, others, brightness).items():
+    for (row, col), (r, g, b) in key_colours(letters, others, brightness, image).items():
         lib.wooting_rgb_array_set_single(row, col, r, g, b)
     if not lib.wooting_rgb_array_update_keyboard():
         return {"ok": False, "error": "the keyboard did not take the colours"}
-    return {"ok": True, "dominant": hex_of(*dominant), "others": [hex_of(*o) for o in others]}
+    return describe(letters, others, key_colours(letters, others, 100, image))
 
 
 def cmd_reset():

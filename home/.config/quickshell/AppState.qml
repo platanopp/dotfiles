@@ -951,6 +951,14 @@ Singleton {
 
     onWallpaperStillChanged: root.applyKeyboardRgb()
 
+    // qs ipc call keyboard apply -- say, bound to a key, after switching
+    // profiles on the keyboard (a profile switch covers these colours).
+    IpcHandler {
+        target: "keyboard"
+        function apply(): void { root.applyKeyboardRgb() }
+        function reset(): void { root.resetKeyboardRgb() }
+    }
+
     Connections {
         target: ShellSettings
         function onKeyboardRgbChanged() {
@@ -981,7 +989,7 @@ Singleton {
                 var d
                 try { d = JSON.parse(text) } catch (e) { return }
                 root.keyboardRgbError = d.ok ? "" : (d.error || "")
-                if (d.ok && d.dominant) root.keyboardRgbPalette = { dominant: d.dominant, others: d.others }
+                if (d.ok && d.dominant) root.keyboardRgbPalette = { dominant: d.dominant, others: d.others, keys: d.keys || ({}) }
             }
         }
     }
