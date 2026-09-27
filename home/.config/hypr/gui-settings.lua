@@ -7,9 +7,6 @@ hl.config({
     decoration = {
         active_opacity = 0.88,
         inactive_opacity = 0.74,
-        shadow = {
-            enabled = true,
-        },
     },
     general = {
         border_size = 0,
