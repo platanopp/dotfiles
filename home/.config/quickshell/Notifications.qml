@@ -65,11 +65,46 @@ Singleton {
     }
 
     // A toast that has had its time: off the screen, still in the centre.
+    //
+    // It leaves in two steps: marked `leaving`, its card animates out
+    // (NotificationPopups) and then calls finishLeave; only then does its row
+    // go. Removing the row at once destroyed the card on the spot, with no
+    // exit at all. A toast still waiting its turn (past the fourth) has no
+    // card on screen and goes straight away; and in case a card never gets
+    // to call back, a timer finishes the job.
     function expire(wrapper) {
         if (!wrapper) return
         wrapper.popup = false
         var i = root.indexIn(root.popups, wrapper.key)
+        if (i === -1) return
+        if (i >= root.maxVisible) {
+            root.popups.remove(i)
+            return
+        }
+        if (wrapper.leaving) return
+        wrapper.leaving = true
+        leaveLater.createObject(root, { key: wrapper.key })
+    }
+
+    function finishLeave(key) {
+        var w = root.get(key)
+        if (w && !w.leaving) return             // raised again meanwhile
+        var i = root.indexIn(root.popups, key)
         if (i !== -1) root.popups.remove(i)
+        if (w) w.leaving = false
+    }
+
+    Component {
+        id: leaveLater
+        Timer {
+            property int key
+            interval: 900
+            running: true
+            onTriggered: {
+                root.finishLeave(key)
+                destroy()
+            }
+        }
     }
 
     // Up as a toast again (a new one, or one its app has just updated), its
@@ -80,6 +115,7 @@ Singleton {
             || (root.dnd && wrapper.urgency !== NotificationUrgency.Critical)
         wrapper.expiresAt = 0
         wrapper.pausedAt = 0
+        wrapper.leaving = false                 // updated on its way out: it stays
         if (quiet) {
             root.expire(wrapper)
             return
@@ -121,9 +157,16 @@ Singleton {
     // Removes a wrapper whose notification is already closed.
     function _drop(wrapper) {
         if (!wrapper || wrapper.gone) return
-        wrapper.gone = true
+        // A toast on screen leaves the way a timed-out one does, animated;
+        // the rest of the removal does not wait for it.
         var p = root.indexIn(root.popups, wrapper.key)
-        if (p !== -1) root.popups.remove(p)
+        if (p !== -1 && p < root.maxVisible && !wrapper.leaving) {
+            wrapper.leaving = true
+            leaveLater.createObject(root, { key: wrapper.key })
+        } else if (p !== -1) {
+            root.popups.remove(p)
+        }
+        wrapper.gone = true
         var m = root.indexIn(root.model, wrapper.key)
         if (m !== -1) root.model.remove(m)
         var next = Object.assign({}, root.byKey)
@@ -160,6 +203,9 @@ Singleton {
         property bool popup: true
         // When it arrived, for the centre's "5m ago".
         property date time: new Date()
+
+        // On its way off the screen: its card is animating out (see expire).
+        property bool leaving: false
 
         // Its toast's countdown, in Date.now() ms: when it runs out (0 until
         // the toast first shows), and when a hover paused it (0 if not).

@@ -82,7 +82,15 @@ PanelWindow {
                 id: card
                 required property int key
                 required property int index
-                readonly property var live: Notifications.get(card.key)
+                // Held on to: an app closing its notification drops it from
+                // Notifications at once, and the card still has to leave.
+                property var live: null
+                readonly property var current: Notifications.get(card.key)
+                onCurrentChanged: if (card.current) card.live = card.current
+                Component.onCompleted: {
+                    card.live = card.current
+                    entrance.start()
+                }
                 readonly property var n: card.live || popups.emptyNotif
 
                 // Only the newest few show; the rest wait, their time not yet
@@ -90,7 +98,35 @@ PanelWindow {
                 readonly property bool shown: card.index < Notifications.maxVisible && card.live !== null
                 visible: card.shown
                 width: popups.cardWidth
-                height: card.shown ? glass.height : 0
+                // Collapses to nothing on the way out, so the cards below
+                // slide up into its place instead of jumping.
+                property real collapse: 1
+                height: (card.shown ? glass.height : 0) * card.collapse
+
+                // ── Leaving ─────────────────────────────────────────────────
+                //
+                // Off to the right and fading, then the space it took closes;
+                // then Notifications drops the row (finishLeave).
+                readonly property bool leaving: !!card.live && card.live.leaving
+                onLeavingChanged: {
+                    if (card.leaving) exit.restart()
+                    else if (exit.running) {           // raised again: back in
+                        exit.stop()
+                        card.collapse = 1
+                        card.opacity = 1
+                        card.x = 0
+                    }
+                }
+
+                SequentialAnimation {
+                    id: exit
+                    ParallelAnimation {
+                        NumberAnimation { target: card; property: "x"; to: 90; duration: 240; easing.type: Easing.InCubic }
+                        NumberAnimation { target: card; property: "opacity"; to: 0; duration: 220; easing.type: Easing.InQuad }
+                    }
+                    NumberAnimation { target: card; property: "collapse"; to: 0; duration: 200; easing.type: Easing.OutCubic }
+                    ScriptAction { script: Notifications.finishLeave(card.key) }
+                }
 
                 readonly property bool sticky: card.n.urgency === NotificationUrgency.Critical
                 readonly property var defaultAction: {
@@ -139,7 +175,6 @@ PanelWindow {
                 // Entrance: in from the right, settling.
                 opacity: 0
                 x: 48
-                Component.onCompleted: entrance.start()
 
                 ParallelAnimation {
                     id: entrance
