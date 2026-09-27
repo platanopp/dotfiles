@@ -33,7 +33,31 @@ Item {
 
     readonly property bool dragging: area.pressed
     property real dragValue: 0
-    readonly property real shown: root.dragging ? root.dragValue : root.value
+    // What was let go of, held until the value comes back changed. Without
+    // it the knob jumped back to the old value the moment it was released
+    // and forward again when the process answered -- which read as the
+    // slider refusing the change.
+    property real pending: NaN
+    readonly property real shown: root.dragging ? root.dragValue
+                                : !isNaN(root.pending) ? root.pending
+                                : root.value
+
+    onValueChanged: { root.pending = NaN; settle.stop() }
+
+    // If nothing answers -- the command failed -- the knob goes back to the
+    // real value rather than claiming a change that did not happen.
+    Timer {
+        id: settle
+        interval: 3000
+        onTriggered: root.pending = NaN
+    }
+
+    function commit(v) {
+        if (Math.abs(v - root.value) < 1e-9) return
+        root.pending = v
+        settle.restart()
+        root.moved(v)
+    }
     readonly property real fraction: Math.max(0, Math.min(1, (root.shown - root.from) / (root.to - root.from)))
 
     implicitHeight: 24
@@ -145,7 +169,11 @@ Item {
 
         onPressed: mouse => root.dragValue = root.valueAt(mouse.x)
         onPositionChanged: mouse => { if (pressed) root.dragValue = root.valueAt(mouse.x) }
-        onReleased: root.moved(root.dragValue)
-        onDoubleClicked: if (!isNaN(root.neutral)) root.moved(root.neutral)
+        onReleased: root.commit(root.dragValue)
+        // The scrolling page can take the gesture over when the hand drifts
+        // vertically; that arrives as a cancel, not a release, and used to
+        // drop the change on the floor.
+        onCanceled: root.commit(root.dragValue)
+        onDoubleClicked: if (!isNaN(root.neutral)) root.commit(root.neutral)
     }
 }
