@@ -152,20 +152,33 @@ def for_screen(keys):
     return out
 
 
-def for_leds(rgb, brightness):
+LED_GAMMA = 1.5
+
+
+def for_leds(rgb, brightness, gain=1.0):
     """sRGB to what an LED needs to look the same. A screen's values are
     gamma-encoded; an LED's are plain light output. Sent as they are, every
     mid tone comes out far too bright and the colours wash out to pastel --
     so they are decoded towards linear light first, then dimmed. Not all
-    the way (a power of 1.8, not sRGB's 2.2): fully decoded, the keys read
-    as too dark beside the screen, which a room's light washes out more
-    than it does an LED."""
-    k = brightness / 100
-    return tuple(int(round(((v / 255) ** 1.8) * 255 * k)) for v in rgb)
+    the way (a power of 1.5, not sRGB's 2.2): decoded further, the keys
+    read as too dark beside the screen, which a room's light washes out
+    more than it does an LED. `gain` is the board's headroom (see gain())."""
+    k = brightness / 100 * gain
+    return tuple(min(255, int(round(((v / 255) ** LED_GAMMA) * 255 * k))) for v in rgb)
 
 
-def linear(rgb):
-    return tuple(v / 255 for v in for_leds(rgb, 100))
+def gain(colours):
+    """How far the whole board can be lifted: until its brightest key uses
+    its LEDs' full output. Every key scales by the same factor, so colours
+    and which keys are brighter than which stay as they were -- the board
+    is just no longer lit at a third of what it can do. Capped, so a board
+    of very dark colours is not blown up into noise."""
+    top = max((max(for_leds(rgb, 100)) for rgb in colours.values()), default=255)
+    return max(1.0, min(2.5, 255 / max(top, 1)))
+
+
+def linear(rgb, g=1.0):
+    return tuple(v / 255 for v in for_leds(rgb, 100, g))
 
 
 def sweep(devices, old, new, brightness, duration=1.4):
@@ -181,13 +194,14 @@ def sweep(devices, old, new, brightness, duration=1.4):
         spots = dev.spots()
         colours = new.get(dev.key, {})
         before = old.get(dev.key, {})
+        g_new, g_old = gain(colours) if colours else 1.0, gain(before) if before else 1.0
         leds = []
         for led, (x0, y0, x1, y1) in spots.items():
             if led not in colours:
                 continue
             # In key units, like the 60% board: 15 across, 5 down.
             pos = (x0 + x1) / 2 * UNITS + (y0 + y1) / 2 * 5 * 0.7
-            leds.append((led, pos, linear(before.get(led, (0, 0, 0))), linear(colours[led])))
+            leds.append((led, pos, linear(before.get(led, (0, 0, 0)), g_old), linear(colours[led], g_new)))
         plan.append((dev, leds))
     width = 2.2
     start, end = -width - 3, UNITS + 3.5 + width + 1
@@ -689,7 +703,8 @@ def paint(devices, image, brightness, animate=False):
     errors = []
     for d in devices:
         try:
-            d.show({led: for_leds(rgb, brightness) for led, rgb in colours[d.key].items()})
+            g = gain(colours[d.key])
+            d.show({led: for_leds(rgb, brightness, g) for led, rgb in colours[d.key].items()})
         except OSError as e:
             errors.append(f"{d.name}: {e}")
     last = load_last()
