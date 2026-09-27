@@ -6,6 +6,12 @@ sort_reverse = false
 sort_dir_first = true
 show_hidden = false
 show_symlink = true
+# Size and date beside each name, like Dolphin's details view (init.lua).
+linemode = "size_and_mtime"
+# Keep a few rows of context above and below the cursor while scrolling.
+scrolloff = 5
+# Click to select, wheel to scroll, and drag -- the mouse as in Dolphin.
+mouse_events = ["click", "scroll", "drag"]
 
 [preview]
 tab_size = 2

@@ -15,6 +15,7 @@ x-scheme-handler/wootwoot=wootility.desktop
 x-scheme-handler/web+wootwoot=wootility.desktop
 x-scheme-handler/about=google-chrome.desktop
 x-scheme-handler/unknown=google-chrome.desktop
+inode/directory=yazi.desktop
 
 [Added Associations]
 x-scheme-handler/http=zen.desktop;

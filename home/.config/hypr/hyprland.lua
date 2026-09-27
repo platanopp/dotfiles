@@ -6,7 +6,10 @@ hl.monitor({
 })
 
 local terminal = "kitty"
-local fileManager = "kitty --class yazi -e yazi"
+-- yazi in its own kitty profile (kitty/yazi.conf): kitty's shortcuts would
+-- otherwise take the Dolphin keys yazi is set up with.
+local kittyDir = os.getenv("HOME") .. "/.config/kitty/"
+local fileManager = "kitty --class yazi -c " .. kittyDir .. "kitty.conf -c " .. kittyDir .. "yazi.conf -e yazi"
 local browser = "zen-browser"
 local mainMod = "SUPER"
 

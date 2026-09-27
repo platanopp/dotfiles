@@ -86,14 +86,24 @@ MOD_NAMES = {"C": "Ctrl", "A": "Alt", "S": "Shift", "D": "Super"}
 
 
 def pretty_key(token):
-    """`<C-a>` -> `Ctrl + A`; a bare letter is left as typed."""
+    """`<C-a>` -> `Ctrl + A`, `<C-A>` -> `Ctrl + Shift + A`, `<C-S-BackTab>`
+    -> `Ctrl + Shift + BackTab`; a bare letter is left as typed.
+
+    An upper-case letter under a modifier is how yazi spells Shift, and was
+    shown as the lower-case one: Ctrl+A and Ctrl+Shift+A read the same."""
     if token in KEY_NAMES:
         return KEY_NAMES[token]
-    combo = re.fullmatch(r"<([CASD])-(.+)>", token)
+    combo = re.fullmatch(r"<((?:[CASD]-)+)(.+)>", token)
     if combo:
-        mod = MOD_NAMES.get(combo.group(1), combo.group(1))
+        mods = [MOD_NAMES.get(m, m) for m in combo.group(1).split("-") if m]
         key = combo.group(2)
-        return f"{mod} + {key.upper() if len(key) == 1 else key}"
+        if len(key) == 1 and key.isalpha():
+            if key.isupper() and "Shift" not in mods:
+                mods.append("Shift")
+            key = key.upper()
+        else:
+            key = KEY_NAMES.get(f"<{key}>", key)
+        return " + ".join(mods + [key])
     if token.startswith("<") and token.endswith(">"):
         return token[1:-1]
     return token

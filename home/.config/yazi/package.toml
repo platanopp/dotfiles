@@ -38,5 +38,10 @@ use = "yazi-rs/plugins:mount"
 rev = "c591a36"
 hash = "b95f898e6dc60b52edbc415952e14395"
 
+[[plugin.deps]]
+use = "yazi-rs/plugins:toggle-pane"
+rev = "f703392"
+hash = "5b2fbef7d1513ce38ff72623a071a5e"
+
 [flavor]
 deps = []

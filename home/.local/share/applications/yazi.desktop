@@ -1,0 +1,14 @@
+[Desktop Entry]
+# Overrides the packaged yazi.desktop (same id): that one asks for "a
+# terminal", which came up as a plain kitty -- not floating, and with kitty's
+# shortcuts in the way. This is the same window Super+E opens.
+Name=Yazi
+GenericName=File Manager
+Comment=Blazing fast terminal file manager
+Icon=yazi
+Type=Application
+Terminal=false
+Exec=sh -c "exec kitty --class yazi -c \\"\\$HOME/.config/kitty/kitty.conf\\" -c \\"\\$HOME/.config/kitty/yazi.conf\\" -e yazi \\"\\$@\\"" sh %f
+MimeType=inode/directory;
+Categories=System;FileTools;FileManager;ConsoleOnly;
+Keywords=File;Manager;Explorer;Browser;Launcher;Dolphin;Archivos
