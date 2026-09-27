@@ -957,6 +957,12 @@ Singleton {
         target: "keyboard"
         function apply(): void { root.applyKeyboardRgb() }
         function reset(): void { root.resetKeyboardRgb() }
+        // What was last sent: dominant, others, accents -- or the error.
+        function status(): string {
+            var p = root.keyboardRgbPalette
+            return JSON.stringify(p ? { dominant: p.dominant, accents: p.accents || [], others: p.others }
+                                    : { error: root.keyboardRgbError })
+        }
     }
 
     Connections {
@@ -989,7 +995,7 @@ Singleton {
                 var d
                 try { d = JSON.parse(text) } catch (e) { return }
                 root.keyboardRgbError = d.ok ? "" : (d.error || "")
-                if (d.ok && d.dominant) root.keyboardRgbPalette = { dominant: d.dominant, others: d.others, keys: d.keys || ({}) }
+                if (d.ok && d.dominant) root.keyboardRgbPalette = { dominant: d.dominant, others: d.others, accents: d.accents || [], keys: d.keys || ({}) }
             }
         }
     }
