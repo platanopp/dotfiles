@@ -1,6 +1,6 @@
 # dotfiles
 
-![The bar over the desktop](home/.config/quickshell/screenshots/desktop.jpg)
+![The bar over the desktop](home/.config/quickshell/screenshots/desktop-2026-09.jpg)
 
 ```sh
 git clone https://github.com/platanopp/dotfiles.git ~/dotfiles && cd ~/dotfiles && ./install.sh

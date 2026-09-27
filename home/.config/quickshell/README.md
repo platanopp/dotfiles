@@ -3,7 +3,7 @@
 A desktop shell for [Quickshell](https://quickshell.org/), written as a flat set
 of QML components and tuned for Hyprland on Wayland.
 
-![The bar over the desktop](./screenshots/desktop.jpg)
+![The bar over the desktop](./screenshots/desktop-2026-09.jpg)
 
 ## What is on screen
 
