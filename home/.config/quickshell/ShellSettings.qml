@@ -29,6 +29,10 @@ Singleton {
     // Where Settings -> About keeps the configuration's backup (a git
     // repository; see scripts/backup.py). "~" is this user's home.
     readonly property string backupRepo: adapter.backupRepo
+    // A Wooting keyboard coloured from the wallpaper (scripts/keyboard_rgb.py),
+    // and how bright, 10-100.
+    readonly property bool keyboardRgb: adapter.keyboardRgb
+    readonly property int keyboardRgbBrightness: adapter.keyboardRgbBrightness
 
     function set(key, value) {
         adapter[key] = value
@@ -55,6 +59,8 @@ Singleton {
             property bool lockAtBoot: true
             property string lockMonitor: "DP-2"
             property string backupRepo: "~/dotfiles"
+            property bool keyboardRgb: true
+            property int keyboardRgbBrightness: 100
         }
     }
 }

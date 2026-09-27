@@ -920,6 +920,83 @@ Singleton {
     // lock covers its screen, so handed the original it cropped it again at
     // the centre -- and a wallpaper framed off-centre in the picker showed a
     // different part of itself on the lock than on the desktop.
+    // ── Keyboard colours from the wallpaper ─────────────────────────────
+    //
+    // A Wooting keyboard painted from whatever wallpaper is up (see
+    // scripts/keyboard_rgb.py): letters in the dominant colour, the rest in
+    // the picture's other tones. Follows wallpaperStill, so a video
+    // wallpaper colours it from its poster frame.
+    property var keyboardRgbStatus: ({ connected: false })
+    // The colours in use: { dominant, others } as hex, for the Settings page.
+    property var keyboardRgbPalette: null
+    property string keyboardRgbError: ""
+
+    readonly property string keyboardRgbScript:
+        Quickshell.env("HOME") + "/.config/quickshell/scripts/keyboard_rgb.py"
+
+    function applyKeyboardRgb() {
+        if (!ShellSettings.keyboardRgb || root.wallpaperStill.length === 0) return
+        keyboardRgbDebounce.restart()
+    }
+
+    function resetKeyboardRgb() {
+        keyboardRgbProc.command = ["python3", root.keyboardRgbScript, "reset"]
+        keyboardRgbProc.running = true
+        root.keyboardRgbPalette = null
+    }
+
+    function refreshKeyboardRgb() {
+        if (!keyboardRgbStatusProc.running) keyboardRgbStatusProc.running = true
+    }
+
+    onWallpaperStillChanged: root.applyKeyboardRgb()
+
+    Connections {
+        target: ShellSettings
+        function onKeyboardRgbChanged() {
+            if (ShellSettings.keyboardRgb) root.applyKeyboardRgb()
+            else root.resetKeyboardRgb()
+        }
+        function onKeyboardRgbBrightnessChanged() { root.applyKeyboardRgb() }
+    }
+
+    // A wallpaper change settles (the crop is rendered, the video's poster is
+    // cut) before the keyboard follows; one write, not several.
+    Timer {
+        id: keyboardRgbDebounce
+        interval: 600
+        onTriggered: {
+            if (keyboardRgbProc.running) { keyboardRgbDebounce.restart(); return }
+            keyboardRgbProc.command = ["python3", root.keyboardRgbScript, "apply",
+                                       root.wallpaperStill, String(ShellSettings.keyboardRgbBrightness)]
+            keyboardRgbProc.running = true
+        }
+    }
+
+    Process {
+        id: keyboardRgbProc
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var d
+                try { d = JSON.parse(text) } catch (e) { return }
+                root.keyboardRgbError = d.ok ? "" : (d.error || "")
+                if (d.ok && d.dominant) root.keyboardRgbPalette = { dominant: d.dominant, others: d.others }
+            }
+        }
+    }
+
+    Process {
+        id: keyboardRgbStatusProc
+        running: true
+        command: ["python3", root.keyboardRgbScript, "status"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try { root.keyboardRgbStatus = JSON.parse(text) } catch (e) {}
+            }
+        }
+    }
+
     readonly property string wallpaperStill: {
         if (root.activeVideoWallpaper !== "") {
             var f = root.videoWallpaperFrames[root.activeVideoWallpaper]

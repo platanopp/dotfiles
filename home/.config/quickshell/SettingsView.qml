@@ -25,6 +25,7 @@ Item {
         { group: "Devices", items: [
             { id: "displays", label: "Displays", icon: "\u{F037A}", file: "SettingsPageDisplays.qml" },
             { id: "colour", label: "Colour", icon: "\u{F03D8}", file: "SettingsPageColour.qml" },
+            { id: "keyboard", label: "Keyboard", icon: "\u{F030C}", file: "SettingsPageKeyboard.qml" },
             { id: "sound", label: "Sound", icon: "\u{F057E}", file: "SettingsPageSound.qml" }
         ] },
         { group: "Hyprland", items: [
