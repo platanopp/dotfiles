@@ -1,7 +1,8 @@
 import QtQuick
 import QtQuick.Layouts
 
-// Settings -> Keyboard: a Wooting keyboard lit with the wallpaper itself --
+// Settings -> Keyboard: RGB keyboards lit with the wallpaper itself -- a
+// Wooting through its own SDK, any other brand through OpenRGB --
 // the picture laid over the board, each key the colour of the part under it
 // (scripts/keyboard_rgb.py). The board drawn here shows the colours last
 // sent, key for key.
@@ -78,13 +79,45 @@ Column {
 
     SettingsGroup {
         width: parent.width
-        title: "Wooting"
+        title: "Keyboards"
+
+        // Every keyboard being lit, and how: key by key, by zones, or one
+        // colour for the whole board.
+        Repeater {
+            model: page.status.devices || []
+
+            SettingsRow {
+                id: kb
+                required property var modelData
+                icon: "\u{F030C}"
+                title: kb.modelData.name
+                description: (kb.modelData.kind === "wooting" ? "Wooting SDK" : "OpenRGB") + " · "
+                    + (kb.modelData.shape === "per-key" ? "key by key"
+                       : kb.modelData.shape === "zones" ? "by zones" : "one colour")
+            }
+        }
 
         SettingsRow {
+            visible: !page.status.devices || page.status.devices.length === 0
             icon: "\u{F030C}"
-            title: page.status.connected ? (page.status.model || "Wooting keyboard")
-                 : page.status.sdk === false ? "The Wooting RGB SDK is not installed"
-                 : "No Wooting keyboard found"
+            title: "No RGB keyboard found"
+            description: page.status.openrgb ? "" : "Other brands need OpenRGB running"
+
+            PillButton {
+                icon: "\u{F0450}"
+                text: "Check"
+                onClicked: AppState.refreshKeyboardRgb()
+            }
+        }
+
+        // Only the Wooting SDK reaches a Wooting; OpenRGB reaches the rest.
+        // Said when it is not running, since that is why a keyboard of
+        // another brand would be missing from the list above.
+        SettingsRow {
+            visible: page.status.devices && page.status.devices.length > 0 && page.status.openrgb === false
+            icon: "\u{F02FD}"
+            title: "Other brands"
+            description: "Keyboards other than Wooting are lit through OpenRGB, which is not running"
 
             PillButton {
                 icon: "\u{F0450}"
@@ -109,9 +142,10 @@ Column {
         // one it is on right now is marked: switch on the keyboard and see.
         SettingsRow {
             stacked: true
-            visible: ShellSettings.keyboardRgb
+            // Profiles are a Wooting's: the others have none to choose.
+            visible: ShellSettings.keyboardRgb && (page.status.devices || []).some(d => d.kind === "wooting")
             icon: "\u{F0004}"
-            title: "Profile"
+            title: "Wooting profile"
             value: AppState.keyboardProfileActive >= 0 ? "On the keyboard now: " + (AppState.keyboardProfileActive + 1) : ""
 
             Segmented {

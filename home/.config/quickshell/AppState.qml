@@ -1123,6 +1123,15 @@ Singleton {
                     root.keyboardProfileActive = d.active
                     return
                 }
+                // Keyboards plugged in or out: keep the list current without
+                // losing the rest of the last status.
+                if (d.cmd === "devices") {
+                    var st = Object.assign({}, root.keyboardRgbStatus)
+                    st.devices = d.devices
+                    st.connected = d.devices.length > 0
+                    root.keyboardRgbStatus = st
+                    return
+                }
                 if (d.cmd === "status") {
                     root.keyboardRgbStatus = d
                     if (d.active !== null && d.active !== undefined) root.keyboardProfileActive = d.active
