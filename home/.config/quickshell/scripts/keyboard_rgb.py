@@ -3,7 +3,9 @@
 own shade. The letters draw from the picture's dominant colour and its
 nearest neighbours, every other key from the picture's other tones, and each
 key is mixed between two of them and moved in lightness and saturation --
-from pale to deep, the way a picture's one colour actually varies. The
+from pale to deep, the way a picture's one colour actually varies. Accents
+-- a vivid colour on a small part of the picture, like red eyes on a blue
+portrait -- are found apart (see accents()) and scattered over some keys. The
 arrangement is fixed for a given wallpaper and different for the next.
 
 Talks to the keyboard through Wooting's RGB SDK (libwooting-rgb-sdk.so, in
@@ -82,7 +84,7 @@ def hue_distance(a, b):
 
 
 def palette(image_path):
-    """(letters, others): two pools of HLS colours. Letters get the dominant
+    """(letters, others, accents): pools of HLS colours. Letters get the dominant
     colour -- the most common, weighted by how colourful it is, so a grey
     picture with a pink subject gives pink -- and the colours nearest it in
     hue; others get the rest. Close colours are kept, not merged: they are
@@ -109,6 +111,7 @@ def palette(image_path):
                   key=lambda c: hue_distance(c[0], dominant[0]))
     letters = [dominant] + rest[:3]
     others = rest[3:] or rest[:]
+    found = accents(image_path, dominant[0])
     # A picture of one colour: its own neighbours, lighter and darker.
     k = 0
     while len(others) < 4:
@@ -116,7 +119,73 @@ def palette(image_path):
         others.append(((h + (0.035, -0.035, 0.07, -0.07)[k]) % 1.0,
                        min(0.8, max(0.15, l + (-0.15, 0.15, -0.25, 0.1)[k])), s))
         k += 1
-    return letters, others
+    return letters, others, found
+
+
+def accents(image_path, dominant_hue):
+    """Vivid colours that cover little of the picture. Quantizing by area
+    folds them into whatever surrounds them, so they are looked for on
+    their own: a histogram of hue over the saturated pixels of a large
+    thumbnail (a small one averages a pair of eyes away), runs of adjacent
+    hues merged, and every run far enough from the dominant hue and big
+    enough not to be noise kept -- by how many vivid pixels it has, up to
+    three. The colour of each is the mean of its most saturated pixels."""
+    from PIL import Image
+    with Image.open(image_path) as im:
+        im = im.convert("RGB")
+        im.thumbnail((900, 900))
+        hsv = im.convert("HSV").tobytes()
+        rgb = im.tobytes()
+    bins = 36
+    vivid = [[0, 0, 0, 0] for _ in range(bins)]     # r, g, b sums and count
+    for i in range(0, len(hsv), 3):
+        h, s, v = hsv[i], hsv[i + 1], hsv[i + 2]
+        if s < 64 or v < 64:
+            continue
+        b = h * bins // 256
+        if s > 140:
+            acc = vivid[b]
+            acc[0] += rgb[i]; acc[1] += rgb[i + 1]; acc[2] += rgb[i + 2]; acc[3] += 1
+
+    # Only hues well away from the dominant one can be accents; among
+    # those, adjacent hues with vivid pixels form a group, split where the
+    # count dips to a valley -- the lavender of a shadow and the red of an
+    # eye can sit next to each other on the circle and are not one colour.
+    def far(i):
+        return hue_distance((i + 0.5) / bins, dominant_hue) >= 40 / 360
+    alive = [far(i) and vivid[i][3] >= 12 for i in range(bins)]
+    start = next((i for i in range(bins) if not alive[i]), None)
+    if start is None:
+        return []
+    groups, current = [], []
+    for k in range(1, bins + 1):
+        i = (start + k) % bins
+        if alive[i]:
+            current.append(i)
+        elif current:
+            groups.append(current)
+            current = []
+    if current:
+        groups.append(current)
+
+    def split(group):
+        v = [vivid[i][3] for i in group]
+        for j in range(1, len(group) - 1):
+            if v[j] < 0.5 * min(max(v[:j]), max(v[j + 1:])):
+                return split(group[:j]) + split(group[j + 1:])
+        return [group]
+
+    found = []
+    for group in (g for grp in groups for g in split(grp)):
+        m = sum(vivid[i][3] for i in group)
+        if m < 20:
+            continue
+        r = sum(vivid[i][0] for i in group) / m
+        g = sum(vivid[i][1] for i in group) / m
+        bl = sum(vivid[i][2] for i in group) / m
+        found.append((m, hls((r, g, bl))))
+    found.sort(reverse=True)
+    return [c for _, c in found[:3]]
 
 
 def mix(a, b, t):
@@ -149,11 +218,22 @@ def pick(pool, row, col, salt, seed, first_weight=0.0):
     return pool[int(u * 997) % len(pool)]
 
 
-def key_colours(letters, others, brightness, seed=""):
+def key_colours(letters, others, found, brightness, seed=""):
+    """found: the accents, which take about one key in five outside the
+    letters and one in ten among them -- enough to be seen, few enough to
+    stay accents."""
     out = {}
     for row in range(1, ROWS):
         for col in range(COLS):
-            if (row, col) in LETTERS:
+            letter = (row, col) in LETTERS
+            share = 0.1 if letter else 0.2
+            if found and (jitter(row, col, "accent", seed) + 1) / 2 < share:
+                h, l, s = pick(found, row, col, "which", seed, 0.5)
+                l += jitter(row, col, "l", seed) * 0.1
+                s += jitter(row, col, "s", seed) * 0.1
+                out[(row, col)] = for_leds(h, l, max(0.0, min(1.0, s)), brightness)
+                continue
+            if letter:
                 a = pick(letters, row, col, "a", seed, 0.35)
                 b = pick(letters, row, col, "b", seed)
             else:
@@ -193,16 +273,17 @@ def cmd_status():
             "model": (meta.model or b"").decode(errors="replace")}
 
 
-def describe(letters, others, keys):
+def describe(letters, others, found, keys):
     return {"ok": True, "dominant": hex_of(*letters[0]),
             "others": [hex_of(*o) for o in others],
+            "accents": [hex_of(*a) for a in found],
             # Full brightness, for the Settings page's picture of the board.
             "keys": {f"{r},{c}": "#%02x%02x%02x" % rgb for (r, c), rgb in keys.items()}}
 
 
 def cmd_palette(image):
-    letters, others = palette(image)
-    return describe(letters, others, key_colours(letters, others, 100, image))
+    letters, others, found = palette(image)
+    return describe(letters, others, found, key_colours(letters, others, found, 100, image))
 
 
 def cmd_apply(image, brightness):
@@ -211,13 +292,13 @@ def cmd_apply(image, brightness):
     lib, err = connect()
     if not lib:
         return {"ok": False, "error": err}
-    letters, others = palette(image)
+    letters, others, found = palette(image)
     lib.wooting_rgb_array_auto_update(False)
-    for (row, col), (r, g, b) in key_colours(letters, others, brightness, image).items():
+    for (row, col), (r, g, b) in key_colours(letters, others, found, brightness, image).items():
         lib.wooting_rgb_array_set_single(row, col, r, g, b)
     if not lib.wooting_rgb_array_update_keyboard():
         return {"ok": False, "error": "the keyboard did not take the colours"}
-    return describe(letters, others, key_colours(letters, others, 100, image))
+    return describe(letters, others, found, key_colours(letters, others, found, 100, image))
 
 
 def cmd_reset():
