@@ -35,6 +35,9 @@ Singleton {
     readonly property int keyboardRgbBrightness: adapter.keyboardRgbBrightness
     // Sweep to the new colours when the wallpaper changes, or just switch.
     readonly property bool keyboardRgbAnimate: adapter.keyboardRgbAnimate
+    // Which of the keyboard's profiles gets the wallpaper (0-3); -1: all.
+    // The others keep the colours they were given in Wootility.
+    readonly property int keyboardRgbProfile: adapter.keyboardRgbProfile
 
     function set(key, value) {
         adapter[key] = value
@@ -64,6 +67,7 @@ Singleton {
             property bool keyboardRgb: true
             property int keyboardRgbBrightness: 100
             property bool keyboardRgbAnimate: true
+            property int keyboardRgbProfile: -1
         }
     }
 }

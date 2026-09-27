@@ -929,6 +929,8 @@ Singleton {
     // The colours in use: { keys: { "row,col": hex } }, for the Settings page.
     property var keyboardRgbPalette: null
     property string keyboardRgbError: ""
+    // The profile the keyboard is on (0-3), -1 until known.
+    property int keyboardProfileActive: -1
 
     readonly property string keyboardRgbScript:
         Quickshell.env("HOME") + "/.config/quickshell/scripts/keyboard_rgb.py"
@@ -979,6 +981,9 @@ Singleton {
             else root.resetKeyboardRgb()
         }
         function onKeyboardRgbBrightnessChanged() { root.applyKeyboardRgb(false) }
+        function onKeyboardRgbProfileChanged() {
+            root.keyboardRgbSend({ cmd: "target", profile: ShellSettings.keyboardRgbProfile })
+        }
     }
 
     // A wallpaper change settles (the crop is rendered, the video's poster is
@@ -1004,8 +1009,13 @@ Singleton {
             onRead: line => {
                 var d
                 try { d = JSON.parse(line) } catch (e) { return }
+                if (d.cmd === "profile") {
+                    root.keyboardProfileActive = d.active
+                    return
+                }
                 if (d.cmd === "status") {
                     root.keyboardRgbStatus = d
+                    if (d.active !== null && d.active !== undefined) root.keyboardProfileActive = d.active
                     return
                 }
                 root.keyboardRgbError = d.ok ? "" : (d.error || "")
@@ -1013,7 +1023,10 @@ Singleton {
             }
         }
         // Asked once it is up, so Settings knows whether there is a keyboard.
-        onStarted: keyboardRgbProc.write(JSON.stringify({ cmd: "status" }) + "\n")
+        onStarted: {
+            keyboardRgbProc.write(JSON.stringify({ cmd: "target", profile: ShellSettings.keyboardRgbProfile }) + "\n")
+            keyboardRgbProc.write(JSON.stringify({ cmd: "status" }) + "\n")
+        }
     }
 
     readonly property string wallpaperStill: {

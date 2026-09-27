@@ -105,6 +105,29 @@ Column {
             }
         }
 
+        // The keyboard only says which profile it is on by number, so the
+        // one it is on right now is marked: switch on the keyboard and see.
+        SettingsRow {
+            stacked: true
+            visible: ShellSettings.keyboardRgb
+            icon: "\u{F0004}"
+            title: "Profile"
+            value: AppState.keyboardProfileActive >= 0 ? "On the keyboard now: " + (AppState.keyboardProfileActive + 1) : ""
+
+            Segmented {
+                width: parent.width
+                options: [
+                    { value: -1, label: "All" },
+                    { value: 0, label: AppState.keyboardProfileActive === 0 ? "1 •" : "1" },
+                    { value: 1, label: AppState.keyboardProfileActive === 1 ? "2 •" : "2" },
+                    { value: 2, label: AppState.keyboardProfileActive === 2 ? "3 •" : "3" },
+                    { value: 3, label: AppState.keyboardProfileActive === 3 ? "4 •" : "4" }
+                ]
+                value: ShellSettings.keyboardRgbProfile
+                onPicked: v => ShellSettings.set("keyboardRgbProfile", v)
+            }
+        }
+
         SettingsRow {
             stacked: true
             visible: ShellSettings.keyboardRgb

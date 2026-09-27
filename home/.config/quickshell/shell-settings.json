@@ -1,7 +1,12 @@
 {
+    "backupRepo": "~/dotfiles",
     "barHideFullscreen": true,
     "clock24h": false,
     "clockDate": "hover",
+    "keyboardRgb": true,
+    "keyboardRgbAnimate": true,
+    "keyboardRgbBrightness": 100,
+    "keyboardRgbProfile": 0,
     "lockAtBoot": true,
     "lockMonitor": "DP-2"
 }

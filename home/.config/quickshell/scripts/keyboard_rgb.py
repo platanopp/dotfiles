@@ -25,12 +25,20 @@ wooting_rgb_close(), which would reset the colours on the way out.
                              What the shell runs: finding the keyboard costs
                              two seconds (the SDK probes every model it
                              knows), paid once here instead of per change.
+                             Also {"cmd": "target", "profile": N}: paint only
+                             while the keyboard is on profile N (0-3; -1 for
+                             any), the profile's own colours on the others.
+                             The active profile is watched, and reported as
+                             {"cmd": "profile", "active": N} when it changes.
+  profile                    JSON: the keyboard's active profile (0-3)
 
 Prints JSON: {"ok": true, ...} or {"ok": false, "error": ...}.
 """
 
 import colorsys
 import ctypes
+import fcntl
+import glob
 import json
 import os
 import select
@@ -237,6 +245,71 @@ def save_last(colours):
         pass
 
 
+# ── The active profile ───────────────────────────────────────────────────
+#
+# Read over hidraw, not the SDK: the SDK waits for a 2046-byte answer and a
+# 60HE (ARM) sends 33, so it gives up and drops the connection. The request
+# is Wooting's command 11 (GetCurrentKeyboardProfileIndex) as a feature
+# report on the configuration interface (usage page 0xFF55); the answer is
+# an input report [id, D1, DA, 11, status, length, data...] whose second data
+# byte is the profile, 0-3.
+
+WOOTING_VENDOR = "31E3"
+PROFILE_COMMAND = 11
+
+
+def HIDIOCSFEATURE(n):
+    return (3 << 30) | (n << 16) | (ord("H") << 8) | 0x06
+
+
+class ProfileReader:
+    def __init__(self):
+        self.fd = None
+
+    def open(self):
+        for d in sorted(glob.glob("/sys/class/hidraw/hidraw*")):
+            try:
+                with open(d + "/device/uevent") as fh:
+                    if WOOTING_VENDOR not in fh.read().upper():
+                        continue
+                with open(d + "/device/report_descriptor", "rb") as fh:
+                    if b"\x06\x55\xff" not in fh.read():
+                        continue
+                self.fd = os.open("/dev/" + os.path.basename(d), os.O_RDWR | os.O_NONBLOCK)
+                return True
+            except OSError:
+                continue
+        return False
+
+    def close(self):
+        if self.fd is not None:
+            try:
+                os.close(self.fd)
+            except OSError:
+                pass
+        self.fd = None
+
+    def active(self):
+        """0-3, or None when it cannot be read (unplugged: reopened next time)."""
+        if self.fd is None and not self.open():
+            return None
+        try:
+            # Whatever is queued is someone else's -- the SDK's writes, or
+            # Wootility's own questions when it is open.
+            while select.select([self.fd], [], [], 0)[0]:
+                os.read(self.fd, 4096)
+            fcntl.ioctl(self.fd, HIDIOCSFEATURE(8), bytearray([1, 0xD1, 0xDA, PROFILE_COMMAND, 0, 0, 0, 0]))
+            end = time.monotonic() + 0.5
+            while time.monotonic() < end:
+                if select.select([self.fd], [], [], 0.05)[0]:
+                    r = os.read(self.fd, 4096)
+                    if len(r) >= 8 and r[1] == 0xD1 and r[2] == 0xDA and r[3] == PROFILE_COMMAND:
+                        return r[7]
+        except OSError:
+            self.close()
+        return None
+
+
 # ── Commands ─────────────────────────────────────────────────────────────
 
 def connect():
@@ -299,19 +372,52 @@ def cmd_reset(lib=None):
 def serve():
     """The long-running form (see `serve` above). Commands that pile up
     while a sweep runs are not played one after another: only the last
-    apply is, the wallpaper actually up by then. Leaving on end of input
-    keeps the colours on the keys."""
+    apply is, the wallpaper actually up by then. Between commands, the
+    active profile is checked once a second. Leaving on end of input keeps
+    the colours on the keys."""
     sdk = load_sdk()
     if sdk is None:
         print(json.dumps({"ok": False, "error": "the Wooting RGB SDK is not installed"}), flush=True)
         return
     fd = sys.stdin.fileno()
     pending = b""
+    reader = ProfileReader()
+    target = -1                  # the profile to paint on; -1: any
+    active = None                # the keyboard's, as last read
+    wanted = None                # (image, brightness): what to paint
+    painted = False              # whether the keys show it now
 
-    def lines(block):
+    def say(out):
+        print(json.dumps(out), flush=True)
+
+    def keyboard():
+        # Cheap once connected; after an unplug, finds it again.
+        return sdk if sdk.wooting_rgb_kbd_connected() else None
+
+    def ours():
+        return target < 0 or active is None or active == target
+
+    def settle(animate):
+        """Paint or give the keys back, whichever the profile calls for."""
+        nonlocal painted
+        lib = keyboard()
+        if not lib:
+            return {"ok": False, "error": "no Wooting keyboard found"}
+        if ours():
+            if not wanted:
+                return {"ok": True}
+            out = cmd_apply(wanted[0], wanted[1], animate, lib)
+            painted = out.get("ok", False)
+            return out
+        if painted:
+            lib.wooting_rgb_reset_rgb()
+            painted = False
+        return {"ok": True, "skipped": "profile"}
+
+    def lines(timeout):
         nonlocal pending
         while b"\n" not in pending:
-            ready, _, _ = select.select([fd], [], [], None if block else 0)
+            ready, _, _ = select.select([fd], [], [], timeout)
             if not ready:
                 return None
             chunk = os.read(fd, 65536)
@@ -323,45 +429,61 @@ def serve():
 
     while True:
         try:
-            batch = [lines(True)]
-            while True:
-                more = lines(False)
+            first = lines(1.0)
+            batch = [first] if first is not None else []
+            while batch:
+                more = lines(0)
                 if more is None:
                     break
                 batch.append(more)
         except EOFError:
+            reader.close()
             return
+
+        # Once a second (or after commands): has the profile changed?
+        now = reader.active()
+        if now is not None and now != active:
+            before = ours()
+            active = now
+            say({"cmd": "profile", "active": active})
+            if ours() != before or (ours() and not painted):
+                settle(animate=True)
+
         commands = []
         for raw in batch:
             try:
                 commands.append(json.loads(raw))
             except ValueError:
                 continue
-        # Of the applies waiting, only the latest; everything else in order.
         last_apply = max((i for i, c in enumerate(commands) if c.get("cmd") == "apply"), default=-1)
         for i, c in enumerate(commands):
             cmd = c.get("cmd")
             if cmd == "apply" and i != last_apply:
                 continue
-            # Cheap once connected; after an unplug, finds it again.
-            lib = sdk if sdk.wooting_rgb_kbd_connected() else None
             try:
                 if cmd == "status":
+                    lib = keyboard()
                     out = cmd_status(lib) if lib else {"ok": True, "connected": False, "sdk": True,
                                                        "error": "no Wooting keyboard found"}
-                elif not lib:
-                    out = {"ok": False, "error": "no Wooting keyboard found"}
+                    out["active"] = active
                 elif cmd == "apply":
                     b = max(10, min(100, int(c.get("brightness", 100))))
-                    out = cmd_apply(os.path.expanduser(c.get("image", "")), b, bool(c.get("animate")), lib)
+                    wanted = (os.path.expanduser(c.get("image", "")), b)
+                    out = settle(bool(c.get("animate")))
+                elif cmd == "target":
+                    target = int(c.get("profile", -1))
+                    out = settle(animate=True)
                 elif cmd == "reset":
-                    out = cmd_reset(lib)
+                    wanted = None
+                    lib = keyboard()
+                    out = cmd_reset(lib) if lib else {"ok": False, "error": "no Wooting keyboard found"}
+                    painted = False
                 else:
                     out = {"ok": False, "error": f"unknown command {cmd}"}
             except (OSError, ValueError) as e:
                 out = {"ok": False, "error": str(e)}
             out["cmd"] = cmd
-            print(json.dumps(out), flush=True)
+            say(out)
 
 
 def main():
@@ -378,6 +500,9 @@ def main():
             out = cmd_reset()
         elif a in ([], ["status"]):
             out = cmd_status()
+        elif a == ["profile"]:
+            n = ProfileReader().active()
+            out = {"ok": n is not None, "active": n}
         elif a == ["serve"]:
             serve()
             return
