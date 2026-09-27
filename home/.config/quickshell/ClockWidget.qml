@@ -76,8 +76,52 @@ PanelWindow {
                              : compactRow.implicitWidth + 24 + compactPaddingH * 2
     implicitHeight: panelOpen ? panelColumn.implicitHeight + 56 : 64
 
+    // Off while the date is folding in or out: that change is animated where
+    // it starts (revealDate below), and a second animation chasing it here
+    // made the pill grow in stutters.
     Behavior on implicitWidth {
+        enabled: !revealAnim.running
         NumberAnimation { duration: Theme.durLong; easing.type: Easing.OutCubic }
+    }
+
+    // ── Time only, date on hover ─────────────────────────────────────────
+    //
+    // At rest the pill carries the time and nothing else; the date opens out
+    // beside it while the pointer is on the pill, and folds away a moment
+    // after it leaves -- the moment is so that brushing the pill's edge does
+    // not make it flicker. The pill is centred, so it grows both ways.
+    // "Always" in Settings -> Shell keeps the date out for good.
+    readonly property bool showDate: ShellSettings.clockDate === "always"
+                                     || barHover.hovered || clockItem.panelOpen
+    property real revealDate: 0
+
+    Component.onCompleted: clockItem.revealDate = clockItem.showDate ? 1 : 0
+
+    onShowDateChanged: {
+        if (clockItem.showDate) {
+            foldTimer.stop()
+            revealAnim.to = 1
+            revealAnim.restart()
+        } else {
+            foldTimer.restart()
+        }
+    }
+
+    Timer {
+        id: foldTimer
+        interval: 220
+        onTriggered: {
+            revealAnim.to = 0
+            revealAnim.restart()
+        }
+    }
+
+    NumberAnimation {
+        id: revealAnim
+        target: clockItem
+        property: "revealDate"
+        duration: Theme.durLong
+        easing.type: Easing.OutCubic
     }
 
     Behavior on implicitHeight {
@@ -165,7 +209,11 @@ PanelWindow {
         RowLayout {
             id: compactRow
             anchors.centerIn: parent
-            spacing: 8
+            // No spacing between the time and the date: the gap lives inside
+            // the date (its leading margin below), so it folds away with it.
+            // A row spacing stayed behind at rest as eight pixels of padding
+            // on the right of the time.
+            spacing: 0
             visible: !clockItem.panelOpen
             opacity: clockItem.panelOpen ? 0 : 1
 
@@ -181,18 +229,34 @@ PanelWindow {
                 font.family: Theme.fontMono
             }
 
-            Text {
-                text: "\u00b7"
-                color: Theme.textMuted
-                font.pixelSize: 14
-                font.family: Theme.fontMono
-            }
+            // The date, folded to nothing at rest. Its width is what opens,
+            // so the pill grows with it frame by frame; clipped so the text is
+            // uncovered rather than squeezed.
+            Item {
+                Layout.preferredWidth: (dateRow.implicitWidth + 8) * clockItem.revealDate
+                Layout.preferredHeight: dateRow.implicitHeight
+                clip: true
+                opacity: clockItem.revealDate
 
-            Text {
-                text: AppState.currentDate
-                color: Theme.textSecondary
-                font.pixelSize: 13
-                font.family: Theme.fontMono
+                RowLayout {
+                    id: dateRow
+                    x: 8
+                    spacing: 8
+
+                    Text {
+                        text: "\u00b7"
+                        color: Theme.textMuted
+                        font.pixelSize: 14
+                        font.family: Theme.fontMono
+                    }
+
+                    Text {
+                        text: AppState.currentDate
+                        color: Theme.textSecondary
+                        font.pixelSize: 13
+                        font.family: Theme.fontMono
+                    }
+                }
             }
         }
 

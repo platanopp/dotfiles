@@ -1,0 +1,7 @@
+{
+    "barHideFullscreen": true,
+    "clock24h": false,
+    "clockDate": "hover",
+    "lockAtBoot": true,
+    "lockMonitor": "DP-2"
+}

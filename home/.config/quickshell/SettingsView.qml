@@ -22,21 +22,19 @@ Item {
     signal closeRequested()
 
     readonly property var nav: [
-        { group: "Display", items: [
-            { id: "displays", label: "Displays", icon: "\u{F037A}", tint: Theme.accent,
-              subtitle: "Where your screens sit, and how they draw", file: "SettingsPageDisplays.qml" },
-            { id: "colour", label: "Colour", icon: "\u{F03D8}", tint: Theme.accent,
-              subtitle: "Saturation and tone", file: "SettingsPageColour.qml" }
+        { group: "Devices", items: [
+            { id: "displays", label: "Displays", icon: "\u{F037A}", file: "SettingsPageDisplays.qml" },
+            { id: "colour", label: "Colour", icon: "\u{F03D8}", file: "SettingsPageColour.qml" },
+            { id: "sound", label: "Sound", icon: "\u{F057E}", file: "SettingsPageSound.qml" }
         ] },
         { group: "Hyprland", items: [
-            { id: "look", label: "Look", icon: "\u{F05B2}", tint: Theme.accent,
-              subtitle: "Applied live · checked · saved to git", file: "SettingsPageLook.qml" },
-            { id: "input", label: "Input", icon: "\u{F037D}", tint: Theme.accent,
-              subtitle: "Applied live · checked · saved to git", file: "SettingsPageInput.qml" }
+            { id: "look", label: "Look", icon: "\u{F05B2}", file: "SettingsPageLook.qml" },
+            { id: "input", label: "Input", icon: "\u{F037D}", file: "SettingsPageInput.qml" }
         ] },
         { group: "System", items: [
-            { id: "power", label: "Power & idle", icon: "\u{F0241}", tint: Theme.accent,
-              subtitle: "Performance, and stepping away", file: "SettingsPagePower.qml" }
+            { id: "shell", label: "Shell", icon: "\u{F10AC}", file: "SettingsPageShell.qml" },
+            { id: "power", label: "Power & idle", icon: "\u{F0241}", file: "SettingsPagePower.qml" },
+            { id: "about", label: "About", icon: "\u{F02FD}", file: "SettingsPageAbout.qml" }
         ] }
     ]
 
@@ -166,7 +164,7 @@ Item {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 44
                             radius: 14
-                            color: navItem.chosen ? Theme.alpha(navItem.modelData.tint, 0.14)
+                            color: navItem.chosen ? Theme.alpha(Theme.accent, 0.14)
                                  : navState.hovered ? Theme.surfaceContainer : "transparent"
 
                             Behavior on color { ColorAnimation { duration: Theme.durShort } }
@@ -179,7 +177,7 @@ Item {
 
                                 TintBadge {
                                     icon: navItem.modelData.icon
-                                    tint: navItem.modelData.tint
+                                    tint: Theme.accent
                                     box: 30
                                 }
 
@@ -198,7 +196,7 @@ Item {
                                     Layout.preferredWidth: 6
                                     Layout.preferredHeight: 6
                                     radius: 3
-                                    color: navItem.modelData.tint
+                                    color: Theme.accent
                                 }
                             }
 
@@ -240,7 +238,7 @@ Item {
 
                 TintBadge {
                     icon: view.current.icon
-                    tint: view.current.tint
+                    tint: Theme.accent
                     box: 46
                 }
 

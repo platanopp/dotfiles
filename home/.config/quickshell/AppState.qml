@@ -29,7 +29,17 @@ Singleton {
     property string wifiExpandedSsid: ""
     property string wifiStatusMessage: ""
     property bool wifiConnecting: false
-    property string currentTime: Qt.formatDateTime(new Date(), "hh:mm")
+    property string currentTime: root.formatTime(new Date())
+
+    // 24-hour or 12-hour, from Settings -> Shell.
+    function formatTime(d) {
+        return Qt.formatDateTime(d, ShellSettings.clock24h ? "hh:mm" : "h:mm AP")
+    }
+
+    Connections {
+        target: ShellSettings
+        function onClock24hChanged() { root.currentTime = root.formatTime(new Date()) }
+    }
     // Pinned to en_US rather than left to the system locale, so the bar reads
     // the same whatever LANG happens to be set to.
     property string currentDate: new Date().toLocaleDateString(Qt.locale("en_US"), "d MMMM")
@@ -248,6 +258,72 @@ Singleton {
         setSinkProc.command = ["bash", "-lc", "wpctl set-default " + id]
         setSinkProc.running = true
         audioSinksRefreshTimer.restart()
+    }
+
+    // ── Input devices and the microphone's level ─────────────────────────
+    //
+    // For the Settings window's Sound page. The bar only ever needed mute;
+    // choosing the capture device and its level is new.
+    property var audioSources: []
+    property real micVolume: 100
+
+    function refreshAudioSources() {
+        if (!audioSourcesProc.running) audioSourcesProc.running = true
+        if (!micVolumeProc.running) micVolumeProc.running = true
+    }
+
+    function setDefaultSource(id) {
+        audioSourceSetProc.command = ["wpctl", "set-default", String(id)]
+        audioSourceSetProc.running = true
+        audioSourcesRefresh.restart()
+    }
+
+    function setMicVolume(percent) {
+        var v = Math.max(0, Math.min(150, Math.round(percent)))
+        root.micVolume = v
+        micVolumeSetProc.command = ["wpctl", "set-volume", "@DEFAULT_AUDIO_SOURCE@", (v / 100).toFixed(2)]
+        micVolumeSetProc.running = true
+    }
+
+    Process {
+        id: audioSourcesProc
+        running: false
+        command: ["bash", Quickshell.env("HOME") + "/.config/quickshell/scripts/audio_sources.sh"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var lines = text.trim().length > 0 ? text.trim().split("\n") : []
+                var list = []
+                for (var i = 0; i < lines.length; i++) {
+                    var parts = lines[i].split("|")
+                    if (parts.length < 3) continue
+                    list.push({ id: parts[0], name: parts[1], isDefault: parts[2] === "1" })
+                }
+                root.audioSources = list
+            }
+        }
+    }
+
+    Process {
+        id: micVolumeProc
+        running: false
+        command: ["wpctl", "get-volume", "@DEFAULT_AUDIO_SOURCE@"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var m = /Volume:\s*([0-9.]+)/.exec(text)
+                if (m) root.micVolume = Math.round(parseFloat(m[1]) * 100)
+            }
+        }
+    }
+
+    Process { id: audioSourceSetProc; running: false }
+    Process { id: micVolumeSetProc; running: false }
+
+    // wpctl answers before PipeWire has moved the default, so the list is
+    // read again a moment later rather than straight away.
+    Timer {
+        id: audioSourcesRefresh
+        interval: 400
+        onTriggered: root.refreshAudioSources()
     }
 
     function refreshAudioStreams() {
@@ -1055,7 +1131,7 @@ Singleton {
         running: true
         repeat: true
         onTriggered: {
-            root.currentTime = Qt.formatDateTime(new Date(), "hh:mm")
+            root.currentTime = root.formatTime(new Date())
             root.currentDate = new Date().toLocaleDateString(Qt.locale("en_US"), "d MMMM")
         }
     }
@@ -1459,6 +1535,63 @@ Singleton {
             }
         }
         onExited: root.hyprNext()
+    }
+
+    // ── About: the machine, and its backup ───────────────────────────────
+    //
+    // scripts/about.py: facts for the About page, and the backup in
+    // ~/dotfiles -- status, a local commit of everything pending, a push.
+    property var aboutInfo: ({})
+    property var backupStatus: ({ repo: false })
+    property bool backupBusy: false
+    // The last backup/push: { action, ok, error?, at }
+    property var backupLast: null
+
+    readonly property string aboutScript:
+        Quickshell.env("HOME") + "/.config/quickshell/scripts/about.py"
+
+    function refreshAbout() {
+        if (!aboutInfoProc.running) aboutInfoProc.running = true
+        root.backupCmd("status")
+    }
+
+    function backupCmd(action) {
+        if (backupProc.running) return
+        root.backupBusy = action !== "status"
+        backupProc.action = action
+        backupProc.command = ["python3", root.aboutScript, action]
+        backupProc.running = true
+    }
+
+    Process {
+        id: aboutInfoProc
+        running: false
+        command: ["python3", Quickshell.env("HOME") + "/.config/quickshell/scripts/about.py", "info"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try { root.aboutInfo = JSON.parse(text) } catch (e) {}
+            }
+        }
+    }
+
+    Process {
+        id: backupProc
+        property string action: "status"
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var d
+                try { d = JSON.parse(text) } catch (e) { return }
+                if (backupProc.action === "status") {
+                    root.backupStatus = d
+                    return
+                }
+                if (d.status) root.backupStatus = d.status
+                root.backupLast = { action: backupProc.action, ok: d.ok, error: d.error || "",
+                                    committed: d.committed !== false, at: Date.now() }
+            }
+        }
+        onExited: root.backupBusy = false
     }
 
     // ── Idle and lock timing ─────────────────────────────────────────────

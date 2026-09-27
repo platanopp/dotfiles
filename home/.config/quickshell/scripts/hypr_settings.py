@@ -255,8 +255,8 @@ def commit(message):
     run("git", "-C", DOTFILES, "add", "home/.config/hypr")
     if run("git", "-C", DOTFILES, "diff", "--cached", "--quiet").returncode == 0:
         return {"committed": False, "reason": "nothing changed"}
-    body = message + "\n\nMade in the Settings window; applied live and checked.\n\n" \
-           "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n"
+    # A change made by pressing a control is the user's own commit.
+    body = message + "\n\nMade in the Settings window; applied live and checked.\n"
     # The pathspec keeps the commit to .config/hypr even if something else
     # was already staged by hand.
     p = subprocess.run(["git", "-C", DOTFILES, "commit", "-q", "-F", "-", "--", "home/.config/hypr"],
@@ -305,6 +305,12 @@ def cmd_set(key, raw):
     before = live(key)
 
     state = load_state()
+    # Letting go of a slider where it already was is not a change: nothing
+    # to write, and no "border 0 -> 0" commit.
+    same = before == value or (isinstance(before, dict) and before.get("left") == value)
+    if same and key not in state:
+        print(json.dumps({"ok": True, "commit": {"committed": False, "reason": "unchanged"}}))
+        return
     base = state.get(key, {}).get("base", before)
     if kind == "sides":
         # Only the sides and the bottom: the top edge is sized for the bar, and

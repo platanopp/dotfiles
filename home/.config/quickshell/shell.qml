@@ -90,7 +90,9 @@ Scope {
                 || controlPanelWidget.panelOpen || mediaWidget.panelOpen
                 || clockWidget.panelOpen || notesWidget.panelOpen
 
-            readonly property bool wantBar: !fullscreen || barHovered || panelsOpen
+            // Settings -> Shell can keep the bar up over fullscreen windows.
+            readonly property bool wantBar: !(fullscreen && ShellSettings.barHideFullscreen)
+                                            || barHovered || panelsOpen
 
             // Shows at once, hides on a short delay. Revealing drops the pills
             // under the cursor, and for a frame the zone can have lost the

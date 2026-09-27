@@ -172,7 +172,8 @@ Singleton {
     // So the screen is named, the same way the workspace rules and hypridle's
     // wlopm lines in the Hyprland config name it. One place to change if the
     // desk ever changes.
-    property string mainMonitor: "DP-2"
+    // Chosen in Settings -> Shell; see ShellSettings.
+    readonly property string mainMonitor: ShellSettings.lockMonitor
 
     // What the field lands on in the end: the named screen while it is plugged
     // in, and whatever holds focus when it is not -- unplugging the main
@@ -583,12 +584,12 @@ Singleton {
     readonly property string timeText: {
         var d = root.now;
         var h = d.getHours();
-        var hh = true ? h : (h % 12 === 0 ? 12 : h % 12);
-        return (true && hh < 10 ? "0" : "") + hh + ":" + (d.getMinutes() < 10 ? "0" : "") + d.getMinutes();
+        var hh = ShellSettings.clock24h ? h : (h % 12 === 0 ? 12 : h % 12);
+        return (ShellSettings.clock24h && hh < 10 ? "0" : "") + hh + ":" + (d.getMinutes() < 10 ? "0" : "") + d.getMinutes();
     }
     readonly property string hourText: root.timeText.split(":")[0]
     readonly property string minuteText: root.timeText.split(":")[1]
-    readonly property string meridiem: true ? "" : (root.now.getHours() < 12 ? "AM" : "PM")
+    readonly property string meridiem: ShellSettings.clock24h ? "" : (root.now.getHours() < 12 ? "AM" : "PM")
     readonly property string dateText: root.now.toLocaleDateString(Qt.locale(), "dddd, d MMMM")
     readonly property string greeting: {
         var h = root.now.getHours();
@@ -759,7 +760,9 @@ Singleton {
         // "cannot overwrite existing file" in the log.
         command: ["sh", "-c", "f=\"$XDG_RUNTIME_DIR/quickshell/boot-lock\"; mkdir -p \"${f%/*}\" || exit 1; { set -C; : > \"$f\"; } 2>/dev/null"]
         onExited: (code) => {
-            if (code === 0)
+            // The claim is taken either way, so switching the setting on
+            // later in the session does not lock the screen there and then.
+            if (code === 0 && ShellSettings.lockAtBoot)
                 root.lock();
 
         }

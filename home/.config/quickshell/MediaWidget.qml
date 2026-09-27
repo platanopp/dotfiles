@@ -183,7 +183,7 @@ PanelWindow {
         RowLayout {
             id: mediaWidgetRow
             anchors.centerIn: parent
-            spacing: 8
+            spacing: 10
             visible: !mediaWidgetItem.panelOpen
             opacity: mediaWidgetItem.panelOpen ? 0 : 1
 
@@ -191,13 +191,47 @@ PanelWindow {
                 NumberAnimation { duration: 150 }
             }
 
+            // The artwork inside a ring that fills as the track plays -- the
+            // pill says how far along the song is without a word of text.
+            // Paused, the ring dims and the cover darkens under a pause mark.
             Item {
-                Layout.preferredWidth: 32
-                Layout.preferredHeight: 32
+                id: art
+                Layout.preferredWidth: 34
+                Layout.preferredHeight: 34
+
+                readonly property real progress: mediaWidgetItem.trackLength > 0
+                    ? Math.max(0, Math.min(1, mediaWidgetItem.currentPosition / mediaWidgetItem.trackLength)) : 0
+
+                Canvas {
+                    id: progressRing
+                    anchors.fill: parent
+                    property real progress: art.progress
+                    property bool playing: bar.isPlaying
+                    onProgressChanged: requestPaint()
+                    onPlayingChanged: requestPaint()
+                    onPaint: {
+                        var ctx = getContext("2d")
+                        ctx.reset()
+                        var c = width / 2, r = c - 1.5
+                        ctx.lineWidth = 2
+                        ctx.lineCap = "round"
+                        ctx.strokeStyle = Qt.rgba(Theme.foreground.r, Theme.foreground.g, Theme.foreground.b, 0.14)
+                        ctx.beginPath(); ctx.arc(c, c, r, 0, Math.PI * 2); ctx.stroke()
+                        if (progressRing.progress > 0) {
+                            var ink = progressRing.playing ? Theme.accent : Theme.textMuted
+                            ctx.strokeStyle = Qt.rgba(ink.r, ink.g, ink.b, ink.a)
+                            ctx.beginPath()
+                            ctx.arc(c, c, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progressRing.progress)
+                            ctx.stroke()
+                        }
+                    }
+                }
 
                 Rectangle {
                     id: artMask
-                    anchors.fill: parent
+                    anchors.centerIn: parent
+                    width: 26
+                    height: 26
                     radius: width / 2
                     visible: false
                     layer.enabled: true
@@ -205,10 +239,13 @@ PanelWindow {
 
                 Image {
                     id: artImage
-                    anchors.fill: parent
+                    anchors.centerIn: parent
+                    width: 26
+                    height: 26
                     source: bar.trackArtUrl
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: true
+                    sourceSize.width: 64
                     visible: status === Image.Ready
                     layer.enabled: true
                     layer.effect: MultiEffect {
@@ -218,7 +255,9 @@ PanelWindow {
                 }
 
                 Rectangle {
-                    anchors.fill: parent
+                    anchors.centerIn: parent
+                    width: 26
+                    height: 26
                     radius: width / 2
                     color: Theme.track
                     visible: artImage.status !== Image.Ready
@@ -227,7 +266,27 @@ PanelWindow {
                         anchors.centerIn: parent
                         text: "󰎇"
                         color: Theme.textPrimary
-                        size: Theme.iconSmall
+                        size: Theme.iconTiny
+                    }
+                }
+
+                // Paused: the cover steps back under a pause mark.
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: 26
+                    height: 26
+                    radius: width / 2
+                    color: Qt.rgba(0, 0, 0, 0.55)
+                    opacity: bar.isPlaying ? 0 : 1
+                    visible: opacity > 0
+
+                    Behavior on opacity { NumberAnimation { duration: Theme.durMedium } }
+
+                    IconGlyph {
+                        anchors.centerIn: parent
+                        text: "\u{F03E4}"
+                        color: Theme.textPrimary
+                        size: Theme.iconTiny
                     }
                 }
             }
@@ -237,7 +296,9 @@ PanelWindow {
 
                 Item {
                     id: titleMarquee
-                    width: 180
+                    // As wide as the title, up to the cap. A fixed 180 left a
+                    // short title ("Remember Me") beside an empty strip.
+                    width: Math.min(titleText.implicitWidth, 180)
                     height: titleText.implicitHeight
                     clip: true
 
@@ -311,7 +372,9 @@ PanelWindow {
         Timer {
             interval: 1000
             repeat: true
-            running: mediaWidgetItem.panelOpen && bar.isPlaying
+            // The compact pill's progress ring reads it too, so it runs
+            // whenever something is playing, not only with the panel open.
+            running: bar.isPlaying && !bar.barHidden
             triggeredOnStart: true
             onTriggered: if (mediaWidgetItem.player) mediaWidgetItem.currentPosition = mediaWidgetItem.player.position
         }
