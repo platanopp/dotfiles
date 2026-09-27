@@ -12,7 +12,7 @@
     "base": 15
   },
   "shadow": {
-    "value": true,
+    "value": false,
     "base": true
   }
 }
