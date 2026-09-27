@@ -145,14 +145,15 @@ def for_screen(keys):
     out = {}
     for key, (h, l, s) in keys.items():
         n = max(0.0, min(1.0, (l - lo) / span))
-        # Halfway between the picture's own lightness and the stretched one.
-        l = max(0.3, min(0.78, (l + (0.36 + n * 0.44)) / 2))
+        # Halfway between the picture's own lightness and the stretched one,
+        # with a floor that keeps the darkest keys well lit.
+        l = max(0.38, min(0.78, (l + (0.42 + n * 0.40)) / 2))
         s = min(1.0, s * 1.12 + 0.02)
         out[key] = tuple(int(round(c * 255)) for c in colorsys.hls_to_rgb(h, l, s))
     return out
 
 
-LED_GAMMA = 1.5
+LED_GAMMA = 1.3
 
 
 def for_leds(rgb, brightness, gain=1.0):
@@ -160,7 +161,7 @@ def for_leds(rgb, brightness, gain=1.0):
     gamma-encoded; an LED's are plain light output. Sent as they are, every
     mid tone comes out far too bright and the colours wash out to pastel --
     so they are decoded towards linear light first, then dimmed. Not all
-    the way (a power of 1.5, not sRGB's 2.2): decoded further, the keys
+    the way (a power of 1.3, not sRGB's 2.2): decoded further, the keys
     read as too dark beside the screen, which a room's light washes out
     more than it does an LED. `gain` is the board's headroom (see gain())."""
     k = brightness / 100 * gain
