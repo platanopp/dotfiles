@@ -49,17 +49,6 @@ Scope {
         return best
     }
 
-    property real position: 0
-
-    // Position is not signalled as it moves; read once a second while shown.
-    Timer {
-        running: LockEngine.locked && root.player !== null && root.player.isPlaying
-        interval: 1000
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: root.position = root.player ? root.player.position : 0
-    }
-
     WlSessionLock {
         id: session
         locked: LockEngine.locked
@@ -205,7 +194,7 @@ Scope {
                     //
                     // The bar's media pill, grown: the cover at the card's
                     // left end, faded out before the title starts; controls
-                    // on the right; progress as a hairline along the foot.
+                    // on the right; the beat along the foot.
                     // Steps back while the password is being typed.
                     Rectangle {
                         id: nowPlaying
@@ -217,7 +206,7 @@ Scope {
                         Layout.alignment: Qt.AlignHCenter
                         Layout.topMargin: 30
                         Layout.preferredWidth: 400
-                        Layout.preferredHeight: 84
+                        Layout.preferredHeight: 94
                         radius: 24
                         color: Theme.glass
                         opacity: LockEngine.focused ? 0.45 : 1
@@ -295,6 +284,8 @@ Scope {
                             anchors.fill: parent
                             anchors.leftMargin: 104
                             anchors.rightMargin: 14
+                            // Clear of the beat along the foot.
+                            anchors.bottomMargin: 16
                             spacing: 6
 
                             ColumnLayout {
@@ -364,35 +355,58 @@ Scope {
                             }
                         }
 
-                        // How far along, along the foot inside the rounded ends.
-                        Item {
+                        // The beat: the spectrum the media panel draws, small,
+                        // along the card's foot in the album's colour. The
+                        // capture only runs while this is on screen and the
+                        // music is playing (Spectrum stops with no subscriber).
+                        readonly property bool wantSpectrum: LockEngine.locked && nowPlaying.visible && nowPlaying.playing
+                        onWantSpectrumChanged: nowPlaying.wantSpectrum ? Spectrum.subscribe() : Spectrum.unsubscribe()
+                        Component.onDestruction: if (nowPlaying.wantSpectrum) Spectrum.unsubscribe()
+
+                        Row {
+                            id: beat
                             anchors.left: parent.left
                             anchors.right: parent.right
                             anchors.bottom: parent.bottom
-                            anchors.leftMargin: 20
-                            anchors.rightMargin: 20
-                            anchors.bottomMargin: 5
-                            height: 2
-                            readonly property real progress: nowPlaying.p && nowPlaying.p.length > 0
-                                ? Math.max(0, Math.min(1, root.position / nowPlaying.p.length)) : 0
-                            visible: progress > 0
+                            anchors.leftMargin: 104
+                            anchors.rightMargin: 18
+                            anchors.bottomMargin: 9
+                            height: 14
+                            spacing: 2
+                            opacity: nowPlaying.playing ? 1 : 0
 
-                            Rectangle {
-                                anchors.fill: parent
-                                radius: 1
-                                color: Theme.alpha(Theme.foreground, 0.12)
+                            Behavior on opacity { NumberAnimation { duration: Theme.durMedium } }
+
+                            readonly property int count: Math.floor((width + spacing) / (3 + spacing))
+
+                            // Low bands in the middle, mirrored out to both ends.
+                            function level(i) {
+                                var b = Spectrum.bands
+                                var half = beat.count / 2
+                                var band = Math.floor(Math.abs(i - half + 0.5) / half * b.length)
+                                return (band >= 0 && band < b.length) ? b[band] : 0
                             }
 
-                            Rectangle {
-                                width: parent.width * parent.progress
-                                height: parent.height
-                                radius: 1
-                                color: Theme.alpha(Theme.foreground, nowPlaying.playing ? 0.75 : 0.35)
+                            Repeater {
+                                model: beat.count
 
-                                // No Behavior on width: the position is read once
-                                // a second, and an animation restarted every second
-                                // never stops -- the window redrew ~54 times a
-                                // second for as long as music played.
+                                Rectangle {
+                                    required property int index
+                                    readonly property real level: beat.level(index)
+                                    // Not readonly: Behavior smooths the step
+                                    // between the helper's frames.
+                                    property real len: 2 + level * 12
+
+                                    anchors.bottom: parent.bottom
+                                    width: 3
+                                    height: len
+                                    radius: 1.5
+                                    color: Theme.alpha(AlbumColors.accent, 0.4 + level * 0.6)
+
+                                    Behavior on len {
+                                        NumberAnimation { duration: 70; easing.type: Easing.OutQuad }
+                                    }
+                                }
                             }
                         }
                     }
