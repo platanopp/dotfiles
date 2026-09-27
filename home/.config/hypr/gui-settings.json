@@ -30,7 +30,7 @@
     "base": 15
   },
   "active_opacity": {
-    "value": 1.0,
+    "value": 0.96,
     "base": 0.8
   }
 }
