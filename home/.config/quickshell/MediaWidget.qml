@@ -229,22 +229,28 @@ PanelWindow {
 
             readonly property bool hasArt: coverImage.status === Image.Ready
 
-            // What the cover is cut to: the pill's left end, solid at the
-            // edge and clear by the right. Only its alpha is used.
-            Rectangle {
+            // Rounded on the left only, following the pill's end: the
+            // rectangle runs twice as wide and is cut off at this item's edge
+            // (the mask is taken at this item's size), so its right-hand
+            // corners never show and the cover fades out straight.
+            Item {
                 id: coverMask
                 anchors.fill: parent
-                radius: height / 2
                 visible: false
-                gradient: Gradient {
-                    orientation: Gradient.Horizontal
-                    GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 1) }
-                    GradientStop { position: 0.45; color: Qt.rgba(1, 1, 1, 0.85) }
-                    GradientStop { position: 0.8; color: Qt.rgba(1, 1, 1, 0.2) }
-                    GradientStop { position: 1.0; color: Qt.rgba(1, 1, 1, 0) }
+
+                Rectangle {
+                    width: parent.width * 2
+                    height: parent.height
+                    radius: height / 2
+                    gradient: Gradient {
+                        orientation: Gradient.Horizontal
+                        GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 1) }
+                        GradientStop { position: 0.225; color: Qt.rgba(1, 1, 1, 0.85) }
+                        GradientStop { position: 0.4; color: Qt.rgba(1, 1, 1, 0.2) }
+                        GradientStop { position: 0.5; color: Qt.rgba(1, 1, 1, 0) }
+                    }
                 }
             }
-
             Image {
                 id: coverImage
                 anchors.fill: parent

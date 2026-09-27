@@ -229,17 +229,25 @@ Scope {
                             anchors.bottom: parent.bottom
                             width: 100
 
-                            Rectangle {
+                            // Rounded on the left only: twice as wide and cut
+                            // off at this item's edge, so the cover fades out
+                            // straight instead of ending in a rounded cap.
+                            Item {
                                 id: coverMask
                                 anchors.fill: parent
-                                radius: nowPlaying.radius
                                 visible: false
-                                gradient: Gradient {
-                                    orientation: Gradient.Horizontal
-                                    GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 1) }
-                                    GradientStop { position: 0.5; color: Qt.rgba(1, 1, 1, 0.85) }
-                                    GradientStop { position: 0.82; color: Qt.rgba(1, 1, 1, 0.2) }
-                                    GradientStop { position: 1.0; color: Qt.rgba(1, 1, 1, 0) }
+
+                                Rectangle {
+                                    width: parent.width * 2
+                                    height: parent.height
+                                    radius: nowPlaying.radius
+                                    gradient: Gradient {
+                                        orientation: Gradient.Horizontal
+                                        GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 1) }
+                                        GradientStop { position: 0.25; color: Qt.rgba(1, 1, 1, 0.85) }
+                                        GradientStop { position: 0.41; color: Qt.rgba(1, 1, 1, 0.2) }
+                                        GradientStop { position: 0.5; color: Qt.rgba(1, 1, 1, 0) }
+                                    }
                                 }
                             }
 
