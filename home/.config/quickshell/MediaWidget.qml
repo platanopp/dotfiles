@@ -342,7 +342,9 @@ PanelWindow {
                 radius: 1
                 color: Theme.alpha(Theme.foreground, bar.isPlaying ? 0.75 : 0.35)
 
-                Behavior on width { NumberAnimation { duration: 900; easing.type: Easing.Linear } }
+                // No Behavior on width: the position is read once a second, and
+                // an animation restarted every second never stops -- the window
+                // redrew ~54 times a second for as long as music played.
                 Behavior on color { ColorAnimation { duration: Theme.durMedium } }
             }
         }
@@ -389,12 +391,35 @@ PanelWindow {
                         // there. Both handlers are needed -- one for the title
                         // changing under a stopped animation, one for the
                         // animation stopping because the new title fits.
-                        onTextChanged: x = 0
+                        onTextChanged: {
+                            x = 0
+                            marquee.restart()
+                        }
+
+                        // Scrolls twice when the track starts and then rests
+                        // at the start; again while the pointer is on the
+                        // pill. It used to scroll for as long as the song
+                        // played -- the window redrawing every frame, all
+                        // song long, for a title nobody was reading.
+                        readonly property bool overflows: titleText.implicitWidth > titleMarquee.width
+                        readonly property bool hovered: mediaWidgetItem.barHovered
+
+                        onOverflowsChanged: overflows ? marquee.restart() : marquee.stop()
+                        onHoveredChanged: {
+                            if (hovered && overflows && !marquee.running) {
+                                marquee.loops = Animation.Infinite
+                                marquee.restart()
+                            } else if (!hovered && marquee.loops === Animation.Infinite) {
+                                marquee.stop()
+                            }
+                        }
 
                         SequentialAnimation on x {
-                            running: titleText.implicitWidth > titleMarquee.width
+                            id: marquee
+                            running: false
                             onRunningChanged: if (!running) titleText.x = 0
-                            loops: Animation.Infinite
+                            loops: 2
+                            onStarted: if (!titleText.hovered) marquee.loops = 2
 
                             PauseAnimation { duration: 1400 }
 

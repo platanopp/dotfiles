@@ -80,7 +80,7 @@ Singleton {
     }
 
     function toggleMicMute() {
-        micToggleProc.command = ["bash", "-lc", "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"]
+        micToggleProc.command = ["bash", "-c", "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"]
         micToggleProc.running = true
         root.micMuted = !root.micMuted
         // Cued off the state we just moved to rather than off a re-read: the
@@ -101,7 +101,7 @@ Singleton {
     // cancelling the first -- which is what re-running a tracked Process
     // would do.
     function playCue(name) {
-        cueProc.command = ["bash", "-lc",
+        cueProc.command = ["bash", "-c",
             "exec setsid pw-play --volume=0.5 \"/usr/share/sounds/freedesktop/stereo/$1.oga\" >/dev/null 2>&1 &",
             "_", name]
         cueProc.running = true
@@ -113,14 +113,14 @@ Singleton {
     }
 
     function toggleWifiRadio() {
-        wifiToggleProc.command = ["bash", "-lc", "nmcli radio wifi " + (root.wifiRadioEnabled ? "off" : "on")]
+        wifiToggleProc.command = ["bash", "-c", "nmcli radio wifi " + (root.wifiRadioEnabled ? "off" : "on")]
         wifiToggleProc.running = true
         root.wifiRadioEnabled = !root.wifiRadioEnabled
         wifiRadioRefreshTimer.restart()
     }
 
     function toggleBluetoothPower() {
-        btToggleProc.command = ["bash", "-lc", "bluetoothctl power " + (root.btEnabled ? "off" : "on")]
+        btToggleProc.command = ["bash", "-c", "bluetoothctl power " + (root.btEnabled ? "off" : "on")]
         btToggleProc.running = true
         root.btEnabled = !root.btEnabled
         btRefreshTimer.restart()
@@ -243,7 +243,7 @@ Singleton {
     function forgetBluetoothDevice(mac, name) {
         root.btActionInProgress = true
         root.btStatusMessage = "Forgetting " + name + "..."
-        btActionProc.command = ["bash", "-lc", "bluetoothctl remove \"$1\" 2>&1", "_", mac]
+        btActionProc.command = ["bash", "-c", "bluetoothctl remove \"$1\" 2>&1", "_", mac]
         btActionProc.running = true
     }
 
@@ -318,7 +318,7 @@ Singleton {
     function disconnectWifi(ssid) {
         root.wifiConnecting = true
         root.wifiStatusMessage = "Disconnecting..."
-        wifiConnectProc.command = ["bash", "-lc", "nmcli connection down id \"$1\" 2>&1 && echo DISCONNECTED", "_", ssid]
+        wifiConnectProc.command = ["bash", "-c", "nmcli connection down id \"$1\" 2>&1 && echo DISCONNECTED", "_", ssid]
         wifiConnectProc.running = true
     }
 
@@ -372,11 +372,11 @@ Singleton {
         root.wifiConnecting = true
         root.wifiStatusMessage = "Connecting to " + ssid + "..."
         if (saved) {
-            wifiConnectProc.command = ["bash", "-lc", "nmcli connection up id \"$1\" 2>&1", "_", ssid]
+            wifiConnectProc.command = ["bash", "-c", "nmcli connection up id \"$1\" 2>&1", "_", ssid]
         } else if (secure) {
-            wifiConnectProc.command = ["bash", "-lc", "nmcli device wifi connect \"$1\" password \"$2\" 2>&1", "_", ssid, password]
+            wifiConnectProc.command = ["bash", "-c", "nmcli device wifi connect \"$1\" password \"$2\" 2>&1", "_", ssid, password]
         } else {
-            wifiConnectProc.command = ["bash", "-lc", "nmcli device wifi connect \"$1\" 2>&1", "_", ssid]
+            wifiConnectProc.command = ["bash", "-c", "nmcli device wifi connect \"$1\" 2>&1", "_", ssid]
         }
         wifiConnectProc.running = true
     }
@@ -401,7 +401,7 @@ Singleton {
     }
 
     function setDefaultSink(id) {
-        setSinkProc.command = ["bash", "-lc", "wpctl set-default " + id]
+        setSinkProc.command = ["bash", "-c", "wpctl set-default " + id]
         setSinkProc.running = true
         audioSinksRefreshTimer.restart()
     }
@@ -593,9 +593,9 @@ Singleton {
         root.btActionInProgress = true
         root.btStatusMessage = "Connecting to " + name + "..."
         if (paired) {
-            btActionProc.command = ["bash", "-lc", "bluetoothctl connect \"$1\" 2>&1", "_", mac]
+            btActionProc.command = ["bash", "-c", "bluetoothctl connect \"$1\" 2>&1", "_", mac]
         } else {
-            btActionProc.command = ["bash", "-lc", "bluetoothctl pair \"$1\" 2>&1; bluetoothctl trust \"$1\" 2>&1; bluetoothctl connect \"$1\" 2>&1", "_", mac]
+            btActionProc.command = ["bash", "-c", "bluetoothctl pair \"$1\" 2>&1; bluetoothctl trust \"$1\" 2>&1; bluetoothctl connect \"$1\" 2>&1", "_", mac]
         }
         btActionProc.running = true
     }
@@ -603,7 +603,7 @@ Singleton {
     function disconnectBluetoothDevice(mac, name) {
         root.btActionInProgress = true
         root.btStatusMessage = "Disconnecting " + name + "..."
-        btActionProc.command = ["bash", "-lc", "bluetoothctl disconnect \"$1\" 2>&1", "_", mac]
+        btActionProc.command = ["bash", "-c", "bluetoothctl disconnect \"$1\" 2>&1", "_", mac]
         btActionProc.running = true
     }
 
@@ -692,7 +692,7 @@ Singleton {
     Process {
         id: sysInfoProc
         running: true
-        command: ["bash", "-lc", "printf '%s|%s' \"$(uname -n)\" \"$(. /etc/os-release 2>/dev/null && printf '%s' \"$PRETTY_NAME\")\""]
+        command: ["bash", "-c", "printf '%s|%s' \"$(uname -n)\" \"$(. /etc/os-release 2>/dev/null && printf '%s' \"$PRETTY_NAME\")\""]
         stdout: StdioCollector {
             onStreamFinished: {
                 var parts = text.split("|")
@@ -705,7 +705,7 @@ Singleton {
     Process {
         id: uptimeProc
         running: false
-        command: ["bash", "-lc", "cut -d' ' -f1 /proc/uptime"]
+        command: ["bash", "-c", "cut -d' ' -f1 /proc/uptime"]
         stdout: StdioCollector {
             onStreamFinished: {
                 var v = parseFloat(text.trim())
@@ -732,7 +732,7 @@ Singleton {
     Process {
         id: wifiIpProc
         running: false
-        command: ["bash", "-lc", "export LC_ALL=C; dev=$(nmcli -t -f DEVICE,TYPE,STATE device status | awk -F: '$2==\"wifi\" && $3==\"connected\"{print $1; exit}'); nmcli -t -f IP4.ADDRESS device show \"$dev\" | cut -d: -f2 | cut -d/ -f1"]
+        command: ["bash", "-c", "export LC_ALL=C; dev=$(nmcli -t -f DEVICE,TYPE,STATE device status | awk -F: '$2==\"wifi\" && $3==\"connected\"{print $1; exit}'); nmcli -t -f IP4.ADDRESS device show \"$dev\" | cut -d: -f2 | cut -d/ -f1"]
         stdout: StdioCollector {
             onStreamFinished: root.wifiIp = text.trim()
         }
@@ -741,7 +741,7 @@ Singleton {
     Process {
         id: btPoweredProc
         running: false
-        command: ["bash", "-lc", "LC_ALL=C bluetoothctl show | awk '/Powered/{print $2}'"]
+        command: ["bash", "-c", "LC_ALL=C bluetoothctl show | awk '/Powered/{print $2}'"]
         stdout: StdioCollector {
             onStreamFinished: root.btEnabled = text.trim() === "yes"
         }
@@ -750,7 +750,7 @@ Singleton {
     Process {
         id: btConnectedProc
         running: false
-        command: ["bash", "-lc", "LC_ALL=C bluetoothctl devices Connected | wc -l"]
+        command: ["bash", "-c", "LC_ALL=C bluetoothctl devices Connected | wc -l"]
         stdout: StdioCollector {
             onStreamFinished: root.btConnectedCount = parseInt(text.trim()) || 0
         }
@@ -759,7 +759,7 @@ Singleton {
     Process {
         id: wifiRadioProc
         running: false
-        command: ["bash", "-lc", "LC_ALL=C nmcli radio wifi"]
+        command: ["bash", "-c", "LC_ALL=C nmcli radio wifi"]
         stdout: StdioCollector {
             onStreamFinished: root.wifiRadioEnabled = text.trim() === "enabled"
         }
@@ -778,7 +778,7 @@ Singleton {
     Process {
         id: wifiScanProc
         running: false
-        command: ["bash", "-lc", "nmcli dev wifi rescan >/dev/null 2>&1; sleep 1; LC_ALL=C nmcli -t -f IN-USE,SSID,SIGNAL,SECURITY dev wifi list; echo --saved--; LC_ALL=C nmcli -t -f NAME,TYPE connection show | awk -F: '$NF==\"802-11-wireless\"{print $1}'"]
+        command: ["bash", "-c", "nmcli dev wifi rescan >/dev/null 2>&1; sleep 1; LC_ALL=C nmcli -t -f IN-USE,SSID,SIGNAL,SECURITY dev wifi list; echo --saved--; LC_ALL=C nmcli -t -f NAME,TYPE connection show | awk -F: '$NF==\"802-11-wireless\"{print $1}'"]
         stdout: StdioCollector {
             onStreamFinished: root.parseWifiScan(text)
         }
@@ -816,7 +816,7 @@ Singleton {
     Process {
         id: btScanProc
         running: false
-        command: ["bash", "-lc", "bash \"$HOME/.config/quickshell/scripts/bt_scan.sh\""]
+        command: ["bash", "-c", "bash \"$HOME/.config/quickshell/scripts/bt_scan.sh\""]
         stdout: StdioCollector {
             onStreamFinished: root.parseBtScan(text)
         }
@@ -919,7 +919,7 @@ Singleton {
         // that is still empty -- it opened on the first file in the folder
         // and the model arriving a moment later kept it there.
         running: true
-        command: ["bash", "-lc", "find \"$HOME/Pictures/Wallpapers\" -maxdepth 1 -type f \\( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \\) 2>/dev/null | sort"]
+        command: ["bash", "-c", "find \"$HOME/Pictures/Wallpapers\" -maxdepth 1 -type f \\( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \\) 2>/dev/null | sort"]
         stdout: StdioCollector {
             onStreamFinished: {
                 var trimmed = text.trim()
@@ -1230,7 +1230,7 @@ Singleton {
                 }
                 if (rendered.length === 0) return
                 root.renderedWallpaper = rendered
-                wallpaperSetProc.command = ["bash", "-lc", "P=\"$1\"; hyprctl hyprpaper preload \"$P\" >/dev/null 2>&1; hyprctl hyprpaper wallpaper \",$P,cover\"; printf 'splash = false\\nwallpaper {\\n    monitor =\\n    path = %s\\n    fit_mode = cover\\n}\\n' \"$P\" > \"$HOME/.config/hypr/hyprpaper.conf\"", "_", rendered]
+                wallpaperSetProc.command = ["bash", "-c", "P=\"$1\"; hyprctl hyprpaper preload \"$P\" >/dev/null 2>&1; hyprctl hyprpaper wallpaper \",$P,cover\"; printf 'splash = false\\nwallpaper {\\n    monitor =\\n    path = %s\\n    fit_mode = cover\\n}\\n' \"$P\" > \"$HOME/.config/hypr/hyprpaper.conf\"", "_", rendered]
                 wallpaperSetProc.running = true
             }
         }
@@ -1239,7 +1239,7 @@ Singleton {
     Process {
         id: micMutedProc
         running: false
-        command: ["bash", "-lc", "wpctl get-volume @DEFAULT_AUDIO_SOURCE@ | grep -q MUTED && echo true || echo false"]
+        command: ["bash", "-c", "wpctl get-volume @DEFAULT_AUDIO_SOURCE@ | grep -q MUTED && echo true || echo false"]
         stdout: StdioCollector {
             onStreamFinished: root.micMuted = text.trim() === "true"
         }
@@ -1253,7 +1253,7 @@ Singleton {
     Process {
         id: batteryProc
         running: false
-        command: ["bash", "-lc", "bat=$(ls /sys/class/power_supply/ | grep -m1 '^BAT'); if [ -n \"$bat\" ]; then cat \"/sys/class/power_supply/$bat/capacity\"; else echo none; fi"]
+        command: ["bash", "-c", "bat=$(ls /sys/class/power_supply/ | grep -m1 '^BAT'); if [ -n \"$bat\" ]; then cat \"/sys/class/power_supply/$bat/capacity\"; else echo none; fi"]
         stdout: StdioCollector {
             onStreamFinished: {
                 var t = text.trim()
@@ -1273,7 +1273,7 @@ Singleton {
     Process {
         id: audioSinksProc
         running: false
-        command: ["bash", "-lc", "bash \"$HOME/.config/quickshell/scripts/audio_sinks.sh\""]
+        command: ["bash", "-c", "bash \"$HOME/.config/quickshell/scripts/audio_sinks.sh\""]
         stdout: StdioCollector {
             onStreamFinished: root.parseAudioSinks(text)
         }
@@ -1357,7 +1357,7 @@ Singleton {
     Process {
         id: cpuProc
         running: false
-        command: ["bash", "-lc", "read cpu a b c idle rest < /proc/stat; t1=$((a+b+c+idle)); i1=$idle; sleep 0.4; read cpu a b c idle rest < /proc/stat; t2=$((a+b+c+idle)); i2=$idle; dt=$((t2-t1)); di=$((i2-i1)); if [ \"$dt\" -gt 0 ]; then echo $(( (100*(dt-di))/dt )); else echo 0; fi"]
+        command: ["bash", "-c", "read cpu a b c idle rest < /proc/stat; t1=$((a+b+c+idle)); i1=$idle; sleep 0.4; read cpu a b c idle rest < /proc/stat; t2=$((a+b+c+idle)); i2=$idle; dt=$((t2-t1)); di=$((i2-i1)); if [ \"$dt\" -gt 0 ]; then echo $(( (100*(dt-di))/dt )); else echo 0; fi"]
         stdout: StdioCollector {
             onStreamFinished: {
                 var v = parseInt(text.trim())
@@ -1369,7 +1369,7 @@ Singleton {
     Process {
         id: ramProc
         running: false
-        command: ["bash", "-lc", "free | awk '/Mem:/{printf \"%d\", ($3/$2)*100}'"]
+        command: ["bash", "-c", "free | awk '/Mem:/{printf \"%d\", ($3/$2)*100}'"]
         stdout: StdioCollector {
             onStreamFinished: {
                 var v = parseInt(text.trim())
@@ -1381,7 +1381,7 @@ Singleton {
     Process {
         id: diskProc
         running: false
-        command: ["bash", "-lc", "df --output=pcent / | tail -1 | tr -d '% '"]
+        command: ["bash", "-c", "df --output=pcent / | tail -1 | tr -d '% '"]
         stdout: StdioCollector {
             onStreamFinished: {
                 var v = parseInt(text.trim())
@@ -1393,7 +1393,7 @@ Singleton {
     Process {
         id: tempProc
         running: false
-        command: ["bash", "-lc", "cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null | awk '{printf \"%d\", $1/1000}'"]
+        command: ["bash", "-c", "cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null | awk '{printf \"%d\", $1/1000}'"]
         stdout: StdioCollector {
             onStreamFinished: {
                 var v = parseInt(text.trim())
@@ -1455,22 +1455,59 @@ Singleton {
             micMutedProc.running = true
             otdStateProc.running = true
             batteryProc.running = true
-            uptimeProc.running = true
         }
     }
 
+    // ── Audio changes, as they happen ────────────────────────────────────
+    //
+    // `pactl subscribe` prints a line whenever a sink, source or stream
+    // changes; the volume and mute are read then, rather than asking wpctl
+    // every three seconds whether anything moved. A burst of events (a drag
+    // on a slider, an app starting) is read once.
+    Process {
+        id: audioEvents
+        running: true
+        command: ["pactl", "subscribe"]
+        stdout: SplitParser {
+            onRead: line => {
+                if (line.indexOf("on sink") !== -1 || line.indexOf("on server") !== -1) audioEventDebounce.sink = true
+                if (line.indexOf("on source") !== -1 || line.indexOf("on server") !== -1) audioEventDebounce.source = true
+                if (audioEventDebounce.sink || audioEventDebounce.source) audioEventDebounce.restart()
+            }
+        }
+        // Should pactl go (PipeWire restarting), start it again shortly.
+        onExited: audioEventsRestart.restart()
+    }
+
     Timer {
-        interval: 3000
+        id: audioEventsRestart
+        interval: 2000
+        onTriggered: audioEvents.running = true
+    }
+
+    Timer {
+        id: audioEventDebounce
+        property bool sink: false
+        property bool source: false
+        interval: 80
+        onTriggered: {
+            if (audioEventDebounce.sink && !volumeGetProc.running) volumeGetProc.running = true
+            if (audioEventDebounce.source && !micMutedProc.running) micMutedProc.running = true
+            audioEventDebounce.sink = false
+            audioEventDebounce.source = false
+        }
+    }
+
+    // Belt and braces for the events above: a slow poll in case one is lost.
+    Timer {
+        interval: 30000
         running: true
         repeat: true
         triggeredOnStart: true
-        onTriggered: {
-            volumeGetProc.running = true
-            cpuProc.running = true
-            ramProc.running = true
-            diskProc.running = true
-            tempProc.running = true
-        }
+        // Volume only. CPU, memory, disk and temperature were polled here
+        // too, four processes every three seconds, for gauges that have since
+        // left the control panel and the clock; nothing reads them now.
+        onTriggered: volumeGetProc.running = true
     }
 
     Timer {

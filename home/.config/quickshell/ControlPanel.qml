@@ -970,13 +970,13 @@ PanelWindow {
                         Process {
                             id: rebootProc
                             running: false
-                            command: ["bash", "-lc", "systemctl reboot"]
+                            command: ["bash", "-c", "systemctl reboot"]
                         }
 
                         Process {
                             id: shutdownProc
                             running: false
-                            command: ["bash", "-lc", "systemctl poweroff"]
+                            command: ["bash", "-c", "systemctl poweroff"]
                         }
 }
 }

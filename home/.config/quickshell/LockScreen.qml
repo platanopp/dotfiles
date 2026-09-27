@@ -389,7 +389,10 @@ Scope {
                                 radius: 1
                                 color: Theme.alpha(Theme.foreground, nowPlaying.playing ? 0.75 : 0.35)
 
-                                Behavior on width { NumberAnimation { duration: 900; easing.type: Easing.Linear } }
+                                // No Behavior on width: the position is read once
+                                // a second, and an animation restarted every second
+                                // never stops -- the window redrew ~54 times a
+                                // second for as long as music played.
                             }
                         }
                     }
