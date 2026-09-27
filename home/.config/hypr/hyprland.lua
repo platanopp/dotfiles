@@ -33,6 +33,13 @@ hl.on("hyprland.start", function()
     -- below takes a second or two to draw, and every one of those seconds
     -- would be desktop on screen with no lock over it. Behind the lock they
     -- can take as long as they like.
+    --
+    -- On Qt's basic render loop (its own pick here), which draws every window
+    -- in one pass: the pills are separate surfaces that move together, and
+    -- the threaded loop (QSG_RENDER_LOOP=threaded, animations at the
+    -- monitor's refresh instead of 60 fps) presents each window on its own
+    -- thread -- neighbours landed a frame apart and the gaps between the
+    -- pills shook by up to 12px mid-animation.
     hl.exec_cmd("quickshell")
     hl.exec_cmd("kitty")
     -- Chat and the game client, parked on workspace 2 by the rules further
