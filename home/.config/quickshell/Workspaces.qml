@@ -21,11 +21,21 @@ Item {
 
     property var monitor: null
 
-    readonly property int slotSize: 22
-    readonly property int slotGap: 4
+    // Compact: a dot's slot is narrow, the active one wide enough for its
+    // number. The row is laid out arithmetically so the highlight can slide
+    // to where the active slot is going, not chase where it is.
+    readonly property int dotSlot: 12
+    readonly property int activeSlot: 26
+    readonly property int slotGap: 2
+    readonly property int slotHeight: 22
 
-    implicitWidth: row.width + (specialSlot.visible ? root.slotGap + root.slotSize : 0)
-    implicitHeight: root.slotSize
+    function slotX(i) {
+        var a = root.activeId - 1
+        return i * (root.dotSlot + root.slotGap) + (a >= 0 && i > a ? root.activeSlot - root.dotSlot : 0)
+    }
+
+    implicitWidth: row.width + (specialSlot.visible ? root.slotGap + 4 + specialSlot.width : 0)
+    implicitHeight: root.slotHeight
 
     readonly property int activeId: monitor && monitor.activeWorkspace ? monitor.activeWorkspace.id : 0
 
@@ -91,8 +101,9 @@ Item {
 
     Item {
         id: row
-        width: root.count * root.slotSize + (root.count - 1) * root.slotGap
-        height: root.slotSize
+        width: root.count * root.dotSlot + (root.count - 1) * root.slotGap
+               + (root.activeId >= 1 && root.activeId <= root.count ? root.activeSlot - root.dotSlot : 0)
+        height: root.slotHeight
 
         Behavior on width {
             NumberAnimation { duration: Theme.durLong; easing.type: Easing.OutCubic }
@@ -104,9 +115,9 @@ Item {
             id: highlight
             readonly property int index: root.activeId - 1
             visible: root.activeId >= 1 && root.activeId <= root.count
-            x: Math.max(0, highlight.index) * (root.slotSize + root.slotGap) - 3
-            width: root.slotSize + 6
-            height: root.slotSize
+            x: root.slotX(Math.max(0, highlight.index))
+            width: root.activeSlot
+            height: root.slotHeight
             radius: height / 2
             color: Theme.accent
 
@@ -127,13 +138,18 @@ Item {
                 readonly property bool occupied: !!slot.info && slot.info.windows > 0
                 readonly property bool urgent: !!slot.info && slot.info.urgent && !slot.active
 
-                x: slot.index * (root.slotSize + root.slotGap)
-                width: root.slotSize
-                height: root.slotSize
+                x: root.slotX(slot.index)
+                width: slot.active ? root.activeSlot : root.dotSlot
+                height: root.slotHeight
+
+                Behavior on x { NumberAnimation { duration: Theme.durLong; easing.type: Easing.OutCubic } }
+                Behavior on width { NumberAnimation { duration: Theme.durLong; easing.type: Easing.OutCubic } }
 
                 // Under the pointer, the same soft disc as every other button.
                 Rectangle {
-                    anchors.fill: parent
+                    anchors.centerIn: parent
+                    width: 18
+                    height: 18
                     radius: width / 2
                     color: Theme.foreground
                     opacity: slot.active ? 0 : tap.pressed ? Theme.pressOpacity : hover.hovered ? Theme.hoverOpacity + 0.04 : 0
@@ -145,7 +161,7 @@ Item {
                     id: dot
                     anchors.centerIn: parent
                     visible: !slot.active
-                    width: slot.urgent ? 8 : slot.occupied ? 7 : 5
+                    width: slot.urgent ? 7 : slot.occupied ? 6 : 4
                     height: width
                     radius: width / 2
                     color: slot.urgent ? Theme.error
@@ -195,9 +211,10 @@ Item {
     Item {
         id: specialSlot
         visible: root.specialName.length > 0
-        x: row.width + root.slotGap
-        width: root.slotSize
-        height: root.slotSize
+        x: row.width + root.slotGap + 4
+        width: 20
+        height: 20
+        y: (root.slotHeight - height) / 2
 
         Rectangle {
             anchors.fill: parent

@@ -247,7 +247,7 @@ Scope {
             property bool canGoPrevious: activePlayer ? activePlayer.canGoPrevious : false
             property bool canTogglePlaying: activePlayer ? activePlayer.canTogglePlaying : false
 
-            Rectangle {
+            Item {
                 id: leftPill
                 visible: !bar.barHidden
                 anchors.left: parent.left
@@ -258,19 +258,29 @@ Scope {
                 anchors.topMargin: AppState.gapTop
                 implicitWidth: leftRow.implicitWidth + Theme.pillPaddingH * 2
                 implicitHeight: 40
-                radius: 20
-                color: Theme.glass
 
-                // The same drop shadow as every other pill (their MultiEffect).
-                RectangularShadow {
+                // Glass and shadow exactly as every other pill draws them: a
+                // hidden layered rectangle through MultiEffect. A shadow item
+                // under a plain translucent rectangle showed through it, and
+                // this pill came out darker than the rest.
+                Rectangle {
+                    id: leftGlass
                     anchors.fill: parent
-                    z: -1
-                    radius: parent.radius
-                    // Tuned by measurement to darken what is under it as much
-                    // as the MultiEffect shadow does under the other pills.
-                    blur: 20
-                    offset.y: 4
-                    color: Qt.rgba(0, 0, 0, 0.8)
+                    radius: 20
+                    color: Theme.glass
+                    visible: false
+                    layer.enabled: true
+                }
+
+                MultiEffect {
+                    source: leftGlass
+                    anchors.fill: leftGlass
+                    shadowEnabled: true
+                    shadowColor: "#000000"
+                    shadowOpacity: 0.5
+                    shadowBlur: 0.7
+                    shadowVerticalOffset: 4
+                    autoPaddingEnabled: true
                 }
 
                 Behavior on implicitWidth {
