@@ -32,6 +32,7 @@ Item {
             { id: "input", label: "Input", icon: "\u{F037D}", file: "SettingsPageInput.qml" }
         ] },
         { group: "System", items: [
+            { id: "profile", label: "Profile", icon: "\u{F0004}", file: "SettingsPageProfile.qml" },
             { id: "shell", label: "Shell", icon: "\u{F10AC}", file: "SettingsPageShell.qml" },
             { id: "power", label: "Power & idle", icon: "\u{F0241}", file: "SettingsPagePower.qml" },
             { id: "about", label: "About", icon: "\u{F02FD}", file: "SettingsPageAbout.qml" }

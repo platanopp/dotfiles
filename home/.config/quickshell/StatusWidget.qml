@@ -61,6 +61,89 @@ PanelWindow {
 
     property string expandedPanel: ""
 
+    // A panel's heading: title, one line of state under it, and whatever
+    // controls it carries on the right (a switch, refresh, settings).
+    component PanelHeader: RowLayout {
+        id: header
+        property string title: ""
+        property string subtitle: ""
+        default property alias controls: slot.data
+        width: parent ? parent.width : 0
+        spacing: 8
+
+        Column {
+            Layout.fillWidth: true
+            spacing: 1
+
+            Text {
+                text: header.title
+                color: Theme.textPrimary
+                font.pixelSize: 14
+                font.bold: true
+                font.family: Theme.fontMono
+            }
+
+            Text {
+                visible: text.length > 0
+                width: parent.width
+                text: header.subtitle
+                color: Theme.textMuted
+                font.pixelSize: 11
+                font.family: Theme.fontMono
+                elide: Text.ElideRight
+            }
+        }
+
+        Row {
+            id: slot
+            Layout.alignment: Qt.AlignVCenter
+            spacing: 6
+        }
+    }
+
+    // Refresh that spins while its scan runs.
+    component ScanButton: IconButton {
+        id: scan
+        property bool busy: false
+        icon: "\u{F0450}"
+        size: 28
+        glyphSize: Theme.iconMedium
+        iconColor: Theme.textPrimary
+        interactive: !scan.busy
+        opacity: scan.busy ? 0.6 : 1
+
+        RotationAnimation on rotation {
+            running: scan.busy
+            loops: Animation.Infinite
+            from: 0; to: 360
+            duration: 900
+            onStopped: scan.rotation = 0
+        }
+    }
+
+    // A small heading inside a panel.
+    component PanelLabel: Text {
+        color: Theme.textMuted
+        font.pixelSize: 10
+        font.bold: true
+        font.letterSpacing: 1.2
+        font.capitalization: Font.AllUppercase
+        font.family: Theme.fontMono
+    }
+
+    // Said plainly when there is nothing to list, and why.
+    component EmptyNote: Text {
+        width: parent ? parent.width : 0
+        color: Theme.textMuted
+        font.pixelSize: 12
+        font.family: Theme.fontMono
+        horizontalAlignment: Text.AlignHCenter
+        topPadding: 10
+        bottomPadding: 10
+        wrapMode: Text.WordWrap
+    }
+
+
     function togglePanel(name) {
         if (statusItem.expandedPanel === name) {
             statusItem.expandedPanel = ""
@@ -71,14 +154,43 @@ PanelWindow {
         if (name === "bluetooth") AppState.scanBluetoothDevices()
         if (name === "audio") {
             AppState.refreshAudioSinks()
+            AppState.refreshAudioSources()
             AppState.refreshAudioStreams()
         }
     }
 
     function signalIcon(signal) {
-        if (signal >= 70) return "󰤨"
-        if (signal >= 40) return "󰤢"
-        return "󰤟"
+        if (signal >= 75) return "\u{F0928}"
+        if (signal >= 50) return "\u{F0925}"
+        if (signal >= 25) return "\u{F0922}"
+        return "\u{F091F}"
+    }
+
+    // What the bar shows for the network: Wi-Fi by strength, a cable when
+    // wired, and the difference between Wi-Fi off and just not connected.
+    readonly property string networkIcon: AppState.wifiSsid.length > 0
+        ? statusItem.signalIcon(AppState.wifiSignal < 0 ? 100 : AppState.wifiSignal)
+        : AppState.ethernetUp ? "\u{F0200}"
+        : !AppState.wifiRadioEnabled ? "\u{F092E}"
+        : "\u{F092F}"
+
+    function volumeIcon(v, muted) {
+        if (muted || v === 0) return "\u{F0581}"
+        if (v < 34) return "\u{F057F}"
+        if (v < 67) return "\u{F0580}"
+        return "\u{F057E}"
+    }
+
+    // Kinds of Bluetooth device, by the icon name BlueZ gives them.
+    function btIcon(kind) {
+        if (/headset|headphone/.test(kind)) return "\u{F02CB}"
+        if (/audio|speaker/.test(kind)) return "\u{F04C3}"
+        if (/gaming|joystick/.test(kind)) return "\u{F0296}"
+        if (/mouse/.test(kind)) return "\u{F037D}"
+        if (/keyboard/.test(kind)) return "\u{F030C}"
+        if (/phone/.test(kind)) return "\u{F011C}"
+        if (/computer/.test(kind)) return "\u{F0322}"
+        return "\u{F00AF}"
     }
 
     readonly property int compactWidth: compactRow.implicitWidth + 24 + Theme.pillPaddingH * 2
@@ -151,8 +263,8 @@ PanelWindow {
                 spacing: 6
 
                 IconGlyph {
-                    text: AppState.wifiSsid.length > 0 ? "󰤨" : "󰤭"
-                    color: Theme.textPrimary
+                    text: statusItem.networkIcon
+                    color: AppState.wifiSsid.length > 0 || AppState.ethernetUp ? Theme.textPrimary : Theme.textMuted
                     size: Theme.iconLarge
                 }
 
@@ -175,15 +287,16 @@ PanelWindow {
                 spacing: 4
 
                 IconGlyph {
-                    text: AppState.btEnabled ? "󰂯" : "󰂲"
-                    color: Theme.textPrimary
+                    text: !AppState.btEnabled ? "\u{F00B2}"
+                        : AppState.btConnectedCount > 0 ? "\u{F00B1}" : "\u{F00AF}"
+                    color: AppState.btEnabled ? Theme.textPrimary : Theme.textMuted
                     size: Theme.iconLarge
                 }
 
                 Text {
-                    visible: AppState.btEnabled && AppState.btConnectedCount > 0
+                    visible: AppState.btEnabled && AppState.btConnectedCount > 1
                     text: AppState.btConnectedCount.toString()
-                    color: AppState.themeAccent
+                    color: Theme.textPrimary
                     font.pixelSize: 12
                     font.bold: true
                     font.family: Theme.fontMono
@@ -194,24 +307,33 @@ PanelWindow {
                 }
             }
 
+            // The wheel turns the volume up and down without opening anything.
             RowLayout {
                 spacing: 6
 
                 IconGlyph {
-                    text: "󰕾"
-                    color: Theme.textPrimary
+                    text: statusItem.volumeIcon(AppState.volumePercent, AppState.volumeMuted)
+                    color: AppState.volumeMuted ? Theme.textMuted : Theme.textPrimary
                     size: Theme.iconLarge
                 }
 
                 Text {
                     text: Math.round(AppState.volumePercent) + "%"
-                    color: Theme.textPrimary
+                    color: AppState.volumeMuted ? Theme.textMuted : Theme.textPrimary
                     font.pixelSize: 12
                     font.family: Theme.fontMono
                 }
 
                 TapHandler {
                     onTapped: statusItem.togglePanel("audio")
+                }
+
+                WheelHandler {
+                    acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                    onWheel: event => {
+                        var d = event.angleDelta.y
+                        if (d !== 0) AppState.setVolume(AppState.volumePercent + (d > 0 ? 5 : -5))
+                    }
                 }
             }
 
@@ -281,614 +403,590 @@ PanelWindow {
             width: parent.width
             spacing: 14
 
+            // ── Wi-Fi ────────────────────────────────────────────────────
             Column {
                 width: parent.width
                 spacing: 10
                 visible: statusItem.expandedPanel === "wifi"
 
+                PanelHeader {
+                    title: "Wi-Fi"
+                    subtitle: !AppState.wifiRadioEnabled ? "Off"
+                        : AppState.wifiSsid.length > 0
+                            ? AppState.wifiSsid + " · " + (AppState.wifiIp.length > 0 ? AppState.wifiIp : "getting an address…")
+                        : AppState.ethernetUp ? "Using a wired connection"
+                        : "Not connected"
 
-            RowLayout {
-                width: parent.width
-
-                Column {
-                    Layout.fillWidth: true
-                    spacing: 1
-
-                    Text {
-                        text: "Wi-Fi networks"
-                        color: Theme.textPrimary
-                        font.pixelSize: 14
-                        font.bold: true
-                        font.family: Theme.fontMono
+                    ScanButton {
+                        visible: AppState.wifiRadioEnabled
+                        busy: AppState.wifiScanning
+                        onTapped: AppState.scanWifiNetworks()
                     }
 
-                    Text {
-                        visible: AppState.wifiSsid.length > 0
-                        text: AppState.wifiSsid + " · " + (AppState.wifiIp.length > 0 ? AppState.wifiIp : "obteniendo IP...")
-                        color: Theme.textMuted
-                        font.pixelSize: 11
-                        font.family: Theme.fontMono
-                        elide: Text.ElideRight
-                        width: parent.width
-                    }
-                }
-
-                IconButton {
-                    icon: "󰑐"
-                    size: 28
-                    glyphSize: Theme.iconMedium
-                    iconColor: Theme.textPrimary
-                    onTapped: AppState.scanWifiNetworks()
-                }
-            }
-
-            Text {
-                visible: AppState.wifiNetworks.length === 0
-                text: "Scanning for networks..."
-                color: Theme.textMuted
-                font.pixelSize: 12
-                font.family: Theme.fontMono
-            }
-
-            Column {
-                width: parent.width
-                spacing: 6
-
-                Repeater {
-                    model: AppState.wifiNetworks
-
-                    Column {
-                        id: networkRow
-                        required property var modelData
-                        width: parent.width
-                        spacing: 6
-
-                        Rectangle {
-                            width: parent.width
-                            height: 44
-                            radius: 14
-                            color: networkRow.modelData.inUse ? AppState.themeAccent : Theme.surfaceContainer
-
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 12
-                                anchors.rightMargin: 12
-                                spacing: 10
-
-                                IconGlyph {
-                                    text: statusItem.signalIcon(networkRow.modelData.signal)
-                                    color: networkRow.modelData.inUse ? Theme.accentText : Theme.textPrimary
-                                    size: Theme.iconMedium
-                                }
-
-                                Column {
-                                    Layout.fillWidth: true
-                                    spacing: 0
-
-                                    Text {
-                                        text: networkRow.modelData.ssid
-                                        color: networkRow.modelData.inUse ? Theme.accentText : Theme.textPrimary
-                                        font.pixelSize: 13
-                                        font.bold: networkRow.modelData.inUse
-                                        font.family: Theme.fontMono
-                                        elide: Text.ElideRight
-                                        width: parent.width
-                                    }
-
-                                    Text {
-                                        text: networkRow.modelData.signal + "% · " + (networkRow.modelData.secure ? "Protegida" : "Open")
-                                        color: networkRow.modelData.inUse ? Theme.accentText : Theme.textMuted
-                                        opacity: networkRow.modelData.inUse ? 0.7 : 1
-                                        font.pixelSize: 10
-                                        font.family: Theme.fontMono
-                                    }
-                                }
-
-                                IconGlyph {
-                                    visible: networkRow.modelData.secure && !networkRow.modelData.inUse
-                                    text: "󰌾"
-                                    color: Theme.textMuted
-                                    size: Theme.iconSmall
-                                }
-
-                                IconGlyph {
-                                    visible: networkRow.modelData.inUse
-                                    text: "󰄬"
-                                    color: Theme.accentText
-                                    size: Theme.iconSmall
-                                }
-                            }
-
-                            StateLayer {
-                                interactive: !networkRow.modelData.inUse
-                                onTapped: {
-                                    if (networkRow.modelData.secure) {
-                                        AppState.toggleWifiExpand(networkRow.modelData.ssid)
-                                    } else {
-                                        AppState.connectToWifi(networkRow.modelData.ssid, "", false)
-                                    }
-                                }
-                            }
+                    SettingsSwitch {
+                        anchors.verticalCenter: parent.verticalCenter
+                        checked: AppState.wifiRadioEnabled
+                        onToggled: {
+                            AppState.toggleWifiRadio()
+                            if (!AppState.wifiRadioEnabled) return
+                            wifiRescan.restart()
                         }
 
+                        // The radio takes a moment to come up before it
+                        // can see anything.
+                        Timer {
+                            id: wifiRescan
+                            interval: 2500
+                            onTriggered: AppState.scanWifiNetworks()
+                        }
+                    }
+                }
+
+                EmptyNote {
+                    visible: !AppState.wifiRadioEnabled
+                    text: "Wi-Fi is off"
+                }
+
+                EmptyNote {
+                    visible: AppState.wifiRadioEnabled && AppState.wifiNetworks.length === 0
+                    text: AppState.wifiScanning ? "Looking for networks…" : "No networks found"
+                }
+
+                Column {
+                    width: parent.width
+                    spacing: 6
+                    visible: AppState.wifiRadioEnabled
+
+                    Repeater {
+                        model: AppState.wifiNetworks
+
                         Column {
-                            visible: AppState.wifiExpandedSsid === networkRow.modelData.ssid
+                            id: networkRow
+                            required property var modelData
+                            readonly property bool open: AppState.wifiExpandedSsid === networkRow.modelData.ssid
                             width: parent.width
                             spacing: 6
 
-                            onVisibleChanged: {
-                                if (visible) wifiPasswordInput.forceActiveFocus()
-                            }
-
                             Rectangle {
                                 width: parent.width
-                                height: 34
-                                radius: 12
-                                color: Theme.surfaceContainer
+                                height: 46
+                                radius: 14
+                                color: networkRow.modelData.inUse ? Theme.accent : Theme.surfaceContainer
 
-                                TextInput {
-                                    id: wifiPasswordInput
+                                Behavior on color { ColorAnimation { duration: Theme.durShort } }
+
+                                RowLayout {
                                     anchors.fill: parent
-                                    anchors.margins: 10
-                                    color: Theme.textPrimary
-                                    font.pixelSize: 12
-                                    font.family: Theme.fontMono
-                                    echoMode: TextInput.Password
-                                    clip: true
-                                    activeFocusOnTab: true
-                                    onAccepted: AppState.connectToWifi(networkRow.modelData.ssid, text, true)
+                                    anchors.leftMargin: 12
+                                    anchors.rightMargin: 12
+                                    spacing: 10
+
+                                    IconGlyph {
+                                        text: statusItem.signalIcon(networkRow.modelData.signal)
+                                        color: networkRow.modelData.inUse ? Theme.accentText : Theme.textPrimary
+                                        size: Theme.iconMedium
+                                    }
+
+                                    Column {
+                                        Layout.fillWidth: true
+                                        spacing: 0
+
+                                        Text {
+                                            text: networkRow.modelData.ssid
+                                            color: networkRow.modelData.inUse ? Theme.accentText : Theme.textPrimary
+                                            font.pixelSize: 13
+                                            font.bold: networkRow.modelData.inUse
+                                            font.family: Theme.fontMono
+                                            elide: Text.ElideRight
+                                            width: parent.width
+                                        }
+
+                                        Text {
+                                            text: (networkRow.modelData.inUse ? "Connected"
+                                                   : networkRow.modelData.saved ? "Saved"
+                                                   : networkRow.modelData.secure ? "Secured" : "Open")
+                                                  + " · " + networkRow.modelData.signal + "%"
+                                            color: networkRow.modelData.inUse ? Theme.accentText : Theme.textMuted
+                                            opacity: networkRow.modelData.inUse ? 0.75 : 1
+                                            font.pixelSize: 10
+                                            font.family: Theme.fontMono
+                                        }
+                                    }
+
+                                    IconGlyph {
+                                        visible: networkRow.modelData.secure
+                                        text: "\u{F033E}"
+                                        color: networkRow.modelData.inUse ? Theme.accentText : Theme.textMuted
+                                        size: Theme.iconSmall
+                                    }
+                                }
+
+                                // Saved and open networks connect at once;
+                                // a new secured one asks for its password;
+                                // the one in use offers to disconnect.
+                                StateLayer {
+                                    tint: networkRow.modelData.inUse ? Theme.accentText : Theme.foreground
+                                    interactive: !AppState.wifiConnecting
+                                    onTapped: {
+                                        var n = networkRow.modelData
+                                        if (n.inUse || (n.secure && !n.saved))
+                                            AppState.toggleWifiExpand(n.ssid)
+                                        else
+                                            AppState.connectToWifi(n.ssid, "", n.secure, n.saved)
+                                    }
                                 }
                             }
 
-                            Rectangle {
-                                width: parent.width
-                                height: 32
-                                radius: 12
-                                color: AppState.themeAccent
-                                opacity: AppState.wifiConnecting ? 0.6 : 1
+                            // The one in use: disconnect.
+                            Row {
+                                visible: networkRow.open && networkRow.modelData.inUse
+                                anchors.right: parent.right
+                                spacing: 6
 
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: AppState.wifiConnecting ? "Connecting..." : "Conectar"
-                                    color: Theme.accentText
-                                    font.pixelSize: 12
-                                    font.bold: true
-                                    font.family: Theme.fontMono
+                                PillButton {
+                                    text: "Disconnect"
+                                    available: !AppState.wifiConnecting
+                                    onClicked: AppState.disconnectWifi(networkRow.modelData.ssid)
+                                }
+                            }
+
+                            // A new secured one: its password.
+                            RowLayout {
+                                visible: networkRow.open && !networkRow.modelData.inUse
+                                width: parent.width
+                                spacing: 6
+
+                                onVisibleChanged: if (visible) wifiPasswordInput.forceActiveFocus()
+
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 36
+                                    radius: 18
+                                    color: Theme.surfaceContainer
+                                    border.width: wifiPasswordInput.activeFocus ? 1 : 0
+                                    border.color: Theme.alpha(Theme.foreground, 0.4)
+
+                                    TextInput {
+                                        id: wifiPasswordInput
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 14
+                                        anchors.rightMargin: 36
+                                        verticalAlignment: TextInput.AlignVCenter
+                                        color: Theme.textPrimary
+                                        font.pixelSize: 12
+                                        font.family: Theme.fontMono
+                                        echoMode: reveal.shown ? TextInput.Normal : TextInput.Password
+                                        clip: true
+                                        activeFocusOnTab: true
+                                        onAccepted: if (text.length > 0)
+                                            AppState.connectToWifi(networkRow.modelData.ssid, text, true, false)
+
+                                        Text {
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            visible: wifiPasswordInput.text.length === 0
+                                            text: "Password"
+                                            color: Theme.textMuted
+                                            font: wifiPasswordInput.font
+                                        }
+                                    }
+
+                                    IconButton {
+                                        id: reveal
+                                        property bool shown: false
+                                        anchors.right: parent.right
+                                        anchors.rightMargin: 6
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        icon: reveal.shown ? "\u{F0209}" : "\u{F0208}"
+                                        onTapped: reveal.shown = !reveal.shown
+                                    }
                                 }
 
-                                StateLayer {
-                                    tint: Theme.accentText
-                                    interactive: !AppState.wifiConnecting
-                                    onTapped: AppState.connectToWifi(networkRow.modelData.ssid, wifiPasswordInput.text, true)
+                                PillButton {
+                                    text: AppState.wifiConnecting ? "…" : "Connect"
+                                    emphasis: true
+                                    available: !AppState.wifiConnecting && wifiPasswordInput.text.length > 0
+                                    onClicked: AppState.connectToWifi(networkRow.modelData.ssid, wifiPasswordInput.text, true, false)
                                 }
                             }
                         }
                     }
                 }
+
+                Text {
+                    visible: AppState.wifiStatusMessage.length > 0
+                    text: AppState.wifiStatusMessage
+                    color: /Wrong|Could not|out of range/.test(AppState.wifiStatusMessage) ? Theme.error : Theme.textSecondary
+                    font.pixelSize: 11
+                    font.family: Theme.fontMono
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                }
             }
 
-            Text {
-                visible: AppState.wifiStatusMessage.length > 0
-                text: AppState.wifiStatusMessage
-                color: Theme.textSecondary
-                font.pixelSize: 12
-                font.family: Theme.fontMono
-                width: parent.width
-                wrapMode: Text.WordWrap
-            }
-            }
-
+            // ── Bluetooth ────────────────────────────────────────────────
             Column {
+                id: btPanel
                 width: parent.width
                 spacing: 10
                 visible: statusItem.expandedPanel === "bluetooth"
 
+                readonly property var mine: AppState.bluetoothDevices.filter(d => d.paired)
+                readonly property var nearby: AppState.bluetoothDevices.filter(d => !d.paired)
 
-            RowLayout {
-                width: parent.width
+                PanelHeader {
+                    title: "Bluetooth"
+                    subtitle: !AppState.btEnabled ? "Off"
+                        : AppState.btConnectedCount > 0 ? AppState.btConnectedCount + " connected"
+                        : "Nothing connected"
 
-                Column {
-                    Layout.fillWidth: true
-                    spacing: 1
-
-                    Text {
-                        text: "Bluetooth devices"
-                        color: Theme.textPrimary
-                        font.pixelSize: 14
-                        font.bold: true
-                        font.family: Theme.fontMono
-                        elide: Text.ElideRight
-                        width: parent.width
+                    ScanButton {
+                        visible: AppState.btEnabled
+                        busy: AppState.btScanning
+                        onTapped: AppState.scanBluetoothDevices()
                     }
 
-                    Text {
-                        text: AppState.btConnectedCount > 0
-                              ? AppState.btConnectedCount + (AppState.btConnectedCount === 1
-                                                             ? " connected" : " connected")
-                              : "None connected"
-                        color: Theme.textMuted
-                        font.pixelSize: 11
-                        font.family: Theme.fontMono
+                    SettingsSwitch {
+                        anchors.verticalCenter: parent.verticalCenter
+                        checked: AppState.btEnabled
+                        onToggled: {
+                            AppState.toggleBluetoothPower()
+                            if (AppState.btEnabled) btRescan.restart()
+                        }
+
+                        Timer {
+                            id: btRescan
+                            interval: 1500
+                            onTriggered: AppState.scanBluetoothDevices()
+                        }
                     }
                 }
 
-                IconButton {
-                    icon: "󰑐"
-                    size: 28
-                    glyphSize: Theme.iconMedium
-                    iconColor: Theme.textPrimary
-                    onTapped: AppState.scanBluetoothDevices()
+                EmptyNote {
+                    visible: !AppState.btEnabled
+                    text: "Bluetooth is off"
                 }
-            }
 
-            Text {
-                visible: AppState.bluetoothDevices.length === 0
-                text: "Scanning for devices..."
-                color: Theme.textMuted
-                font.pixelSize: 12
-                font.family: Theme.fontMono
-            }
-
-            Column {
-                width: parent.width
-                spacing: 6
+                EmptyNote {
+                    visible: AppState.btEnabled && AppState.bluetoothDevices.length === 0
+                    text: AppState.btScanning ? "Looking for devices…" : "No devices found"
+                }
 
                 Repeater {
-                    model: AppState.bluetoothDevices
+                    model: AppState.btEnabled ? [
+                        { label: "My devices", list: btPanel.mine },
+                        { label: "Nearby", list: btPanel.nearby }
+                    ] : []
 
-                    Rectangle {
-                        id: btDeviceRow
+                    Column {
+                        id: btSection
                         required property var modelData
                         width: parent.width
-                        height: 44
-                        radius: 14
-                        // Unpaired devices still get a faint surface, otherwise
-                        // the row reads as a gap in the list.
-                        color: btDeviceRow.modelData.connected ? AppState.themeAccent
-                             : (btDeviceRow.modelData.paired ? Theme.surfaceContainer : Theme.alpha(Theme.foreground, 0.04))
+                        spacing: 6
+                        visible: btSection.modelData.list.length > 0
 
-                        RowLayout {
-                            anchors.fill: parent
-                            anchors.leftMargin: 12
-                            anchors.rightMargin: 12
-                            spacing: 10
+                        PanelLabel { text: btSection.modelData.label }
 
-                            IconGlyph {
-                                text: "󰂯"
-                                color: btDeviceRow.modelData.connected ? Theme.accentText : Theme.textPrimary
-                                size: Theme.iconMedium
-                            }
+                        Repeater {
+                            model: btSection.modelData.list
 
-                            Column {
-                                Layout.fillWidth: true
-                                spacing: 0
+                            Rectangle {
+                                id: btDeviceRow
+                                required property var modelData
+                                width: parent.width
+                                height: 46
+                                radius: 14
+                                color: btDeviceRow.modelData.connected ? Theme.accent : Theme.surfaceContainer
 
-                                Text {
-                                    text: btDeviceRow.modelData.name
-                                    color: btDeviceRow.modelData.connected ? Theme.accentText : Theme.textPrimary
-                                    font.pixelSize: 13
-                                    font.bold: btDeviceRow.modelData.connected
-                                    font.family: Theme.fontMono
-                                    elide: Text.ElideRight
-                                    width: parent.width
+                                Behavior on color { ColorAnimation { duration: Theme.durShort } }
+
+                                readonly property color ink: btDeviceRow.modelData.connected ? Theme.accentText : Theme.textPrimary
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 12
+                                    anchors.rightMargin: 8
+                                    spacing: 10
+                                    // Over the row's StateLayer, so Forget
+                                    // takes its own taps.
+                                    z: 2
+
+                                    IconGlyph {
+                                        text: statusItem.btIcon(btDeviceRow.modelData.icon)
+                                        color: btDeviceRow.ink
+                                        size: Theme.iconMedium
+                                    }
+
+                                    Column {
+                                        Layout.fillWidth: true
+                                        spacing: 0
+
+                                        Text {
+                                            text: btDeviceRow.modelData.name
+                                            color: btDeviceRow.ink
+                                            font.pixelSize: 13
+                                            font.bold: btDeviceRow.modelData.connected
+                                            font.family: Theme.fontMono
+                                            elide: Text.ElideRight
+                                            width: parent.width
+                                        }
+
+                                        Text {
+                                            text: btDeviceRow.modelData.connected ? "Connected · tap to disconnect"
+                                                : btDeviceRow.modelData.paired ? "Paired" : "Tap to pair"
+                                            color: btDeviceRow.modelData.connected ? Theme.accentText : Theme.textMuted
+                                            opacity: btDeviceRow.modelData.connected ? 0.75 : 1
+                                            font.pixelSize: 10
+                                            font.family: Theme.fontMono
+                                        }
+                                    }
+
+                                    // Forget: paired, not in use, and asks twice.
+                                    IconButton {
+                                        id: forget
+                                        property bool armed: false
+                                        visible: btDeviceRow.modelData.paired && !btDeviceRow.modelData.connected
+                                        icon: forget.armed ? "\u{F05E0}" : "\u{F01B4}"
+                                        iconColor: forget.armed ? Theme.error : Theme.textMuted
+                                        interactive: !AppState.btActionInProgress
+                                        onTapped: {
+                                            if (!forget.armed) { forget.armed = true; disarmForget.restart(); return }
+                                            forget.armed = false
+                                            AppState.forgetBluetoothDevice(btDeviceRow.modelData.mac, btDeviceRow.modelData.name)
+                                        }
+
+                                        Timer {
+                                            id: disarmForget
+                                            interval: 3000
+                                            onTriggered: forget.armed = false
+                                        }
+                                    }
                                 }
 
-                                Text {
-                                    visible: !btDeviceRow.modelData.connected && btDeviceRow.modelData.paired
-                                    text: "Paired"
-                                    color: Theme.textMuted
-                                    font.pixelSize: 10
-                                    font.family: Theme.fontMono
-                                }
-                            }
-
-                            IconGlyph {
-                                visible: btDeviceRow.modelData.connected
-                                text: "󰄬"
-                                color: Theme.accentText
-                                size: Theme.iconSmall
-                            }
-                        }
-
-                        StateLayer {
-                            interactive: !AppState.btActionInProgress
-                            onTapped: {
-                                if (btDeviceRow.modelData.connected) {
-                                    AppState.disconnectBluetoothDevice(btDeviceRow.modelData.mac, btDeviceRow.modelData.name)
-                                } else {
-                                    AppState.connectBluetoothDevice(btDeviceRow.modelData.mac, btDeviceRow.modelData.name, btDeviceRow.modelData.paired)
+                                StateLayer {
+                                    tint: btDeviceRow.modelData.connected ? Theme.accentText : Theme.foreground
+                                    interactive: !AppState.btActionInProgress
+                                    onTapped: {
+                                        var d = btDeviceRow.modelData
+                                        if (d.connected) AppState.disconnectBluetoothDevice(d.mac, d.name)
+                                        else AppState.connectBluetoothDevice(d.mac, d.name, d.paired)
+                                    }
                                 }
                             }
                         }
                     }
                 }
+
+                Text {
+                    visible: AppState.btStatusMessage.length > 0
+                    text: AppState.btStatusMessage
+                    color: AppState.btStatusMessage.indexOf("Could not") === 0 ? Theme.error : Theme.textSecondary
+                    font.pixelSize: 11
+                    font.family: Theme.fontMono
+                    width: parent.width
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                }
             }
 
-            Text {
-                visible: AppState.btStatusMessage.length > 0
-                text: AppState.btStatusMessage
-                color: Theme.textSecondary
-                font.pixelSize: 12
-                font.family: Theme.fontMono
-                width: parent.width
-                wrapMode: Text.WordWrap
-            }
-            }
-
+            // ── Sound ────────────────────────────────────────────────────
             Column {
                 width: parent.width
                 spacing: 14
                 visible: statusItem.expandedPanel === "audio"
 
+                PanelHeader {
+                    title: "Sound"
+                    subtitle: {
+                        for (var i = 0; i < AppState.audioSinks.length; i++)
+                            if (AppState.audioSinks[i].isDefault) return AppState.audioSinks[i].name
+                        return ""
+                    }
 
-            Text {
-                text: "Audio"
-                color: Theme.textPrimary
-                font.pixelSize: 14
-                font.bold: true
-                font.family: Theme.fontMono
-            }
+                    // The full page: input devices, and everything else.
+                    IconButton {
+                        icon: "\u{F0493}"
+                        size: 28
+                        glyphSize: Theme.iconMedium
+                        iconColor: Theme.textPrimary
+                        onTapped: {
+                            statusItem.expandedPanel = ""
+                            AppState.openSettings("sound", statusItem.screen ? statusItem.screen.name : "")
+                        }
+                    }
+                }
 
-                                            Column {
-                                                width: parent.width
-                                                spacing: 6
+                // Output and microphone: a mute button, the level, the number.
+                Repeater {
+                    model: [
+                        { key: "out" },
+                        { key: "mic" }
+                    ]
 
-                                                RowLayout {
-                                                    width: parent.width
+                    RowLayout {
+                        id: level
+                        required property var modelData
+                        readonly property bool isMic: level.modelData.key === "mic"
+                        readonly property bool muted: level.isMic ? AppState.micMuted : AppState.volumeMuted
+                        width: parent.width
+                        spacing: 10
 
-                                                    IconGlyph {
-                                                        text: "󰕾"
-                                                        color: Theme.textPrimary
-                                                        size: Theme.iconSmall
-                                                    }
+                        IconButton {
+                            icon: level.isMic ? (AppState.micMuted ? "\u{F036D}" : "\u{F036C}")
+                                              : statusItem.volumeIcon(AppState.volumePercent, AppState.volumeMuted)
+                            size: 30
+                            glyphSize: Theme.iconMedium
+                            iconColor: level.muted ? (level.isMic ? Theme.error : Theme.textMuted) : Theme.textPrimary
+                            onTapped: level.isMic ? AppState.toggleMicMute() : AppState.toggleVolumeMute()
+                        }
 
-                                                    Text {
-                                                        text: "Volume"
-                                                        color: Theme.textPrimary
-                                                        font.pixelSize: 13
-                                                        font.family: Theme.fontMono
-                                                        Layout.fillWidth: true
-                                                        Layout.leftMargin: 4
-                                                    }
+                        SettingsSlider {
+                            id: levelSlider
+                            Layout.fillWidth: true
+                            compact: true
+                            live: !level.isMic
+                            opacity: level.muted ? 0.45 : 1
+                            from: 0; to: level.isMic ? 150 : 100; step: 1
+                            neutral: level.isMic ? 100 : NaN
+                            value: level.isMic ? AppState.micVolume : AppState.volumePercent
+                            onMoved: v => level.isMic ? AppState.setMicVolume(v) : AppState.setVolume(v)
+                        }
 
-                                                    Text {
-                                                        text: Math.round(AppState.volumePercent) + "%"
-                                                        color: Theme.textSecondary
-                                                        font.pixelSize: 12
-                                                        font.family: Theme.fontMono
-                                                    }
-                                                }
+                        Text {
+                            Layout.preferredWidth: 38
+                            horizontalAlignment: Text.AlignRight
+                            text: Math.round(levelSlider.shown) + "%"
+                            color: level.muted ? Theme.textMuted : Theme.textSecondary
+                            font.pixelSize: 11
+                            font.family: Theme.fontMono
+                        }
+                    }
+                }
 
-                                                Item {
-                                                    width: parent.width
-                                                    height: 20
+                // Where it plays.
+                Column {
+                    width: parent.width
+                    spacing: 4
+                    visible: AppState.audioSinks.length > 1
 
-                                                    Rectangle {
-                                                        id: volumeTrack
-                                                        anchors.verticalCenter: parent.verticalCenter
-                                                        width: parent.width
-                                                        height: 6
-                                                        radius: 3
-                                                        color: Theme.track
+                    PanelLabel { text: "Output" }
 
-                                                        Rectangle {
-                                                            width: volumeTrack.width * (AppState.volumePercent / 100)
-                                                            height: parent.height
-                                                            radius: 3
-                                                            color: AppState.themeAccent
-                                                        }
+                    Repeater {
+                        model: AppState.audioSinks
 
-                                                        Rectangle {
-                                                            width: 14
-                                                            height: 14
-                                                            radius: 7
-                                                            color: Theme.textPrimary
-                                                            anchors.verticalCenter: parent.verticalCenter
-                                                            x: volumeTrack.width * (AppState.volumePercent / 100) - width / 2
-                                                        }
-                                                    }
+                        Rectangle {
+                            id: sinkRow
+                            required property var modelData
+                            width: parent.width
+                            height: 36
+                            radius: 12
+                            color: sinkRow.modelData.isDefault ? Theme.surfaceContainer : "transparent"
 
-                                                    MouseArea {
-                                                        anchors.fill: parent
-                                                        onPressed: AppState.setVolume((mouseX / width) * 100)
-                                                        onPositionChanged: if (pressed) AppState.setVolume((mouseX / width) * 100)
-                                                    }
-                                                }
-                                            }
+                            Behavior on color { ColorAnimation { duration: Theme.durShort } }
 
-                                            Rectangle {
-                                                width: parent.width
-                                                height: 1
-                                                color: Theme.outline
-                                            }
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 10
+                                anchors.rightMargin: 10
+                                spacing: 8
 
-                                            Column {
-                                                width: parent.width
-                                                spacing: 6
+                                IconGlyph {
+                                    text: /head/i.test(sinkRow.modelData.name) ? "\u{F02CB}" : "\u{F04C3}"
+                                    color: sinkRow.modelData.isDefault ? Theme.textPrimary : Theme.textMuted
+                                    size: Theme.iconMedium
+                                }
 
-                                                Text {
-                                                    text: "Audio output"
-                                                    color: Theme.textPrimary
-                                                    font.pixelSize: 13
-                                                    font.family: Theme.fontMono
-                                                }
+                                Text {
+                                    text: sinkRow.modelData.name
+                                    color: sinkRow.modelData.isDefault ? Theme.textPrimary : Theme.textSecondary
+                                    font.pixelSize: 12
+                                    font.bold: sinkRow.modelData.isDefault
+                                    font.family: Theme.fontMono
+                                    elide: Text.ElideRight
+                                    Layout.fillWidth: true
+                                }
 
-                                                Text {
-                                                    visible: AppState.audioSinks.length === 0
-                                                    text: "Looking for outputs..."
-                                                    color: Theme.textMuted
-                                                    font.pixelSize: 11
-                                                    font.family: Theme.fontMono
-                                                }
+                                IconGlyph {
+                                    visible: sinkRow.modelData.isDefault
+                                    text: "\u{F012C}"
+                                    color: Theme.textPrimary
+                                    size: Theme.iconSmall
+                                }
+                            }
 
-                                                Column {
-                                                    width: parent.width
-                                                    spacing: 4
+                            StateLayer {
+                                radius: sinkRow.radius
+                                interactive: !sinkRow.modelData.isDefault
+                                onTapped: AppState.setDefaultSink(sinkRow.modelData.id)
+                            }
+                        }
+                    }
+                }
 
-                                                    Repeater {
-                                                        model: AppState.audioSinks
+                // Each application, up to 150% like the Sound page.
+                Column {
+                    width: parent.width
+                    spacing: 10
 
-                                                        Rectangle {
-                                                            id: sinkRow
-                                                            required property var modelData
-                                                            width: parent.width
-                                                            height: 34
-                                                            radius: 12
-                                                            color: sinkRow.modelData.isDefault ? Theme.surfaceContainer : "transparent"
+                    PanelLabel { text: "Applications" }
 
-                                                            Behavior on color { ColorAnimation { duration: Theme.durShort } }
+                    EmptyNote {
+                        visible: AppState.audioStreams.length === 0
+                        text: "Nothing is playing"
+                    }
 
-                                                            RowLayout {
-                                                                anchors.fill: parent
-                                                                anchors.leftMargin: 10
-                                                                anchors.rightMargin: 10
-                                                                spacing: 8
+                    Repeater {
+                        model: AppState.audioStreams
 
-                                                                IconGlyph {
-                                                                    text: sinkRow.modelData.isDefault ? "󰓃" : "󰓄"
-                                                                    color: sinkRow.modelData.isDefault ? AppState.themeAccent : Theme.textPrimary
-                                                                    size: Theme.iconMedium
-                                                                }
+                        Column {
+                            id: streamRow
+                            required property var modelData
+                            width: parent.width
+                            spacing: 2
 
-                                                                Text {
-                                                                    text: sinkRow.modelData.name
-                                                                    color: sinkRow.modelData.isDefault ? AppState.themeAccent : Theme.textPrimary
-                                                                    font.pixelSize: 12
-                                                                    font.bold: sinkRow.modelData.isDefault
-                                                                    font.family: Theme.fontMono
-                                                                    elide: Text.ElideRight
-                                                                    Layout.fillWidth: true
-                                                                }
-                                                            }
+                            RowLayout {
+                                width: parent.width
+                                spacing: 8
 
-                                                            StateLayer {
-                                                                interactive: !sinkRow.modelData.isDefault
-                                                                onTapped: AppState.setDefaultSink(sinkRow.modelData.id)
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
+                                IconImage {
+                                    implicitSize: 22
+                                    mipmap: true
+                                    source: AppState.resolveAppIcon(streamRow.modelData.icons)
+                                }
 
-                                            Rectangle {
-                                                width: parent.width
-                                                height: 1
-                                                color: Theme.outline
-                                            }
+                                Text {
+                                    text: AppState.streamName(streamRow.modelData.name)
+                                    color: Theme.textPrimary
+                                    font.pixelSize: 12
+                                    font.family: Theme.fontMono
+                                    elide: Text.ElideRight
+                                    Layout.fillWidth: true
+                                }
 
-                                            Column {
-                                                width: parent.width
-                                                spacing: 8
+                                Text {
+                                    text: Math.round(streamSlider.shown) + "%"
+                                    color: Theme.textSecondary
+                                    font.pixelSize: 11
+                                    font.family: Theme.fontMono
+                                }
+                            }
 
-                                                Text {
-                                                    text: "Per-app volume"
-                                                    color: Theme.textPrimary
-                                                    font.pixelSize: 13
-                                                    font.family: Theme.fontMono
-                                                }
-
-                                                Text {
-                                                    visible: AppState.audioStreams.length === 0
-                                                    text: "Nothing is playing audio"
-                                                    color: Theme.textMuted
-                                                    font.pixelSize: 11
-                                                    font.family: Theme.fontMono
-                                                }
-
-                                                Column {
-                                                    width: parent.width
-                                                    spacing: 10
-
-                                                    Repeater {
-                                                        model: AppState.audioStreams
-
-                                                        Column {
-                                                            id: streamRow
-                                                            required property var modelData
-                                                            width: parent.width
-                                                            spacing: 4
-
-                                                            property real localVolume: streamRow.modelData.volume
-
-                                                            onModelDataChanged: streamRow.localVolume = streamRow.modelData.volume
-
-                                                            RowLayout {
-                                                                width: parent.width
-                                                                spacing: 8
-
-                                                                IconImage {
-                                                                    implicitSize: 32
-                                                                    mipmap: true
-                                                                    source: AppState.resolveAppIcon(streamRow.modelData.icons)
-                                                                }
-
-                                                                Text {
-                                                                    text: streamRow.modelData.name
-                                                                    color: Theme.textPrimary
-                                                                    font.pixelSize: 12
-                                                                    font.family: Theme.fontMono
-                                                                    elide: Text.ElideRight
-                                                                    Layout.fillWidth: true
-                                                                }
-
-                                                                Text {
-                                                                    text: Math.round(streamRow.localVolume) + "%"
-                                                                    color: Theme.textSecondary
-                                                                    font.pixelSize: 11
-                                                                    font.family: Theme.fontMono
-                                                                }
-                                                            }
-
-                                                            Item {
-                                                                width: parent.width
-                                                                height: 16
-
-                                                                Rectangle {
-                                                                    id: streamTrack
-                                                                    anchors.verticalCenter: parent.verticalCenter
-                                                                    width: parent.width
-                                                                    height: 5
-                                                                    radius: 3
-                                                                    color: Theme.track
-
-                                                                    Rectangle {
-                                                                        width: streamTrack.width * (streamRow.localVolume / 100)
-                                                                        height: parent.height
-                                                                        radius: 3
-                                                                        color: AppState.themeAccent
-                                                                    }
-
-                                                                    Rectangle {
-                                                                        width: 12
-                                                                        height: 12
-                                                                        radius: 6
-                                                                        color: Theme.textPrimary
-                                                                        anchors.verticalCenter: parent.verticalCenter
-                                                                        x: streamTrack.width * (streamRow.localVolume / 100) - width / 2
-                                                                    }
-                                                                }
-
-                                                                MouseArea {
-                                                                    anchors.fill: parent
-                                                                    onPressed: {
-                                                                        AppState.audioStreamsDragging = true
-                                                                        streamRow.localVolume = Math.max(0, Math.min(100, Math.round((mouseX / width) * 100)))
-                                                                        AppState.setStreamVolumeThrottled(streamRow.modelData.id, streamRow.localVolume)
-                                                                    }
-                                                                    onPositionChanged: if (pressed) {
-                                                                        streamRow.localVolume = Math.max(0, Math.min(100, Math.round((mouseX / width) * 100)))
-                                                                        AppState.setStreamVolumeThrottled(streamRow.modelData.id, streamRow.localVolume)
-                                                                    }
-                                                                    onReleased: AppState.audioStreamsDragging = false
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-
+                            SettingsSlider {
+                                id: streamSlider
+                                width: parent.width
+                                compact: true
+                                live: true
+                                from: 0; to: 150; step: 1
+                                neutral: 100
+                                value: streamRow.modelData.volume
+                                onDraggingChanged: AppState.audioStreamsDragging = streamSlider.dragging
+                                onMoved: v => AppState.setStreamVolumeThrottled(streamRow.modelData.id, v)
+                            }
+                        }
+                    }
+                }
             }
         }
     }
-}
+    }
 }

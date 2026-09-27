@@ -70,6 +70,18 @@ PanelWindow {
     property string settingsPage: "displays"
 
     onPanelOpenChanged: if (!panelOpen) settingsOpen = false
+
+    // The bar's own panels link to their page here (AppState.openSettings).
+    // Only the panel on the screen that asked answers.
+    Connections {
+        target: AppState
+        function onSettingsRequested(page, screenName) {
+            if (settingsItem.screen && screenName.length > 0 && settingsItem.screen.name !== screenName) return
+            settingsItem.settingsPage = page
+            settingsItem.panelOpen = true
+            settingsItem.settingsOpen = true
+        }
+    }
     onSettingsOpenChanged: {
         if (!settingsOpen) return
         AppState.refreshDisplay()
@@ -334,9 +346,10 @@ PanelWindow {
                         Image {
                             id: avatarImage
                             anchors.fill: parent
-                            source: AppState.avatarPath.length > 0 ? "file://" + AppState.avatarPath : ""
+                            source: AppState.avatarSource
                             fillMode: Image.PreserveAspectCrop
                             asynchronous: true
+                            cache: false
                             sourceSize.width: 128
                             visible: status === Image.Ready
                         }

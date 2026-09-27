@@ -23,13 +23,6 @@ Column {
         return ""
     }
 
-    // "PipeWire ALSA [osu!]" is how a Wine game's stream is named; the part in
-    // brackets is the name worth showing.
-    function streamName(n) {
-        var m = /\[(.+)\]\s*$/.exec(n || "")
-        return m ? m[1] : (n || "Unknown")
-    }
-
     SettingsGroup {
         width: parent.width
         title: "Output"
@@ -115,7 +108,7 @@ Column {
                 required property var modelData
                 stacked: true
                 icon: "\u{F075A}"
-                title: page.streamName(app.modelData.name)
+                title: AppState.streamName(app.modelData.name)
                 value: Math.round(appSlider.shown) + "%"
 
                 SettingsSlider {

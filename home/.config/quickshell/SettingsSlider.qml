@@ -17,6 +17,9 @@ import QtQuick.Effects
 //   format(v)         text for the bubble
 //   gradient          optional Gradient for the track, e.g. colour temperature
 //   moved(v)          on release
+//   live              also emit moved() while dragging -- for something as
+//                     immediate as volume, where the caller rate-limits
+//   compact           a slimmer knob and track, for the bar's panels
 Item {
     id: root
 
@@ -29,6 +32,8 @@ Item {
     property Gradient gradient: null
     // Kept for pages that still pass one; the slider is monochrome.
     property color tint: Theme.accent
+    property bool live: false
+    property bool compact: false
     signal moved(real value)
 
     readonly property bool dragging: area.pressed
@@ -42,7 +47,9 @@ Item {
                                 : !isNaN(root.pending) ? root.pending
                                 : root.value
 
-    onValueChanged: { root.pending = NaN; settle.stop() }
+    // Only when set: NaN is never equal to itself, so writing NaN over NaN
+    // counts as a change and re-evaluated `shown` in a loop.
+    onValueChanged: { if (!isNaN(root.pending)) root.pending = NaN; settle.stop() }
 
     // If nothing answers -- the command failed -- the knob goes back to the
     // real value rather than claiming a change that did not happen.
@@ -60,7 +67,7 @@ Item {
     }
     readonly property real fraction: Math.max(0, Math.min(1, (root.shown - root.from) / (root.to - root.from)))
 
-    implicitHeight: 24
+    implicitHeight: root.compact ? 18 : 24
     implicitWidth: 240
 
     function snapped(v) {
@@ -81,8 +88,8 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
-        height: 6
-        radius: 3
+        height: root.compact ? 5 : 6
+        radius: height / 2
         color: Theme.track
         gradient: root.gradient
 
@@ -109,9 +116,9 @@ Item {
 
     Rectangle {
         id: knob
-        width: 18
-        height: 18
-        radius: 9
+        width: root.compact ? 14 : 18
+        height: width
+        radius: width / 2
         x: root.knobX
         anchors.verticalCenter: parent.verticalCenter
         color: Theme.foreground
@@ -141,7 +148,8 @@ Item {
         x: Math.max(0, Math.min(root.width - width, knob.x + knob.width / 2 - width / 2))
         y: -height - 8
         color: Theme.accent
-        opacity: root.dragging ? 1 : 0
+        // Not in compact panels: they clip, and show the number beside it.
+        opacity: root.dragging && !root.compact ? 1 : 0
         scale: root.dragging ? 1 : 0.8
         visible: opacity > 0
 
@@ -167,8 +175,17 @@ Item {
         cursorShape: Qt.PointingHandCursor
         preventStealing: true
 
-        onPressed: mouse => root.dragValue = root.valueAt(mouse.x)
-        onPositionChanged: mouse => { if (pressed) root.dragValue = root.valueAt(mouse.x) }
+        onPressed: mouse => {
+            root.dragValue = root.valueAt(mouse.x)
+            if (root.live) root.moved(root.dragValue)
+        }
+        onPositionChanged: mouse => {
+            if (!pressed) return
+            var v = root.valueAt(mouse.x)
+            if (v === root.dragValue) return
+            root.dragValue = v
+            if (root.live) root.moved(v)
+        }
         onReleased: root.commit(root.dragValue)
         // The scrolling page can take the gesture over when the hand drifts
         // vertically; that arrives as a cancel, not a release, and used to

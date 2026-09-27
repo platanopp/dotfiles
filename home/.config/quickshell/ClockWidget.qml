@@ -132,19 +132,30 @@ PanelWindow {
     property int viewYear: today.getFullYear()
     property int viewMonth: today.getMonth()
 
+    // Which way the last change of month went: the grid slides in from that
+    // side (1: a later month, from the right).
+    property int slideDir: 1
+    signal monthTurned()
+
     function shiftMonth(delta) {
+        slideDir = delta > 0 ? 1 : -1
         var m = viewMonth + delta
         var y = viewYear
         while (m < 0) { m += 12; y -= 1 }
         while (m > 11) { m -= 12; y += 1 }
         viewMonth = m
         viewYear = y
+        monthTurned()
     }
 
     function resetToToday() {
         today = new Date()
-        viewYear = today.getFullYear()
-        viewMonth = today.getMonth()
+        var y = today.getFullYear(), m = today.getMonth()
+        if (y === viewYear && m === viewMonth) return
+        slideDir = (y * 12 + m) > (viewYear * 12 + viewMonth) ? 1 : -1
+        viewYear = y
+        viewMonth = m
+        monthTurned()
     }
 
     // Day numbers laid out Monday-first; 0 is a blank cell.
@@ -324,6 +335,7 @@ PanelWindow {
                         spacing: 2
 
                         Text {
+                            id: monthTitle
                             text: new Date(clockItem.viewYear, clockItem.viewMonth, 1)
                                     .toLocaleDateString(clockItem.dateLocale, "MMMM yyyy")
                             color: Theme.textPrimary
@@ -358,7 +370,7 @@ PanelWindow {
                         spacing: 0
 
                         Repeater {
-                            model: ["L", "M", "X", "J", "V", "S", "D"]
+                            model: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
 
                             Item {
                                 id: weekdayCell
@@ -378,8 +390,57 @@ PanelWindow {
                         }
                     }
 
-                    Grid {
+                    // The days, sliding in from the side the month moved to.
+                    // The wheel turns months too.
+                    Item {
                         Layout.fillWidth: true
+                        Layout.preferredHeight: daysGrid.implicitHeight
+                        clip: true
+
+                        Behavior on Layout.preferredHeight {
+                            NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic }
+                        }
+
+                        WheelHandler {
+                            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                            onWheel: event => {
+                                if (turnCooldown.running) return
+                                var d = event.angleDelta.y !== 0 ? event.angleDelta.y : -event.angleDelta.x
+                                if (d === 0) return
+                                clockItem.shiftMonth(d < 0 ? 1 : -1)
+                                turnCooldown.restart()
+                            }
+                        }
+
+                        Timer { id: turnCooldown; interval: 180 }
+
+                        Connections {
+                            target: clockItem
+                            function onMonthTurned() { monthSlide.restart() }
+                        }
+
+                        ParallelAnimation {
+                            id: monthSlide
+                            NumberAnimation {
+                                target: daysGrid; property: "x"
+                                from: clockItem.slideDir * 36; to: 0
+                                duration: Theme.durMedium; easing.type: Easing.OutCubic
+                            }
+                            NumberAnimation {
+                                target: daysGrid; property: "opacity"
+                                from: 0; to: 1
+                                duration: Theme.durMedium; easing.type: Easing.OutCubic
+                            }
+                            NumberAnimation {
+                                target: monthTitle; property: "opacity"
+                                from: 0.2; to: 1
+                                duration: Theme.durMedium; easing.type: Easing.OutCubic
+                            }
+                        }
+
+                    Grid {
+                        id: daysGrid
+                        width: parent.width
                         columns: 7
                         spacing: 0
 
@@ -389,6 +450,8 @@ PanelWindow {
                             Item {
                                 id: dayCell
                                 required property var modelData
+                                required property int index
+                                readonly property bool weekend: index % 7 >= 5
 
                                 readonly property bool isToday:
                                     clockItem.viewingCurrentMonth && modelData === clockItem.today.getDate()
@@ -409,13 +472,15 @@ PanelWindow {
                                     anchors.centerIn: parent
                                     visible: dayCell.modelData > 0
                                     text: dayCell.modelData
-                                    color: dayCell.isToday ? Theme.accentText : Theme.textPrimary
+                                    color: dayCell.isToday ? Theme.accentText
+                                         : dayCell.weekend ? Theme.textSecondary : Theme.textPrimary
                                     font.pixelSize: 12
                                     font.bold: dayCell.isToday
                                     font.family: Theme.fontMono
                                 }
                             }
                         }
+                    }
                     }
                 }
 

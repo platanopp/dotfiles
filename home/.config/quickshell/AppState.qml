@@ -17,6 +17,12 @@ Singleton {
     property bool btEnabled: false
     property int btConnectedCount: 0
     property real volumePercent: 50
+    property bool volumeMuted: false
+    // The connected network's signal (0-100), for the bar's icon; -1 when
+    // not on Wi-Fi. ethernetUp: a wired connection, which the bar shows
+    // instead of a crossed-out Wi-Fi icon.
+    property int wifiSignal: -1
+    property bool ethernetUp: false
     property var wallpaperFiles: []
     property string selectedWallpaper: ""
     // The crop hyprpaper is showing for selectedWallpaper -- the picture at
@@ -120,6 +126,40 @@ Singleton {
         btRefreshTimer.restart()
     }
 
+    function toggleVolumeMute() {
+        volumeSetProc.command = ["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"]
+        volumeSetProc.running = true
+        root.volumeMuted = !root.volumeMuted
+    }
+
+    // "PipeWire ALSA [osu!]" is how a Wine game's stream is named; the part
+    // in brackets is the name worth showing.
+    function streamName(n) {
+        var m = /\[(.+)\]\s*$/.exec(n || "")
+        return m ? m[1] : (n || "Unknown")
+    }
+
+    // Asks the control panel on that screen to open Settings at a page --
+    // for the bar's own panels, which link to their fuller page.
+    signal settingsRequested(string page, string screenName)
+    function openSettings(page, screenName) { root.settingsRequested(page, screenName) }
+
+    // qs ipc call settings open sound -- on the focused monitor.
+    IpcHandler {
+        target: "settings"
+        function open(page: string): void {
+            var m = Hyprland.focusedMonitor
+            root.openSettings(page.length > 0 ? page : "displays", m ? m.name : "")
+        }
+    }
+
+    function forgetBluetoothDevice(mac, name) {
+        root.btActionInProgress = true
+        root.btStatusMessage = "Forgetting " + name + "..."
+        btActionProc.command = ["bash", "-lc", "bluetoothctl remove \"$1\" 2>&1", "_", mac]
+        btActionProc.running = true
+    }
+
     function setVolume(percent) {
         var clamped = Math.max(0, Math.min(100, Math.round(percent)))
         root.volumePercent = clamped
@@ -182,11 +222,25 @@ Singleton {
     }
 
     function scanWifiNetworks() {
-        wifiScanProc.running = true
+        if (!wifiScanProc.running) wifiScanProc.running = true
+    }
+
+    readonly property bool wifiScanning: wifiScanProc.running
+    readonly property bool btScanning: btScanProc.running
+
+    function disconnectWifi(ssid) {
+        root.wifiConnecting = true
+        root.wifiStatusMessage = "Disconnecting..."
+        wifiConnectProc.command = ["bash", "-lc", "nmcli connection down id \"$1\" 2>&1 && echo DISCONNECTED", "_", ssid]
+        wifiConnectProc.running = true
     }
 
     function parseWifiScan(text) {
-        var lines = text.trim().length > 0 ? text.trim().split("\n") : []
+        // The scan, then "--saved--" and the names of saved Wi-Fi
+        // connections: a saved network connects without asking again.
+        var halves = text.split("--saved--")
+        var savedNames = (halves[1] || "").split("\n").map(l => l.trim()).filter(l => l.length > 0)
+        var lines = halves[0].trim().length > 0 ? halves[0].trim().split("\n") : []
         var byS = {}
         for (var i = 0; i < lines.length; i++) {
             var parts = lines[i].split(":")
@@ -198,7 +252,8 @@ Singleton {
                 ssid: ssid,
                 inUse: parts[0] === "*",
                 signal: signal,
-                secure: parts[3] !== "--" && parts[3].length > 0
+                secure: parts[3] !== "--" && parts[3].length > 0,
+                saved: savedNames.indexOf(ssid) !== -1
             }
             // A multi-band AP shows up once per band. Keep the strongest, but
             // carry the in-use flag across: if the connected band is the
@@ -226,10 +281,12 @@ Singleton {
         root.wifiStatusMessage = ""
     }
 
-    function connectToWifi(ssid, password, secure) {
+    function connectToWifi(ssid, password, secure, saved) {
         root.wifiConnecting = true
         root.wifiStatusMessage = "Connecting to " + ssid + "..."
-        if (secure) {
+        if (saved) {
+            wifiConnectProc.command = ["bash", "-lc", "nmcli connection up id \"$1\" 2>&1", "_", ssid]
+        } else if (secure) {
             wifiConnectProc.command = ["bash", "-lc", "nmcli device wifi connect \"$1\" password \"$2\" 2>&1", "_", ssid, password]
         } else {
             wifiConnectProc.command = ["bash", "-lc", "nmcli device wifi connect \"$1\" 2>&1", "_", ssid]
@@ -433,7 +490,8 @@ Singleton {
                 mac: parts[0],
                 paired: parts[1] === "yes",
                 connected: parts[2] === "yes",
-                name: parts[3].length > 0 ? parts[3] : parts[0]
+                name: parts[3].length > 0 ? parts[3] : parts[0],
+                icon: parts[4] || ""
             })
         }
         list.sort(function(a, b) {
@@ -464,8 +522,44 @@ Singleton {
 
     // The logged-in user's picture, from where Linux keeps one: ~/.face (what
     // display managers read), ~/.face.icon, or AccountsService's copy. Empty
-    // when there is none, and the clock's panel shows the initial instead.
+    // when there is none, and the control panel shows the initial instead.
     property string avatarPath: ""
+    // Bumped on every change: the file keeps its name, so an Image showing it
+    // must be told to read it again (see avatarSource).
+    property int avatarVersion: 0
+    // For Images: cleared for one frame on a change, so a picture shown with
+    // cache: false reloads rather than keeping the old one.
+    readonly property string avatarSource: root.avatarPath.length > 0 && root.avatarVersion >= 0
+        ? "file://" + root.avatarPath : ""
+    property string avatarError: ""
+    property bool avatarBusy: false
+
+    function setAvatar(path) { root.avatarCmd(["set", path]) }
+    function removeAvatar() { root.avatarCmd(["remove"]) }
+
+    function avatarCmd(args) {
+        if (avatarSetProc.running) return
+        root.avatarBusy = true
+        root.avatarError = ""
+        avatarSetProc.command = ["python3", Quickshell.env("HOME") + "/.config/quickshell/scripts/avatar.py"].concat(args)
+        avatarSetProc.running = true
+    }
+
+    Process {
+        id: avatarSetProc
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                root.avatarBusy = false
+                var d
+                try { d = JSON.parse(text) } catch (e) { root.avatarError = "Could not change the picture"; return }
+                if (!d.ok) { root.avatarError = d.error || "Could not change the picture"; return }
+                root.avatarPath = ""
+                root.avatarVersion++
+                avatarProc.running = true
+            }
+        }
+    }
 
     Process {
         id: avatarProc
@@ -513,9 +607,15 @@ Singleton {
     Process {
         id: wifiProc
         running: false
-        command: ["bash", "-lc", "LC_ALL=C nmcli -t -f active,ssid dev wifi | awk -F: '$1==\"yes\"{print $2}'"]
+        command: ["bash", Quickshell.env("HOME") + "/.config/quickshell/scripts/net_status.sh"]
         stdout: StdioCollector {
-            onStreamFinished: root.wifiSsid = text.trim()
+            onStreamFinished: {
+                var f = text.replace(/\n$/, "").split("\t")
+                root.wifiSsid = (f[0] || "").trim()
+                var sig = parseInt(f[1])
+                root.wifiSignal = root.wifiSsid.length > 0 && !isNaN(sig) ? sig : -1
+                root.ethernetUp = f[2] === "1"
+            }
         }
     }
 
@@ -568,7 +668,7 @@ Singleton {
     Process {
         id: wifiScanProc
         running: false
-        command: ["bash", "-lc", "nmcli dev wifi rescan >/dev/null 2>&1; sleep 1; LC_ALL=C nmcli -t -f IN-USE,SSID,SIGNAL,SECURITY dev wifi list"]
+        command: ["bash", "-lc", "nmcli dev wifi rescan >/dev/null 2>&1; sleep 1; LC_ALL=C nmcli -t -f IN-USE,SSID,SIGNAL,SECURITY dev wifi list; echo --saved--; LC_ALL=C nmcli -t -f NAME,TYPE connection show | awk -F: '$NF==\"802-11-wireless\"{print $1}'"]
         stdout: StdioCollector {
             onStreamFinished: root.parseWifiScan(text)
         }
@@ -580,8 +680,17 @@ Singleton {
         stdout: StdioCollector {
             onStreamFinished: {
                 var out = text.trim()
-                if (out.toLowerCase().indexOf("error") !== -1) {
-                    root.wifiStatusMessage = "Could not connect (check the password)"
+                if (out.indexOf("DISCONNECTED") !== -1) {
+                    root.wifiStatusMessage = ""
+                    root.wifiExpandedSsid = ""
+                    wifiProc.running = true
+                    wifiScanProc.running = true
+                } else if (out.toLowerCase().indexOf("error") !== -1) {
+                    var low = out.toLowerCase()
+                    root.wifiStatusMessage = low.indexOf("secrets were required") !== -1 || low.indexOf("password") !== -1
+                        ? "Wrong password"
+                        : low.indexOf("no network with ssid") !== -1 ? "That network is out of range"
+                        : "Could not connect"
                 } else {
                     root.wifiStatusMessage = "Connected"
                     root.wifiExpandedSsid = ""
@@ -637,10 +746,13 @@ Singleton {
     Process {
         id: volumeGetProc
         running: false
-        command: ["bash", "-lc", "wpctl get-volume @DEFAULT_AUDIO_SINK@ | awk '{print int($2*100)}'"]
+        command: ["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"]
         stdout: StdioCollector {
             onStreamFinished: {
-                var v = parseInt(text.trim())
+                // "Volume: 0.71" or "Volume: 0.71 [MUTED]"
+                var m = /Volume:\s*([\d.]+)/.exec(text)
+                var v = m ? Math.round(parseFloat(m[1]) * 100) : NaN
+                if (!volumeSetProc.running) root.volumeMuted = text.indexOf("MUTED") !== -1
                 // Mid-drag this reading is already out of date -- it was
                 // taken before the moves still in flight -- and applying it
                 // would drag the handle backwards under the pointer.
