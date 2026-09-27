@@ -8,7 +8,9 @@ Singleton {
     id: root
 
 
-    property string username: ""
+    // From the environment at once; whoami below only confirms it. It used to
+    // start empty, and the clock's panel showed a hard-coded name meanwhile.
+    property string username: Quickshell.env("USER") || ""
     property string wifiSsid: ""
     property string wifiIp: ""
     property bool wifiRadioEnabled: true
@@ -458,6 +460,20 @@ Singleton {
         root.btStatusMessage = "Disconnecting " + name + "..."
         btActionProc.command = ["bash", "-lc", "bluetoothctl disconnect \"$1\" 2>&1", "_", mac]
         btActionProc.running = true
+    }
+
+    // The logged-in user's picture, from where Linux keeps one: ~/.face (what
+    // display managers read), ~/.face.icon, or AccountsService's copy. Empty
+    // when there is none, and the clock's panel shows the initial instead.
+    property string avatarPath: ""
+
+    Process {
+        id: avatarProc
+        running: true
+        command: ["sh", "-c", "for f in \"$HOME/.face\" \"$HOME/.face.icon\" \"/var/lib/AccountsService/icons/$USER\"; do [ -s \"$f\" ] && { printf '%s' \"$f\"; exit 0; }; done"]
+        stdout: StdioCollector {
+            onStreamFinished: root.avatarPath = text.trim()
+        }
     }
 
     Process {
@@ -1539,34 +1555,35 @@ Singleton {
 
     // ── About: the machine, and its backup ───────────────────────────────
     //
-    // scripts/about.py: facts for the About page, and the backup in
-    // ~/dotfiles -- status, a local commit of everything pending, a push.
+    // scripts/about.py for the facts about this machine; scripts/backup.py
+    // for the backup of its configuration, in whatever repository Settings ->
+    // Shell's backupRepo names (~/dotfiles unless changed) -- made on request
+    // if this user has none yet.
     property var aboutInfo: ({})
     property var backupStatus: ({ repo: false })
     property bool backupBusy: false
-    // The last backup/push: { action, ok, error?, at }
+    // The last action: { action, ok, error?, committed?, at }
     property var backupLast: null
-
-    readonly property string aboutScript:
-        Quickshell.env("HOME") + "/.config/quickshell/scripts/about.py"
 
     function refreshAbout() {
         if (!aboutInfoProc.running) aboutInfoProc.running = true
         root.backupCmd("status")
     }
 
+    // status | init | backup | push | github
     function backupCmd(action) {
         if (backupProc.running) return
         root.backupBusy = action !== "status"
         backupProc.action = action
-        backupProc.command = ["python3", root.aboutScript, action]
+        backupProc.command = ["python3", Quickshell.env("HOME") + "/.config/quickshell/scripts/backup.py",
+                              action, ShellSettings.backupRepo]
         backupProc.running = true
     }
 
     Process {
         id: aboutInfoProc
         running: false
-        command: ["python3", Quickshell.env("HOME") + "/.config/quickshell/scripts/about.py", "info"]
+        command: ["python3", Quickshell.env("HOME") + "/.config/quickshell/scripts/about.py"]
         stdout: StdioCollector {
             onStreamFinished: {
                 try { root.aboutInfo = JSON.parse(text) } catch (e) {}

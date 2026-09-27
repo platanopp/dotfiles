@@ -126,18 +126,39 @@ Column {
     }
 
     // ── Backup ───────────────────────────────────────────────────────────
+    //
+    // For whoever is logged in: their configuration, copied into a git
+    // repository (see scripts/backup.py). No repository yet, and the page
+    // offers to make one; no remote, and it offers a private GitHub one when
+    // gh is logged in; a remote, and it can push -- asking twice, and saying
+    // so plainly when the repository is public.
     SettingsGroup {
         width: parent.width
         title: "Backup"
-        visible: page.backup.repo === true
+
+        // No repository yet.
+        SettingsRow {
+            visible: page.backup.repo !== true
+            icon: "\u{F006F}"
+            title: "No backup yet"
+            description: "Keeps a copy of this desktop's configuration in " + (page.backup.display || "~/dotfiles")
+
+            PillButton {
+                text: AppState.backupBusy ? "…" : "Create"
+                emphasis: true
+                available: !AppState.backupBusy
+                onClicked: AppState.backupCmd("init")
+            }
+        }
 
         SettingsRow {
-            icon: "\u{F02A2}"
-            title: "Last saved"
-            description: page.backup.subject || ""
+            visible: page.backup.repo === true
+            icon: "\u{F024B}"
+            title: "Saved in"
+            description: page.backup.hash ? "Last: " + page.backup.hash + (page.backup.when ? " · " + page.backup.when : "") : ""
 
             Text {
-                text: (page.backup.hash || "") + (page.backup.when ? "  ·  " + page.backup.when : "")
+                text: page.backup.display || ""
                 color: Theme.textSecondary
                 font.pixelSize: 11
                 font.family: Theme.fontMono
@@ -145,28 +166,70 @@ Column {
         }
 
         SettingsRow {
+            visible: page.backup.repo === true
             icon: "\u{F006F}"
             title: page.backup.pending > 0
                 ? page.backup.pending + (page.backup.pending === 1 ? " change not saved" : " changes not saved")
                 : "Everything is saved"
 
             PillButton {
-                text: AppState.backupBusy && AppState.backupLast === null ? "…" : "Back up now"
+                text: AppState.backupBusy ? "…" : "Back up now"
                 emphasis: page.backup.pending > 0
                 available: page.backup.pending > 0 && !AppState.backupBusy
                 onClicked: AppState.backupCmd("backup")
             }
         }
 
+        // A repository with nowhere to go: offer GitHub, private, when gh can.
+        SettingsRow {
+            id: githubRow
+            visible: page.backup.repo === true && !page.backup.remote
+            icon: "\u{F02A4}"
+            title: "Local only"
+            description: page.backup.gh
+                ? (githubRow.armed ? "Creates a private repository on your GitHub -- press again"
+                                   : "Not copied anywhere else yet")
+                : "Log in with gh auth login to add GitHub"
+
+            property bool armed: false
+
+            Timer {
+                id: disarmGithub
+                interval: 5000
+                onTriggered: githubRow.armed = false
+            }
+
+            PillButton {
+                visible: page.backup.gh === true
+                text: githubRow.armed ? "Create it" : "Add to GitHub"
+                emphasis: githubRow.armed
+                available: !AppState.backupBusy
+                onClicked: {
+                    if (!githubRow.armed) {
+                        githubRow.armed = true
+                        disarmGithub.restart()
+                        return
+                    }
+                    githubRow.armed = false
+                    AppState.backupCmd("github")
+                }
+            }
+        }
+
+        // A remote: push, asking twice.
         SettingsRow {
             id: pushRow
+            visible: page.backup.repo === true && !!page.backup.remote
             icon: "\u{F0B7E}"
             title: page.backup.unpushed > 0
-                ? page.backup.unpushed + (page.backup.unpushed === 1 ? " commit not on GitHub" : " commits not on GitHub")
-                : "GitHub is up to date"
-            description: pushRow.armed ? "The repository is public -- press again to publish" : ""
+                ? page.backup.unpushed + (page.backup.unpushed === 1 ? " commit to upload" : " commits to upload")
+                : "Uploaded"
+            description: pushRow.armed
+                ? (page.backup.visibility === "public" ? "This repository is public -- press again to publish"
+                                                       : "Press again to upload")
+                : (page.backup.remote || "").replace(/^https:\/\//, "").replace(/\.git$/, "")
+                  + (page.backup.visibility ? " · " + page.backup.visibility : "")
 
-            // Two presses: the first arms it and says why, the second pushes.
             property bool armed: false
 
             Timer {
@@ -176,8 +239,9 @@ Column {
             }
 
             PillButton {
-                text: pushRow.armed ? "Publish" : "Push"
-                danger: pushRow.armed
+                text: pushRow.armed ? (page.backup.visibility === "public" ? "Publish" : "Upload") : "Push"
+                danger: pushRow.armed && page.backup.visibility === "public"
+                emphasis: pushRow.armed && page.backup.visibility !== "public"
                 available: page.backup.unpushed > 0 && !AppState.backupBusy
                 onClicked: {
                     if (!pushRow.armed) {
@@ -192,15 +256,18 @@ Column {
         }
     }
 
-    // What the last backup or push did.
+    // What the last action did.
     Text {
         width: parent.width
         visible: AppState.backupLast !== null
         text: {
             var l = AppState.backupLast
             if (!l) return ""
-            if (!l.ok) return "Could not " + (l.action === "push" ? "push" : "back up") + ": " + l.error
-            if (l.action === "push") return "Pushed to GitHub"
+            var verb = { init: "create the backup", backup: "back up", push: "push", github: "add GitHub" }[l.action] || l.action
+            if (!l.ok) return "Could not " + verb + ": " + l.error
+            if (l.action === "push") return "Uploaded"
+            if (l.action === "github") return "Added to GitHub, private, and uploaded"
+            if (l.action === "init") return "Backup created in " + (page.backup.display || "")
             return l.committed ? "Saved as " + (page.backup.hash || "") : "Nothing to save"
         }
         color: AppState.backupLast && !AppState.backupLast.ok ? Theme.error : Theme.textMuted

@@ -33,7 +33,20 @@ HOME = os.path.expanduser("~")
 HYPR = os.path.join(HOME, ".config/hypr")
 STATE = os.path.join(HYPR, "gui-settings.json")
 LUA = os.path.join(HYPR, "gui-settings.lua")
-DOTFILES = os.path.join(HOME, "dotfiles")
+
+
+def backup_repo():
+    """The repository Settings -> About backs up to (shell-settings.json's
+    backupRepo), ~/dotfiles when unset -- the same one the About page uses."""
+    try:
+        with open(os.path.join(HOME, ".config/quickshell/shell-settings.json"), encoding="utf-8") as fh:
+            path = json.load(fh).get("backupRepo") or "~/dotfiles"
+    except (OSError, json.JSONDecodeError):
+        path = "~/dotfiles"
+    return os.path.expanduser(path)
+
+
+DOTFILES = backup_repo()
 
 # key: (hyprctl option, type, range or choices, label)
 #

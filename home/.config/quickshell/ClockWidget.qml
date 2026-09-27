@@ -47,7 +47,6 @@ PanelWindow {
     readonly property int calendarWidth: 294
     readonly property var dateLocale: Qt.locale("en_US")
 
-    readonly property string avatarPath: Quickshell.env("HOME") + "/Pictures/fastfetch/ce96f0818cb63716e671e999de24dae9.jpg"
 
     anchors {
         top: true
@@ -304,7 +303,7 @@ PanelWindow {
                         id: avatarImage
                         anchors.fill: parent
                         anchors.margins: 3
-                        source: "file://" + clockItem.avatarPath
+                        source: AppState.avatarPath.length > 0 ? "file://" + AppState.avatarPath : ""
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
                         visible: status === Image.Ready
@@ -342,7 +341,7 @@ PanelWindow {
                         spacing: 0
 
                         Text {
-                            text: AppState.username.length > 0 ? AppState.username : "gone"
+                            text: AppState.username
                             color: Theme.textPrimary
                             font.pixelSize: 21
                             font.bold: true
@@ -362,7 +361,7 @@ PanelWindow {
                     }
 
                     Text {
-                        text: "~/dev · " + AppState.distro
+                        text: AppState.distro
                         color: Theme.textMuted
                         font.pixelSize: 10
                         font.family: Theme.fontMono

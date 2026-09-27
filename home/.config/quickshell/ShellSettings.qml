@@ -26,6 +26,9 @@ Singleton {
     readonly property bool lockAtBoot: adapter.lockAtBoot
     // The display that gets the lock screen's password field.
     readonly property string lockMonitor: adapter.lockMonitor
+    // Where Settings -> About keeps the configuration's backup (a git
+    // repository; see scripts/backup.py). "~" is this user's home.
+    readonly property string backupRepo: adapter.backupRepo
 
     function set(key, value) {
         adapter[key] = value
@@ -51,6 +54,7 @@ Singleton {
             property bool barHideFullscreen: true
             property bool lockAtBoot: true
             property string lockMonitor: "DP-2"
+            property string backupRepo: "~/dotfiles"
         }
     }
 }
