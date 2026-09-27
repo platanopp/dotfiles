@@ -14,9 +14,9 @@
   "gaps_out": {
     "value": {
       "top": 20,
-      "bottom": 3,
-      "left": 3,
-      "right": 3
+      "bottom": 13,
+      "left": 13,
+      "right": 13
     },
     "base": {
       "top": 20,
