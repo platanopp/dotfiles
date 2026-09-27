@@ -97,12 +97,20 @@ PanelWindow {
     // neither the date folding out on hover nor the panel opening ever
     // resizes the window sideways; only the box inside grows, both ways from
     // the middle (see PillStage).
+    // The open calendar's height, the largest seen (see panelColumn).
+    property real openHeight: 0
+
     PillStage {
         id: stage
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
         duration: Theme.durLong
         minWindowWidth: clockItem.panelWidth
+        // As tall as the calendar has been once opened, from then on, so the
+        // window does not drop to the pill's height as the panel closes: that
+        // resize left a frame with nothing drawn and the pill blinked out
+        // (measured on the media pill, which had the same shape).
+        minWindowHeight: clockItem.openHeight
         // Centred in a 568-wide window: an even width puts both edges on
         // whole pixels.
         evenWidth: true
@@ -315,6 +323,11 @@ PanelWindow {
             anchors.margins: 16
             spacing: 14
             visible: clockItem.panelOpen
+
+            // Hidden, a Column measures nothing, so the height is kept from
+            // when it was last shown (see the stage's minWindowHeight).
+            onImplicitHeightChanged: if (implicitHeight > 0)
+                clockItem.openHeight = Math.max(clockItem.openHeight, implicitHeight + 56)
 
             // -- Today --------------------------------------------------------
             //

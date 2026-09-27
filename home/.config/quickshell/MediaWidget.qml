@@ -180,7 +180,7 @@ PanelWindow {
     readonly property int compactInner: 40
     // How long the pill's own cover and title wait, when the panel closes,
     // before fading back in (see compactArt).
-    readonly property int compactDelay: 110
+    readonly property int compactDelay: 130
 
     function loopIcon() {
         if (!player) return "󰑗"
@@ -197,6 +197,12 @@ PanelWindow {
         targetWidth: mediaWidgetItem.panelOpen ? 396
                    : mediaWidgetRow.implicitWidth + 24 + 74 + Theme.pillPaddingH
         targetHeight: mediaWidgetItem.panelOpen ? Math.min(mediaContentColumn.implicitHeight + 60, 640) : 64
+        // Sized once for the open panel and never resized, as the status
+        // pill is. Dropping from the panel's height to the pill's when the
+        // panel had shut left one frame with nothing drawn: the whole pill
+        // blinked out as it came to rest. Input stays on the box (stageMask).
+        minWindowWidth: 396
+        minWindowHeight: 640
     }
 
     implicitWidth: stage.windowWidth
@@ -497,7 +503,7 @@ PanelWindow {
                 opacity: mediaWidgetItem.panelOpen ? 1 : 0
 
                 Behavior on opacity {
-                    NumberAnimation { duration: mediaWidgetItem.panelOpen ? 200 : 120 }
+                    NumberAnimation { duration: mediaWidgetItem.panelOpen ? 200 : 90 }
                 }
 
                 readonly property bool hasArt: heroImage.status === Image.Ready
