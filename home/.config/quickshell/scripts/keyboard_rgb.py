@@ -427,7 +427,9 @@ class OpenRGB:
             if self.protocol >= 3:
                 r.take("I")                            # brightness
             r.take("I"); r.take("I")                   # direction, colour mode
-            r.i += 4 * r.take("H")                     # its colours
+            n = r.take("H")                            # its colours: skipped. Read
+            r.i += 4 * n                               # first -- `r.i += 4 * take()`
+                                                       # would add to the old r.i
         zones = []
         for _ in range(r.take("H")):
             zname = r.string()

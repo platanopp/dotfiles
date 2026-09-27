@@ -45,6 +45,10 @@ hl.on("hyprland.start", function()
     -- when the timeout does not fire, what it says about inhibits is the only
     -- account of why, and it used to be thrown away.
     hl.exec_cmd("hypridle > $HOME/.local/state/hypridle.log 2>&1")
+    -- OpenRGB's SDK server, headless: how the shell reaches RGB keyboards of
+    -- any brand other than Wooting (scripts/keyboard_rgb.py, which also
+    -- keeps looking for it, so the order here does not matter).
+    hl.exec_cmd("openrgb --server --noautoconnect > $HOME/.local/state/openrgb.log 2>&1")
     hl.exec_cmd("systemctl --user start hyprpolkitagent")
     hl.exec_cmd("gsettings set org.gnome.desktop.interface color-scheme prefer-dark")
     -- Tailscale's tray icon: tailnet state and a connect/disconnect toggle

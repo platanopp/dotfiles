@@ -27,3 +27,4 @@ wlopm
 ddcutil
 ffmpeg
 python-pillow
+openrgb
