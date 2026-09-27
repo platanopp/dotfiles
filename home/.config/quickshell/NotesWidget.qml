@@ -108,10 +108,19 @@ PanelWindow {
 
     Item {
         id: pillArea
-        // Not animated: it follows the clock's box, which already moves
-        // smoothly; a second animation chasing it made this pill lag behind.
+        // Follows the clock's box, which does the animating. The 1 ms
+        // animation is not there to smooth anything -- a longer one chases
+        // the clock and lags behind it. It is there because without an
+        // animation of its own this full-screen window does not repaint when
+        // the move comes from the clock's: the pill stayed drawn where it had
+        // been, under the clock's date, until something else redrew it. An
+        // animation, however short, makes this window render its own frames.
         x: notesItem.leftMargin
         y: 0
+
+        Behavior on x {
+            NumberAnimation { duration: 1 }
+        }
         width: notesItem.panelOpen ? 340 : notesIcon.width + 24 + Theme.pillPaddingH * 2
         height: notesItem.panelOpen ? Math.min(panelColumn.implicitHeight + 56, 560) : 64
 

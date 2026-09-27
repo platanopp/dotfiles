@@ -22,6 +22,12 @@ import QtQuick
 //                               upstream (the clock's date folding out)
 //   minWindowWidth / Height     never less than this: a window sized for its
 //                               largest state once is not resized at all
+//   evenWidth                   keep the width even -- for a box centred in
+//                               its window, so it sits on whole pixels
+//
+// The box is kept to whole pixels while it moves. Fractional sizes left the
+// edge anchored to the window on a pixel and the other one between two, and
+// the glass and its shadow shimmered as they crossed the grid.
 Item {
     id: stage
 
@@ -32,16 +38,21 @@ Item {
     property int duration: 280
     property real minWindowWidth: 0
     property real minWindowHeight: 0
+    property bool evenWidth: false
 
-    width: targetWidth
-    height: targetHeight
+    // The animated values; the box itself is these rounded.
+    property real animWidth: targetWidth
+    property real animHeight: targetHeight
 
-    Behavior on width {
+    width: stage.evenWidth ? Math.round(stage.animWidth / 2) * 2 : Math.round(stage.animWidth)
+    height: Math.round(stage.animHeight)
+
+    Behavior on animWidth {
         enabled: stage.animateWidth
         NumberAnimation { duration: stage.duration; easing.type: Easing.OutCubic }
     }
 
-    Behavior on height {
+    Behavior on animHeight {
         enabled: stage.animateHeight
         NumberAnimation { duration: stage.duration; easing.type: Easing.OutCubic }
     }

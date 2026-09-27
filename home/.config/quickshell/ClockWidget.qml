@@ -92,6 +92,9 @@ PanelWindow {
         anchors.horizontalCenter: parent.horizontalCenter
         duration: Theme.durLong
         minWindowWidth: clockItem.panelWidth
+        // Centred in a 568-wide window: an even width puts both edges on
+        // whole pixels.
+        evenWidth: true
         targetWidth: clockItem.panelOpen ? clockItem.panelWidth
                    : compactRow.implicitWidth + 24 + clockItem.compactPaddingH * 2
         targetHeight: clockItem.panelOpen ? panelColumn.implicitHeight + 56 : 64

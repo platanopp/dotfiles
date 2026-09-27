@@ -140,6 +140,12 @@ PanelWindow {
         id: stage
         anchors.top: parent.top
         anchors.right: parent.right
+        // Sized for Settings (and the tallest the panel gets) from the start
+        // and never resized: a window anchored on the right that grows moves
+        // its left edge, and for a frame the compositor showed the old buffer
+        // there -- the pill flicked left before growing.
+        minWindowWidth: settingsItem.settingsWidth
+        minWindowHeight: Math.max(settingsItem.settingsHeight, settingsItem.screen.height - 48)
         targetWidth: settingsItem.settingsOpen ? settingsItem.settingsWidth
                    : settingsItem.panelOpen ? 372
                    : settingsText.implicitWidth + 24 + Theme.pillPaddingH * 2

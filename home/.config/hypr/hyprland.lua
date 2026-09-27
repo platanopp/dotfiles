@@ -353,6 +353,16 @@ hl.layer_rule({
     -- transparent margin around each rounded widget renders as a blurred
     -- square. Pixels below this alpha are left unblurred.
     ignore_alpha = 0.3,
+    -- No compositor animation for these surfaces. The "layers" animation
+    -- above slides a layer from its old geometry to its new one whenever it
+    -- moves or resizes -- and the shell moves and resizes the pills itself,
+    -- frame by frame, with its own animations. The two fought: every pill
+    -- that followed a neighbour was also being eased by Hyprland a beat
+    -- behind, and when a pill's window shrank at the end of a close,
+    -- Hyprland slid it across from where the larger window had been, so it
+    -- jumped over its neighbour and crept back. These are never mapped or
+    -- unmapped in use (hidden by input mask), so nothing else is lost.
+    no_anim = true,
 })
 
 hl.layer_rule({

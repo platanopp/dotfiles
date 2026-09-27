@@ -206,6 +206,12 @@ PanelWindow {
         id: stage
         anchors.top: parent.top
         anchors.right: parent.right
+        // Sized for the open panel from the start and never resized: a
+        // window anchored on the right that grows moves its left edge, and
+        // for the frame the compositor takes to get the new buffer it showed
+        // the old one there -- the pill flicked left over the tray.
+        minWindowWidth: 324
+        minWindowHeight: 620
         targetWidth: statusItem.expandedPanel !== "" ? 324 : statusItem.compactWidth
         // Follows the content instead of a fixed 524, which left a large empty
         // box under short lists. Chrome is the 12px inset, the 40px compact row,
