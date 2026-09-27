@@ -324,7 +324,7 @@ hl.window_rule({
     -- Anything launched from Steam gets its own class (steam_app_...), so
     -- this catches the client and its dialogs and no actual game. Not its
     -- notification toasts: those belong where you are looking (below).
-    match     = { class = "^steam$", title = "negative:^notificationtoasts" },
+    match     = { class = "^steam$", title = "negative:^notificationtoasts.*" },
     workspace = "2 silent",
 })
 
@@ -335,9 +335,13 @@ hl.window_rule({
 -- lower than the Xiaomi), so it landed well above the corner. Pinned here to
 -- the bottom-right of the monitor in use, on the same 13px gap as windows,
 -- and never taking focus from the game or the window you are typing in.
+--
+-- The `.*` matters: Hyprland matches a rule's regex against the whole title,
+-- not a prefix of it, so "^notificationtoasts" alone matched no toast
+-- ("notificationtoasts_6_desktop") and they went on as tiles on workspace 2.
 hl.window_rule({
     name     = "steam-toasts",
-    match    = { class = "^steam$", title = "^notificationtoasts" },
+    match    = { class = "^steam$", title = "^notificationtoasts.*" },
     float    = true,
     pin      = true,
     no_focus = true,
