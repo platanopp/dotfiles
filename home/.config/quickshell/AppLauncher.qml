@@ -513,6 +513,7 @@ PanelWindow {
             Quickshell.execDetached(["wl-copy", item.value])
             return
         case "app":
+            overlay.launchedAt = Date.now()
             LauncherHistory.record(item.entry.id)
             // Point the focus at the monitor the pointer is on, so the window
             // opens there: follow_mouse cannot while the grab is held. Then
@@ -522,6 +523,7 @@ PanelWindow {
             item.entry.execute()
             return
         case "web":
+            overlay.launchedAt = Date.now()
             AppState.focusCursorMonitor()
             Quickshell.execDetached(["xdg-open",
                 "https://www.google.com/search?q=" + encodeURIComponent(overlay.query.trim())])
@@ -543,6 +545,43 @@ PanelWindow {
             break
         }
         spawnTimer.restart()
+    }
+
+    // ── Following what was launched ──────────────────────────────────────
+    //
+    // A launch that lands in something already running -- a search handed
+    // to the open browser, Discord or Steam asked to come up -- does not map
+    // a window: the app asks for its existing one to be activated. That
+    // request arrived while this layer was still up, and Hyprland turned it
+    // down and only marked the window urgent: the search opened on another
+    // workspace and you stayed where you were. So for a few seconds after a
+    // launch, the window that turns urgent is the one launched, and it gets
+    // focus -- once this layer is gone, or it would be refused again.
+    property real launchedAt: 0
+    property string urgentAddress: ""
+
+    Connections {
+        target: Hyprland
+        function onRawEvent(event) {
+            if (event.name !== "urgent" || overlay.launchedAt === 0) return
+            if (Date.now() - overlay.launchedAt > 4000) {
+                overlay.launchedAt = 0
+                return
+            }
+            overlay.launchedAt = 0
+            overlay.urgentAddress = event.data
+            overlay.focusUrgent()
+        }
+    }
+
+    onVisibleChanged: overlay.focusUrgent()
+
+    function focusUrgent() {
+        if (overlay.visible || overlay.urgentAddress === "") return
+        var sel = "address:0x" + overlay.urgentAddress
+        overlay.urgentAddress = ""
+        Quickshell.execDetached(["hyprctl", "eval",
+            "hl.dispatch(hl.dsp.focus({ window = '" + sel + "' }))"])
     }
 
     // For what acts on the shell or on a window rather than starting a
