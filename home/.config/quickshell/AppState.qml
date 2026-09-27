@@ -922,12 +922,11 @@ Singleton {
     // different part of itself on the lock than on the desktop.
     // ── Keyboard colours from the wallpaper ─────────────────────────────
     //
-    // A Wooting keyboard painted from whatever wallpaper is up (see
-    // scripts/keyboard_rgb.py): letters in the dominant colour, the rest in
-    // the picture's other tones. Follows wallpaperStill, so a video
-    // wallpaper colours it from its poster frame.
+    // A Wooting keyboard lit with whatever wallpaper is up, the picture laid
+    // over the keys (see scripts/keyboard_rgb.py). Follows wallpaperStill,
+    // so a video wallpaper lights it with its poster frame.
     property var keyboardRgbStatus: ({ connected: false })
-    // The colours in use: { dominant, others } as hex, for the Settings page.
+    // The colours in use: { keys: { "row,col": hex } }, for the Settings page.
     property var keyboardRgbPalette: null
     property string keyboardRgbError: ""
 
@@ -957,11 +956,10 @@ Singleton {
         target: "keyboard"
         function apply(): void { root.applyKeyboardRgb() }
         function reset(): void { root.resetKeyboardRgb() }
-        // What was last sent: dominant, others, accents -- or the error.
+        // What was last sent, key by key ("row,col": colour) -- or the error.
         function status(): string {
             var p = root.keyboardRgbPalette
-            return JSON.stringify(p ? { dominant: p.dominant, accents: p.accents || [], others: p.others }
-                                    : { error: root.keyboardRgbError })
+            return JSON.stringify(p ? p.keys : { error: root.keyboardRgbError })
         }
     }
 
@@ -995,7 +993,7 @@ Singleton {
                 var d
                 try { d = JSON.parse(text) } catch (e) { return }
                 root.keyboardRgbError = d.ok ? "" : (d.error || "")
-                if (d.ok && d.dominant) root.keyboardRgbPalette = { dominant: d.dominant, others: d.others, accents: d.accents || [], keys: d.keys || ({}) }
+                if (d.ok && d.keys) root.keyboardRgbPalette = { keys: d.keys }
             }
         }
     }

@@ -1,10 +1,10 @@
 import QtQuick
 import QtQuick.Layouts
 
-// Settings -> Keyboard: a Wooting keyboard coloured from the wallpaper as a
-// mosaic -- letters from the picture's dominant colours, the other keys from
-// its other tones, every key its own shade (scripts/keyboard_rgb.py). The
-// board drawn here shows the colours last sent, key for key.
+// Settings -> Keyboard: a Wooting keyboard lit with the wallpaper itself --
+// the picture laid over the board, each key the colour of the part under it
+// (scripts/keyboard_rgb.py). The board drawn here shows the colours last
+// sent, key for key.
 Column {
     id: page
     spacing: 24
