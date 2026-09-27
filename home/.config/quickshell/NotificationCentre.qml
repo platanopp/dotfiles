@@ -16,6 +16,12 @@ Item {
     readonly property real wantedHeight: header.implicitHeight + 14
         + (Notifications.count > 0 ? Math.min(list.contentHeight, 560) : empty.implicitHeight + 24)
 
+    // What a card shows for the instant between its notification closing and
+    // the card going.
+    readonly property var emptyNotif: ({ summary: "", body: "", appName: "", appIcon: "", image: "",
+                                         actions: [], urgency: NotificationUrgency.Normal, time: new Date(),
+                                         invoke: function () {} })
+
     // For "5m ago"; ticks while the centre is up.
     property date now: new Date()
 
@@ -136,7 +142,9 @@ Item {
             clip: true
             spacing: 8
             boundsBehavior: Flickable.StopAtBounds
-            model: Notifications.list
+            // Keys, a row per notification, changed a row at a time -- so
+            // the add, remove and displaced transitions below actually play.
+            model: Notifications.model
 
             add: Transition {
                 NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.durMedium }
@@ -152,8 +160,8 @@ Item {
 
             delegate: Rectangle {
                 id: card
-                required property var modelData
-                readonly property var n: card.modelData
+                required property int key
+                readonly property var n: Notifications.get(card.key) || centre.emptyNotif
                 readonly property var defaultAction: {
                     for (var i = 0; i < card.n.actions.length; i++)
                         if (card.n.actions[i].identifier === "default") return card.n.actions[i]

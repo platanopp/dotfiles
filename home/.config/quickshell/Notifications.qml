@@ -11,34 +11,84 @@ import Quickshell.Services.Notifications
 // how it arrives: when the toast times out the notification leaves the
 // screen, not the centre. Do not disturb keeps the toasts away (all but
 // Critical) and still files everything in the centre, quietly.
+//
+// The views read two ListModels of keys -- `model` (the centre) and `popups`
+// (the toasts) -- and look each key up with `get(key)`. They are changed a row
+// at a time, never replaced: a view built on a JS array rebuilt the whole list
+// on every change, so each new toast restarted every other toast's countdown
+// and entrance, and the centre's add/remove animations never played.
+//
+// Each notification keeps its own countdown (see Notif), so a toast's time
+// is its own whatever happens to the cards around it.
 Singleton {
     id: root
 
     // No toasts but Critical; the centre still gets everything.
     property bool dnd: false
 
+    // Toasts on screen at once; the rest wait their turn, their five seconds
+    // not started until they show.
     readonly property int maxVisible: 4
+    // How long a toast stays, in ms, counted while it shows and not hovered.
+    readonly property int lifetime: 5000
     // The centre's length; past it the oldest go.
     readonly property int maxQueued: 60
 
-    // Every notification in the centre, newest first.
-    property var list: []
+    // Keys, newest first.
+    readonly property ListModel model: ListModel {}
+    readonly property ListModel popups: ListModel {}
 
-    // The ones showing as toasts right now, newest first.
-    property var visibleList: []
-    readonly property int count: list.length
+    readonly property int count: root.model.count
     // Arrived since the centre was last looked at.
     property int unread: 0
 
-    function _refresh() {
-        root.visibleList = root.list.filter(w => w.popup).slice(0, root.maxVisible)
+    // key -> Notif
+    property var byKey: ({})
+    property int nextKey: 1
+
+    function get(key) { return root.byKey[key] || null }
+
+    // Every notification in the centre, newest first, as objects.
+    function all() {
+        var out = []
+        for (var i = 0; i < root.model.count; i++) {
+            var w = root.get(root.model.get(i).key)
+            if (w) out.push(w)
+        }
+        return out
+    }
+
+    function indexIn(listModel, key) {
+        for (var i = 0; i < listModel.count; i++)
+            if (listModel.get(i).key === key) return i
+        return -1
     }
 
     // A toast that has had its time: off the screen, still in the centre.
     function expire(wrapper) {
-        if (!wrapper || wrapper.gone || !wrapper.popup) return
+        if (!wrapper) return
         wrapper.popup = false
-        root._refresh()
+        var i = root.indexIn(root.popups, wrapper.key)
+        if (i !== -1) root.popups.remove(i)
+    }
+
+    // Up as a toast again (a new one, or one its app has just updated), its
+    // countdown starting afresh when it shows.
+    function raise(wrapper) {
+        if (!wrapper || wrapper.gone) return
+        var quiet = root.centreOpen
+            || (root.dnd && wrapper.urgency !== NotificationUrgency.Critical)
+        wrapper.expiresAt = 0
+        wrapper.pausedAt = 0
+        if (quiet) {
+            root.expire(wrapper)
+            return
+        }
+        wrapper.popup = true
+        var i = root.indexIn(root.popups, wrapper.key)
+        if (i === 0) return
+        if (i > 0) root.popups.move(i, 0, 1)
+        else root.popups.insert(0, { key: wrapper.key })
     }
 
     function markRead() { root.unread = 0 }
@@ -48,8 +98,9 @@ Singleton {
     property bool centreOpen: false
     onCentreOpenChanged: {
         if (!root.centreOpen) return
-        for (var i = 0; i < root.list.length; i++) root.list[i].popup = false
-        root._refresh()
+        var up = root.all()
+        for (var i = 0; i < up.length; i++) up[i].popup = false
+        root.popups.clear()
         root.unread = 0
     }
 
@@ -58,12 +109,12 @@ Singleton {
     function dismiss(wrapper) {
         if (!wrapper || wrapper.gone) return
         if (wrapper.notification) wrapper.notification.dismiss()
-        else _drop(wrapper)
+        else root._drop(wrapper)
     }
 
     function dismissAll() {
-        var copy = root.list.slice()
-        for (var i = 0; i < copy.length; i++) root.dismiss(copy[i])
+        var every = root.all()
+        for (var i = 0; i < every.length; i++) root.dismiss(every[i])
         root.unread = 0
     }
 
@@ -71,27 +122,49 @@ Singleton {
     function _drop(wrapper) {
         if (!wrapper || wrapper.gone) return
         wrapper.gone = true
-        var copy = root.list.slice()
-        var idx = copy.indexOf(wrapper)
-        if (idx !== -1) {
-            copy.splice(idx, 1)
-            root.list = copy
-        }
-        root._refresh()
-        wrapper.destroy()
+        var p = root.indexIn(root.popups, wrapper.key)
+        if (p !== -1) root.popups.remove(p)
+        var m = root.indexIn(root.model, wrapper.key)
+        if (m !== -1) root.model.remove(m)
+        var next = Object.assign({}, root.byKey)
+        delete next[wrapper.key]
+        root.byKey = next
+        // Later, so a view still showing its last frame of it is not left
+        // pointing at nothing mid-animation.
+        destroyLater.createObject(root, { target: wrapper })
     }
 
-    // Snapshot of a notification. The daemon's object can be freed once the
-    // app closes it, so the fields the UI binds to are copied up front.
+    Component {
+        id: destroyLater
+        Timer {
+            property var target
+            interval: 1000
+            running: true
+            onTriggered: {
+                if (target) target.destroy()
+                destroy()
+            }
+        }
+    }
+
+    // One notification. The daemon's object can be freed once the app closes
+    // it, so the fields the views show are copied -- and copied again when the
+    // app replaces it with new text, which it does in place.
     component Notif: QtObject {
         id: wrapper
 
+        property int key: 0
         property var notification
         property bool gone: false
         // Showing as a toast (see expire); false from the start under DND.
         property bool popup: true
         // When it arrived, for the centre's "5m ago".
         property date time: new Date()
+
+        // Its toast's countdown, in Date.now() ms: when it runs out (0 until
+        // the toast first shows), and when a hover paused it (0 if not).
+        property real expiresAt: 0
+        property real pausedAt: 0
 
         property string summary: ""
         property string body: ""
@@ -105,6 +178,13 @@ Singleton {
         readonly property Connections conn: Connections {
             target: wrapper.notification
             function onClosed() { root._drop(wrapper) }
+            // Replaced by its app (a download's progress, the next track):
+            // the new text, and the toast up again.
+            function onSummaryChanged() { wrapper.copy(); root.raise(wrapper) }
+            function onBodyChanged() { wrapper.copy(); root.raise(wrapper) }
+            function onImageChanged() { wrapper.copy() }
+            function onAppIconChanged() { wrapper.copy() }
+            function onActionsChanged() { wrapper.copy() }
         }
 
         function invoke(identifier) {
@@ -116,18 +196,18 @@ Singleton {
             }
         }
 
-        Component.onCompleted: {
-            if (!notification) return
-            summary = notification.summary
-            body = notification.body
-            appName = notification.appName
-            appIcon = notification.appIcon
-            image = notification.image
-            urgency = notification.urgency
-            expireTimeout = notification.expireTimeout
-
+        function copy() {
+            var n = wrapper.notification
+            if (!n) return
+            wrapper.summary = n.summary
+            wrapper.body = n.body
+            wrapper.appName = n.appName
+            wrapper.appIcon = n.appIcon
+            wrapper.image = n.image
+            wrapper.urgency = n.urgency
+            wrapper.expireTimeout = n.expireTimeout
             var out = []
-            var src = notification.actions
+            var src = n.actions
             var len = src ? src.length : 0
             for (var i = 0; i < len; i++) {
                 var a = src[i]
@@ -140,8 +220,10 @@ Singleton {
                     invoke: (function (action) { return function () { action.invoke() } })(a)
                 })
             }
-            actions = out
+            wrapper.actions = out
         }
+
+        Component.onCompleted: wrapper.copy()
     }
 
     Component {
@@ -161,18 +243,29 @@ Singleton {
         onNotification: function (notif) {
             notif.tracked = true
 
-            var quiet = root.centreOpen
-                || (root.dnd && notif.urgency !== NotificationUrgency.Critical)
-            var wrapper = notifComponent.createObject(root, { notification: notif, popup: !quiet })
+            var key = root.nextKey++
+            var wrapper = notifComponent.createObject(root, { notification: notif, key: key, popup: false })
             if (!wrapper) return
 
-            var queued = [wrapper].concat(root.list)
+            var next = Object.assign({}, root.byKey)
+            next[key] = wrapper
+            root.byKey = next
+            root.model.insert(0, { key: key })
+            root.raise(wrapper)
+            if (!root.centreOpen) root.unread = Math.min(root.unread + 1, root.model.count)
+
             // Drop the oldest past the cap so a burst cannot grow unbounded.
-            var overflow = queued.slice(root.maxQueued)
-            root.list = queued.slice(0, root.maxQueued)
-            if (!root.centreOpen) root.unread = Math.min(root.unread + 1, root.list.length)
-            root._refresh()
-            for (var i = 0; i < overflow.length; i++) root.dismiss(overflow[i])
+            while (root.model.count > root.maxQueued) {
+                var old = root.get(root.model.get(root.model.count - 1).key)
+                if (!old) {
+                    root.model.remove(root.model.count - 1)
+                    continue
+                }
+                // Dropped here and now: the app's "closed" comes back later,
+                // and the loop cannot wait for it.
+                if (old.notification) old.notification.dismiss()
+                root._drop(old)
+            }
         }
     }
 }

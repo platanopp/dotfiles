@@ -21,7 +21,13 @@ PanelWindow {
     screen: bar ? bar.screen : null
 
     readonly property int cardWidth: 372 - 24
-    readonly property int lifetime: 5000
+    readonly property int lifetime: Notifications.lifetime
+
+    // What a card shows for the instant between its notification closing and
+    // the card going, so no binding reads a field of nothing.
+    readonly property var emptyNotif: ({ summary: "", body: "", appName: "", appIcon: "", image: "",
+                                         actions: [], urgency: NotificationUrgency.Normal,
+                                         invoke: function () {} })
 
     WlrLayershell.namespace: "quickshell:bar-blur"
     WlrLayershell.layer: WlrLayer.Overlay
@@ -45,7 +51,7 @@ PanelWindow {
         return !!focused && focused.id === bar.monitor.id
     }
 
-    visible: Notifications.visibleList.length > 0 && onFocusedMonitor
+    visible: Notifications.popups.count > 0 && onFocusedMonitor
     color: "transparent"
 
     // A fixed size, never animated: a surface that resizes every frame
@@ -70,15 +76,21 @@ PanelWindow {
         }
 
         Repeater {
-            model: Notifications.visibleList
+            model: Notifications.popups
 
             Item {
                 id: card
-                required property var modelData
-                readonly property var n: card.modelData
+                required property int key
+                required property int index
+                readonly property var live: Notifications.get(card.key)
+                readonly property var n: card.live || popups.emptyNotif
 
+                // Only the newest few show; the rest wait, their time not yet
+                // running (see the countdown).
+                readonly property bool shown: card.index < Notifications.maxVisible && card.live !== null
+                visible: card.shown
                 width: popups.cardWidth
-                height: glass.height
+                height: card.shown ? glass.height : 0
 
                 readonly property bool sticky: card.n.urgency === NotificationUrgency.Critical
                 readonly property var defaultAction: {
@@ -87,21 +99,42 @@ PanelWindow {
                     return null
                 }
 
-                // What is left of its time on screen, 1 to 0.
+                // ── Its own time ────────────────────────────────────────────
+                //
+                // Kept on the notification (expiresAt), not in this card: the
+                // card can be rebuilt, the time cannot be restarted by it. It
+                // starts when the toast first shows, stops while the pointer
+                // is on it or it is being dragged -- the pause is added to its
+                // end -- and when it runs out the toast leaves for the centre.
+                readonly property bool held: hover.hovered || drag.active
                 property real remaining: 1
 
-                NumberAnimation {
-                    id: countdown
-                    target: card
-                    property: "remaining"
-                    from: 1
-                    to: 0
-                    duration: popups.lifetime
-                    running: !card.sticky
-                    paused: running && (hover.hovered || drag.active)
+                function tick() {
+                    var n = card.live
+                    if (!n || card.sticky) return
+                    var now = Date.now()
+                    if (n.expiresAt === 0) n.expiresAt = now + popups.lifetime
+                    if (card.held) {
+                        if (n.pausedAt === 0) n.pausedAt = now
+                        return
+                    }
+                    if (n.pausedAt !== 0) {
+                        n.expiresAt += now - n.pausedAt
+                        n.pausedAt = 0
+                    }
+                    card.remaining = Math.max(0, Math.min(1, (n.expiresAt - now) / popups.lifetime))
                     // Off the screen, into the centre -- not gone.
-                    onFinished: Notifications.expire(card.n)
+                    if (card.remaining <= 0) Notifications.expire(n)
                 }
+
+                Timer {
+                    running: card.shown && !card.sticky
+                    interval: 30
+                    repeat: true
+                    triggeredOnStart: true
+                    onTriggered: card.tick()
+                }
+                onHeldChanged: card.tick()
 
                 // Entrance: in from the right, settling.
                 opacity: 0
@@ -336,7 +369,7 @@ PanelWindow {
                         width: parent.width * card.remaining
                         height: parent.height
                         radius: parent.radius
-                        color: Theme.alpha(Theme.foreground, countdown.paused ? 0.45 : 0.75)
+                        color: Theme.alpha(Theme.foreground, card.held ? 0.45 : 0.75)
 
                         Behavior on color { ColorAnimation { duration: Theme.durShort } }
                     }
