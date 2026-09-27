@@ -13,7 +13,7 @@ hl.config({
     },
     decoration = {
         shadow = {
-            enabled = false,
+            enabled = true,
         },
     },
 })
