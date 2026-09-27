@@ -1,8 +1,11 @@
 import QtQuick
 import QtQuick.Effects
 import QtQuick.Layouts
+import Qt5Compat.GraphicalEffects
 import Quickshell
 import Quickshell.Wayland
+import Quickshell.Widgets
+import Quickshell.Services.Mpris
 
 // The session lock's face. Every piece of state it draws -- PAM's turn, the
 // attempt ledger read back off faillock, Caps Lock, the keyboard layout,
@@ -13,8 +16,49 @@ import Quickshell.Wayland
 // line share one axis, so the eye never leaves the place the typing goes. The
 // glanceable chips are pushed to the corners, where they can be read without
 // competing with the field, and they fade back when the field is in use.
+//
+// Everything that floats over the wallpaper wears the bar's glass -- the same
+// tint and the same soft shadow as the pills -- so locking looks like the
+// desktop stepping back rather than a different program taking over.
 Scope {
     id: root
+
+    // ── Now playing ──────────────────────────────────────────────────────
+    //
+    // The same choice the bar makes (shell.qml's activePlayer): osu, then
+    // Spotify, then whatever else -- and among equals, whichever is playing.
+    readonly property var preferredPlayers: ["osu", "spotify"]
+
+    function playerRank(p) {
+        var key = ((p.desktopEntry || "") + " " + (p.dbusName || "") + " " + (p.identity || "")).toLowerCase()
+        for (var i = 0; i < root.preferredPlayers.length; i++)
+            if (key.indexOf(root.preferredPlayers[i]) !== -1) return i
+        return root.preferredPlayers.length
+    }
+
+    readonly property var player: {
+        var list = Mpris.players.values
+        var best = null
+        for (var i = 0; i < list.length; i++) {
+            var p = list[i]
+            if (!p.trackTitle) continue
+            if (!best) { best = p; continue }
+            var a = root.playerRank(p), b = root.playerRank(best)
+            if (a < b || (a === b && p.isPlaying && !best.isPlaying)) best = p
+        }
+        return best
+    }
+
+    property real position: 0
+
+    // Position is not signalled as it moves; read once a second while shown.
+    Timer {
+        running: LockEngine.locked && root.player !== null && root.player.isPlaying
+        interval: 1000
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: root.position = root.player ? root.player.position : 0
+    }
 
     WlSessionLock {
         id: session
@@ -157,20 +201,222 @@ Scope {
                         font.pixelSize: 12
                     }
 
+                    // ── Now playing ──────────────────────────────────────
+                    //
+                    // The bar's media pill, grown: the cover at the card's
+                    // left end, faded out before the title starts; controls
+                    // on the right; progress as a hairline along the foot.
+                    // Steps back while the password is being typed.
+                    Rectangle {
+                        id: nowPlaying
+                        readonly property var p: root.player
+                        readonly property bool playing: nowPlaying.p !== null && nowPlaying.p.isPlaying
+                        readonly property bool hasArt: coverImage.status === Image.Ready
+
+                        visible: nowPlaying.p !== null
+                        Layout.alignment: Qt.AlignHCenter
+                        Layout.topMargin: 30
+                        Layout.preferredWidth: 400
+                        Layout.preferredHeight: 84
+                        radius: 24
+                        color: Theme.glass
+                        opacity: LockEngine.focused ? 0.45 : 1
+
+                        Behavior on opacity { NumberAnimation { duration: Theme.durExtraLong } }
+
+                        RectangularShadow {
+                            anchors.fill: parent
+                            z: -1
+                            radius: parent.radius
+                            blur: 18
+                            offset.y: 4
+                            color: Qt.rgba(0, 0, 0, 0.35)
+                        }
+
+                        Item {
+                            id: coverArea
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            anchors.bottom: parent.bottom
+                            width: 100
+
+                            Rectangle {
+                                id: coverMask
+                                anchors.fill: parent
+                                radius: nowPlaying.radius
+                                visible: false
+                                gradient: Gradient {
+                                    orientation: Gradient.Horizontal
+                                    GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 1) }
+                                    GradientStop { position: 0.5; color: Qt.rgba(1, 1, 1, 0.85) }
+                                    GradientStop { position: 0.82; color: Qt.rgba(1, 1, 1, 0.2) }
+                                    GradientStop { position: 1.0; color: Qt.rgba(1, 1, 1, 0) }
+                                }
+                            }
+
+                            Image {
+                                id: coverImage
+                                anchors.fill: parent
+                                source: nowPlaying.p ? (nowPlaying.p.trackArtUrl || "") : ""
+                                fillMode: Image.PreserveAspectCrop
+                                asynchronous: true
+                                sourceSize.width: 256
+                                visible: false
+                            }
+
+                            OpacityMask {
+                                anchors.fill: parent
+                                visible: nowPlaying.hasArt
+                                source: coverImage
+                                maskSource: coverMask
+                                cached: false
+
+                                layer.enabled: true
+                                layer.effect: MultiEffect {
+                                    brightness: nowPlaying.playing ? 0 : -0.3
+                                    saturation: nowPlaying.playing ? 0 : -0.35
+
+                                    Behavior on brightness { NumberAnimation { duration: Theme.durMedium } }
+                                    Behavior on saturation { NumberAnimation { duration: Theme.durMedium } }
+                                }
+                            }
+
+                            IconGlyph {
+                                visible: !nowPlaying.hasArt
+                                x: 26
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "\u{F075A}"
+                                color: Theme.textSecondary
+                                size: Theme.iconLarge
+                            }
+                        }
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 104
+                            anchors.rightMargin: 14
+                            spacing: 6
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 2
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: nowPlaying.p ? nowPlaying.p.trackTitle : ""
+                                    color: Theme.textPrimary
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 14
+                                    font.bold: true
+                                    elide: Text.ElideRight
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: nowPlaying.p ? (nowPlaying.p.trackArtist || nowPlaying.p.identity || "") : ""
+                                    color: Theme.textSecondary
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 11
+                                    elide: Text.ElideRight
+                                }
+                            }
+
+                            IconButton {
+                                icon: "\u{F04AE}"
+                                size: 32
+                                glyphSize: Theme.iconMedium
+                                iconColor: Theme.textPrimary
+                                interactive: nowPlaying.p !== null && nowPlaying.p.canGoPrevious
+                                onTapped: nowPlaying.p.previous()
+                            }
+
+                            Rectangle {
+                                Layout.preferredWidth: 40
+                                Layout.preferredHeight: 40
+                                radius: 20
+                                color: Theme.accent
+                                scale: playTap.pressed ? 0.94 : 1
+
+                                Behavior on scale { NumberAnimation { duration: Theme.durShort } }
+
+                                IconGlyph {
+                                    anchors.centerIn: parent
+                                    text: nowPlaying.playing ? "\u{F03E4}" : "\u{F040A}"
+                                    color: Theme.accentText
+                                    size: Theme.iconMedium
+                                }
+
+                                StateLayer {
+                                    id: playTap
+                                    tint: Theme.accentText
+                                    interactive: nowPlaying.p !== null && nowPlaying.p.canTogglePlaying
+                                    onTapped: nowPlaying.p.togglePlaying()
+                                }
+                            }
+
+                            IconButton {
+                                icon: "\u{F04AD}"
+                                size: 32
+                                glyphSize: Theme.iconMedium
+                                iconColor: Theme.textPrimary
+                                interactive: nowPlaying.p !== null && nowPlaying.p.canGoNext
+                                onTapped: nowPlaying.p.next()
+                            }
+                        }
+
+                        // How far along, along the foot inside the rounded ends.
+                        Item {
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            anchors.leftMargin: 20
+                            anchors.rightMargin: 20
+                            anchors.bottomMargin: 5
+                            height: 2
+                            readonly property real progress: nowPlaying.p && nowPlaying.p.length > 0
+                                ? Math.max(0, Math.min(1, root.position / nowPlaying.p.length)) : 0
+                            visible: progress > 0
+
+                            Rectangle {
+                                anchors.fill: parent
+                                radius: 1
+                                color: Theme.alpha(Theme.foreground, 0.12)
+                            }
+
+                            Rectangle {
+                                width: parent.width * parent.progress
+                                height: parent.height
+                                radius: 1
+                                color: Theme.alpha(Theme.foreground, nowPlaying.playing ? 0.75 : 0.35)
+
+                                Behavior on width { NumberAnimation { duration: 900; easing.type: Easing.Linear } }
+                            }
+                        }
+                    }
+
                     // ── Password ─────────────────────────────────────────
                     Rectangle {
                         id: fieldPill
                         visible: pane.primary
                         Layout.alignment: Qt.AlignHCenter
-                        Layout.topMargin: 36
+                        Layout.topMargin: nowPlaying.visible ? 22 : 36
                         Layout.preferredWidth: 340
                         Layout.preferredHeight: 52
                         radius: 26
-                        color: LockEngine.cardHigh
+                        color: Theme.glass
                         border.width: 1
                         border.color: LockEngine.lockedOut ? Theme.alpha(Theme.error, 0.7)
-                                    : field.activeFocus ? Theme.alpha(Theme.accent, 0.55)
-                                    : LockEngine.hairline
+                                    : field.activeFocus ? Theme.alpha(Theme.foreground, 0.28)
+                                    : "transparent"
+
+                        RectangularShadow {
+                            anchors.fill: parent
+                            z: -1
+                            radius: parent.radius
+                            blur: 18
+                            offset.y: 4
+                            color: Qt.rgba(0, 0, 0, 0.35)
+                        }
 
                         Behavior on border.color { ColorAnimation { duration: Theme.durMedium } }
 
@@ -419,39 +665,92 @@ Scope {
                 // Out of the column on purpose: the column is the transaction,
                 // and the name is a label on it. It also stops the corner from
                 // sitting empty opposite the chips.
-                RowLayout {
+                Rectangle {
                     anchors.top: parent.top
                     anchors.left: parent.left
                     anchors.margins: 28
-                    spacing: 10
                     visible: pane.primary && LockEngine.displayName.length > 0
                     opacity: LockEngine.focused ? 0.45 : 1
+                    width: whoRow.implicitWidth + 12 + 18
+                    height: 44
+                    radius: 22
+                    color: Theme.glass
 
                     Behavior on opacity { NumberAnimation { duration: Theme.durExtraLong } }
 
-                    Rectangle {
-                        Layout.preferredWidth: 30
-                        Layout.preferredHeight: 30
-                        radius: 15
-                        color: Theme.alpha(Theme.accent, 0.2)
-                        border.width: 1
-                        border.color: Theme.alpha(Theme.accent, 0.4)
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: LockEngine.initials
-                            color: Theme.textPrimary
-                            font.family: Theme.fontMono
-                            font.pixelSize: 13
-                            font.bold: true
-                        }
+                    RectangularShadow {
+                        anchors.fill: parent
+                        z: -1
+                        radius: parent.radius
+                        blur: 16
+                        offset.y: 4
+                        color: Qt.rgba(0, 0, 0, 0.3)
                     }
 
-                    Text {
-                        text: LockEngine.displayName
-                        color: Theme.textSecondary
-                        font.family: Theme.fontMono
-                        font.pixelSize: 12
+                    RowLayout {
+                        id: whoRow
+                        anchors.left: parent.left
+                        anchors.leftMargin: 6
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 10
+
+                        // The user's picture (Settings -> Profile), or their
+                        // initial when there is none.
+                        // OpacityMask rather than ClippingRectangle: on the
+                        // lock surface the clipped picture drew nothing at all.
+                        Item {
+                            Layout.preferredWidth: 32
+                            Layout.preferredHeight: 32
+
+                            Rectangle {
+                                id: whoMask
+                                anchors.fill: parent
+                                radius: width / 2
+                                visible: false
+                            }
+
+                            Rectangle {
+                                anchors.fill: parent
+                                radius: width / 2
+                                color: Theme.surfaceContainerHigh
+                                visible: whoImage.status !== Image.Ready
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: LockEngine.initials
+                                    color: Theme.textPrimary
+                                    font.family: Theme.fontMono
+                                    font.pixelSize: 13
+                                    font.bold: true
+                                }
+                            }
+
+                            Image {
+                                id: whoImage
+                                anchors.fill: parent
+                                source: AppState.avatarSource
+                                fillMode: Image.PreserveAspectCrop
+                                asynchronous: true
+                                cache: false
+                                sourceSize.width: 96
+                                visible: false
+                            }
+
+                            OpacityMask {
+                                anchors.fill: parent
+                                visible: whoImage.status === Image.Ready
+                                source: whoImage
+                                maskSource: whoMask
+                            }
+                        }
+
+                        Text {
+                            text: LockEngine.displayName
+                            color: Theme.textPrimary
+                            font.family: Theme.fontMono
+                            font.pixelSize: 12
+                            font.bold: true
+                        }
                     }
                 }
 
@@ -460,60 +759,70 @@ Scope {
                 // State worth a look, not part of signing in: kept out of the
                 // column so the clock stays on the optical middle, and dimmed
                 // while the field is in use.
-                RowLayout {
+                Rectangle {
+                    id: glance
                     anchors.top: parent.top
                     anchors.right: parent.right
                     anchors.margins: 28
-                    spacing: 8
+                    visible: glanceRow.visibleChildren.length > 0
+                    width: glanceRow.implicitWidth + 36
+                    height: 44
+                    radius: 22
+                    color: Theme.glass
                     opacity: LockEngine.focused ? 0.45 : 1
 
                     Behavior on opacity { NumberAnimation { duration: Theme.durExtraLong } }
 
-                    Repeater {
-                        model: [
-                            {
-                                "show": LockEngine.hasBattery,
-                                "glyph": LockEngine.charging ? "\u{F0084}" : "\u{F0079}",
-                                "label": LockEngine.batteryPercent + "%",
-                                "alert": LockEngine.batteryLow
-                            },
-                            {
-                                "show": LockEngine.netLabel.length > 0,
-                                "glyph": LockEngine.netGlyph === "ethernet" ? "\u{F0200}"
-                                       : LockEngine.netGlyph === "wifi" ? "\u{F05A9}"
-                                       : "\u{F05AA}",
-                                "label": LockEngine.netLabel,
-                                "alert": false
-                            },
-                            {
-                                "show": LockEngine.btOn && LockEngine.btLabel.length > 0,
-                                "glyph": "\u{F00AF}",
-                                "label": LockEngine.btLabel,
-                                "alert": false
-                            }
-                        ]
+                    RectangularShadow {
+                        anchors.fill: parent
+                        z: -1
+                        radius: parent.radius
+                        blur: 16
+                        offset.y: 4
+                        color: Qt.rgba(0, 0, 0, 0.3)
+                    }
 
-                        Rectangle {
-                            id: chip
-                            required property var modelData
+                    // One pill, like the bar's status pill: the pieces side by
+                    // side rather than a chip each.
+                    RowLayout {
+                        id: glanceRow
+                        anchors.centerIn: parent
+                        spacing: 16
 
-                            visible: chip.modelData.show
-                            Layout.preferredWidth: chipRow.implicitWidth + 22
-                            Layout.preferredHeight: 30
-                            radius: 15
-                            color: LockEngine.card
-                            border.width: 1
-                            border.color: LockEngine.hairline
+                        Repeater {
+                            model: [
+                                {
+                                    "show": LockEngine.netLabel.length > 0,
+                                    "glyph": LockEngine.netGlyph === "ethernet" ? "\u{F0200}"
+                                           : LockEngine.netGlyph === "wifi" ? "\u{F0928}"
+                                           : "\u{F092F}",
+                                    "label": LockEngine.netLabel,
+                                    "alert": false
+                                },
+                                {
+                                    "show": LockEngine.btOn && LockEngine.btLabel.length > 0,
+                                    "glyph": "\u{F00AF}",
+                                    "label": LockEngine.btLabel,
+                                    "alert": false
+                                },
+                                {
+                                    "show": LockEngine.hasBattery,
+                                    "glyph": LockEngine.charging ? "\u{F0084}" : "\u{F0079}",
+                                    "label": LockEngine.batteryPercent + "%",
+                                    "alert": LockEngine.batteryLow
+                                }
+                            ]
 
                             RowLayout {
-                                id: chipRow
-                                anchors.centerIn: parent
+                                id: chip
+                                required property var modelData
+                                visible: chip.modelData.show
                                 spacing: 7
 
                                 IconGlyph {
                                     text: chip.modelData.glyph
-                                    color: chip.modelData.alert ? Theme.error : Theme.textSecondary
-                                    size: Theme.iconSmall
+                                    color: chip.modelData.alert ? Theme.error : Theme.textPrimary
+                                    size: Theme.iconMedium
                                 }
 
                                 Text {
@@ -567,9 +876,16 @@ Scope {
                             Layout.preferredWidth: powerBtn.isArmed ? confirmLabel.implicitWidth + 32 : 44
                             Layout.preferredHeight: 44
                             radius: 22
-                            color: powerBtn.isArmed ? Theme.alpha(Theme.error, 0.9) : LockEngine.card
-                            border.width: 1
-                            border.color: powerBtn.isArmed ? Theme.error : LockEngine.hairline
+                            color: powerBtn.isArmed ? Theme.alpha(Theme.error, 0.9) : Theme.glass
+
+                            RectangularShadow {
+                                anchors.fill: parent
+                                z: -1
+                                radius: parent.radius
+                                blur: 14
+                                offset.y: 3
+                                color: Qt.rgba(0, 0, 0, 0.3)
+                            }
 
                             Behavior on Layout.preferredWidth {
                                 NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic }
@@ -588,7 +904,7 @@ Scope {
                                     if (id === "reboot")    return "\u{F0709}"
                                     return "\u{F0425}"
                                 }
-                                color: Theme.textSecondary
+                                color: Theme.textPrimary
                                 size: Theme.iconMedium
                             }
 
