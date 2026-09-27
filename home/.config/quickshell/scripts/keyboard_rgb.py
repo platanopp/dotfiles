@@ -77,44 +77,77 @@ def load_sdk():
 # ── The picture, key by key ──────────────────────────────────────────────
 
 def sample(image_path):
-    """{(matrix row, col): (h, l, s)}: the mean colour of the picture under
-    each key. The whole picture is fitted to the board, not cropped -- it is
-    squeezed from 16:9 to the board's 3:1, which LEDs a key apart cannot
-    tell from the original."""
+    """{(matrix row, col): (h, l, s)}: the colour of the picture under each
+    key. The whole picture is fitted to the board, not cropped -- squeezed
+    from 16:9 to the board's 3:1, which LEDs a key apart cannot tell.
+
+    Not the mean of what is under a key: half white hair and half blue sky
+    average to a grey-blue that is nowhere in the picture. The patch is
+    split into its few main colours and the one that dominates it is used,
+    a vivid one counting for more -- so a key over a red eye can be red."""
     from PIL import Image
     cell = 24
     with Image.open(image_path) as im:
         im = im.convert("RGB")
-        # A key-sized cell of this is still hundreds of pixels: enough for a
-        # fair mean, cheap to cut up.
-        im = im.resize((UNITS * cell, len(LAYOUT) * cell), Image.BOX)
+        im = im.resize((UNITS * cell, len(LAYOUT) * cell), Image.LANCZOS)
     out = {}
     for r, row in enumerate(LAYOUT):
         x = 0.0
         for width, col in row:
             box = (int(x * cell), r * cell, int((x + width) * cell), (r + 1) * cell)
-            rgb = im.crop(box).resize((1, 1), Image.BOX).getpixel((0, 0))
-            out[(r + 1, col)] = colorsys.rgb_to_hls(*(c / 255 for c in rgb))
+            patch = im.crop(box)
+            q = patch.quantize(colors=4, method=Image.Quantize.MEDIANCUT)
+            pal = q.getpalette()
+            best, best_score = None, -1.0
+            total = patch.width * patch.height
+            for count, idx in q.getcolors():
+                rgb = tuple(pal[idx * 3: idx * 3 + 3])
+                h, l, s = colorsys.rgb_to_hls(*(c / 255 for c in rgb))
+                # Share of the patch, then vividness: a colour needs about a
+                # fifth of a key to win over a duller one covering the rest.
+                score = (count / total) * (0.35 + s * (1 - abs(l - 0.5) * 1.2))
+                if score > best_score:
+                    best, best_score = (h, l, s), score
+            out[(r + 1, col)] = best
             x += width
     return out
 
 
-def for_leds(keys, brightness):
-    """LEDs are not a screen. A dark part of the picture on a key looks like
-    a key switched off, and a soft colour washes out to white. So the
-    picture's lightness is stretched into the band LEDs show well --
-    keeping which keys are lighter than which -- and colour is pushed up."""
-    lo = min(c[1] for c in keys.values())
-    hi = max(c[1] for c in keys.values())
-    span = max(hi - lo, 0.12)
-    k = brightness / 100
+def percentile(values, p):
+    v = sorted(values)
+    return v[min(len(v) - 1, int(p * len(v)))]
+
+
+def for_screen(keys):
+    """The colours as they should look -- in sRGB, like the screen. A dark
+    part of the picture on a key reads as a key switched off, so lightness
+    is lifted into the band LEDs show well; only gently stretched, and by
+    percentiles, so one bright key does not dim all the others."""
+    ls = [c[1] for c in keys.values()]
+    lo, hi = percentile(ls, 0.05), percentile(ls, 0.95)
+    span = max(hi - lo, 0.2)
     out = {}
     for key, (h, l, s) in keys.items():
-        l = 0.22 + (l - lo) / span * 0.38
-        s = min(1.0, s * 1.35 + 0.08)
-        r, g, b = colorsys.hls_to_rgb(h, l, s)
-        out[key] = tuple(int(round(c * 255 * k)) for c in (r, g, b))
+        n = max(0.0, min(1.0, (l - lo) / span))
+        # Halfway between the picture's own lightness and the stretched one.
+        l = max(0.2, min(0.72, (l + (0.25 + n * 0.45)) / 2))
+        s = min(1.0, s * 1.12 + 0.02)
+        out[key] = tuple(int(round(c * 255)) for c in colorsys.hls_to_rgb(h, l, s))
     return out
+
+
+def for_leds(rgb, brightness):
+    """sRGB to what an LED needs to look the same. A screen's values are
+    gamma-encoded; an LED's are plain light output. Sent as they are, every
+    mid tone comes out far too bright and the colours wash out to pastel --
+    so they are decoded to linear light first, then dimmed."""
+    k = brightness / 100
+
+    def lin(v):
+        v /= 255
+        return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+
+    return tuple(int(round(lin(v) * 255 * k)) for v in rgb)
 
 
 # ── Commands ─────────────────────────────────────────────────────────────
@@ -138,12 +171,13 @@ def cmd_status():
 
 
 def describe(keys):
-    # Full brightness, for the Settings page's picture of the board.
+    # As they should look (sRGB), for the Settings page's picture of the
+    # board -- a screen shows them the way the LEDs, gamma-corrected, do.
     return {"ok": True, "keys": {f"{r},{c}": "#%02x%02x%02x" % rgb for (r, c), rgb in keys.items()}}
 
 
 def cmd_palette(image):
-    return describe(for_leds(sample(image), 100))
+    return describe(for_screen(sample(image)))
 
 
 def cmd_apply(image, brightness):
@@ -152,13 +186,13 @@ def cmd_apply(image, brightness):
     lib, err = connect()
     if not lib:
         return {"ok": False, "error": err}
-    picture = sample(image)
+    colours = for_screen(sample(image))
     lib.wooting_rgb_array_auto_update(False)
-    for (row, col), (r, g, b) in for_leds(picture, brightness).items():
-        lib.wooting_rgb_array_set_single(row, col, r, g, b)
+    for (row, col), rgb in colours.items():
+        lib.wooting_rgb_array_set_single(row, col, *for_leds(rgb, brightness))
     if not lib.wooting_rgb_array_update_keyboard():
         return {"ok": False, "error": "the keyboard did not take the colours"}
-    return describe(for_leds(picture, 100))
+    return describe(colours)
 
 
 def cmd_reset():
