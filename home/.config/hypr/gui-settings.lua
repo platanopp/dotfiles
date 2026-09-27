@@ -12,6 +12,6 @@ hl.config({
         follow_mouse = 1,
     },
     decoration = {
-        rounding = 18,
+        rounding = 22,
     },
 })
