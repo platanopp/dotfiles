@@ -9,6 +9,8 @@ Icon=yazi
 Type=Application
 Terminal=false
 Exec=sh -c "exec kitty --class yazi -c \\"\\$HOME/.config/kitty/kitty.conf\\" -c \\"\\$HOME/.config/kitty/yazi.conf\\" -e yazi \\"\\$@\\"" sh %f
-MimeType=inode/directory;
+# Folders, and archives: opened on the archive, where Enter or e extracts
+# it (yazi.toml, keymap.toml).
+MimeType=inode/directory;application/zip;application/x-zip-compressed;application/vnd.rar;application/x-rar;application/x-rar-compressed;application/x-7z-compressed;application/x-tar;application/gzip;application/x-gzip;application/x-compressed-tar;application/x-bzip2;application/x-bzip2-compressed-tar;application/x-xz;application/x-xz-compressed-tar;application/zstd;application/x-zstd-compressed-tar;application/x-lzma;application/x-lzma-compressed-tar;application/x-cd-image;application/x-iso9660-image;application/vnd.debian.binary-package;application/x-rpm;application/x-cpio;application/x-archive;application/vnd.ms-cab-compressed;
 Categories=System;FileTools;FileManager;ConsoleOnly;
 Keywords=File;Manager;Explorer;Browser;Launcher;Dolphin;Archivos

@@ -50,4 +50,8 @@ prepend_preloaders = [
 [open]
 prepend_rules = [
     { mime = "image/gif", use = ["play-gif", "open"] },
+    # Enter on an archive extracts it here (yazi's own rule, for zip, rar,
+    # 7z, tar and the compressed tars). Disc images and packages were only
+    # previewed; 7-Zip opens those too, so they extract the same way.
+    { mime = "application/{iso9660-image,cd-image,qemu-disk,ms-wim,apple-diskimage,debian*-package,redhat-package-manager,rpm,android.package-archive,java-archive}", use = ["extract", "reveal"] },
 ]

@@ -93,6 +93,9 @@ prepend_keymap = [
     # Two keys, so the c-prefixed copy-path keys (cc path, cd folder path,
     # cf name) are not shadowed -- a bare `c` here swallowed all of them.
     { on = ["c", "z"],    run = "plugin compress",        desc = "Compress the selection" },
+    # Extract here: what Enter does on an archive, for the whole selection
+    # at once. Each goes into a folder named after it.
+    { on = "e",           run = "shell -- ya pub extract --list %s", desc = "Extract here" },
     { on = "T",           run = "plugin chmod",           desc = "Change permissions" },
     { on = "M",           run = "plugin mount",           desc = "Manage disks and partitions" },
     { on = "F",           run = "plugin full-border",     desc = "Toggle the full border" },
