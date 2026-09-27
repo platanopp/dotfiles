@@ -589,6 +589,13 @@ hl.config({
         -- nada". The default is black; this is the shell's own background, so
         -- the handover reads as one screen rather than two.
         background_color = "rgb(101014)",
+
+        -- A window that asks to be activated gets focus, and its workspace
+        -- with it. Opening a link from Discord or the terminal hands the URL
+        -- to the browser already running, which asks exactly that; with this
+        -- off Hyprland only marked it urgent (the pulse on the workspaces
+        -- pill) and you stayed where you were.
+        focus_on_activate = true,
     },
 })
 
