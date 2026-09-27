@@ -147,7 +147,7 @@ def for_screen(keys):
     for key, (h, l, s) in keys.items():
         n = max(0.0, min(1.0, (l - lo) / span))
         # Halfway between the picture's own lightness and the stretched one.
-        l = max(0.2, min(0.72, (l + (0.25 + n * 0.45)) / 2))
+        l = max(0.3, min(0.78, (l + (0.36 + n * 0.44)) / 2))
         s = min(1.0, s * 1.12 + 0.02)
         out[key] = tuple(int(round(c * 255)) for c in colorsys.hls_to_rgb(h, l, s))
     return out
@@ -157,12 +157,14 @@ def for_leds(rgb, brightness):
     """sRGB to what an LED needs to look the same. A screen's values are
     gamma-encoded; an LED's are plain light output. Sent as they are, every
     mid tone comes out far too bright and the colours wash out to pastel --
-    so they are decoded to linear light first, then dimmed."""
+    so they are decoded towards linear light first, then dimmed. Not all
+    the way (a power of 1.8, not sRGB's 2.2): fully decoded, the keys read
+    as too dark beside the screen, which a room's light washes out more
+    than it does an LED."""
     k = brightness / 100
 
     def lin(v):
-        v /= 255
-        return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+        return (v / 255) ** 1.8
 
     return tuple(int(round(lin(v) * 255 * k)) for v in rgb)
 
