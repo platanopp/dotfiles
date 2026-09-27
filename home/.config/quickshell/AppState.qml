@@ -1616,6 +1616,20 @@ Singleton {
         root.launcherOpen = !root.launcherOpen
     }
 
+    // Text to start the field with, taken by the launcher as it opens.
+    property string launcherPreset: ""
+
+    IpcHandler {
+        target: "launcher"
+        function toggle(): void { root.toggleLauncher() }
+        // Open with the field already holding `query` ("" for empty).
+        function open(query: string): void {
+            root.launcherPreset = query
+            root.launcherOpen = true
+        }
+        function close(): void { root.launcherOpen = false }
+    }
+
     // ── Modo mando ─────────────────────────────────────────────────
     //
     // gamepad-mode.service maps a controller onto the pointer and the desktop
