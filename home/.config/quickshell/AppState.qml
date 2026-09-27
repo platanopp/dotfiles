@@ -144,6 +144,17 @@ Singleton {
     signal settingsRequested(string page, string screenName)
     function openSettings(page, screenName) { root.settingsRequested(page, screenName) }
 
+    // The media panel on the focused monitor: qs ipc call media toggle |
+    // open | close -- for a key bind, say.
+    signal mediaRequested(string how, string screenName)
+
+    IpcHandler {
+        target: "media"
+        function toggle(): void { root.mediaRequested("toggle", root.focusedScreenName()) }
+        function open(): void { root.mediaRequested("open", root.focusedScreenName()) }
+        function close(): void { root.mediaRequested("close", "") }
+    }
+
     // The notification centre on the focused monitor's control pill:
     // qs ipc call notifications toggle | open | close | clear -- for a key
     // bind, say. `clear` empties the centre without opening it.

@@ -59,6 +59,16 @@ PanelWindow {
     margins.left: bar ? bar.leftPillRight - 2 : 50
 
     property bool panelOpen: false
+
+    // qs ipc call media toggle (see AppState): only the screen that asked.
+    Connections {
+        target: AppState
+        function onMediaRequested(how, screenName) {
+            if (how === "close") { mediaWidgetItem.panelOpen = false; return }
+            if (mediaWidgetItem.screen && screenName.length > 0 && mediaWidgetItem.screen.name !== screenName) return
+            mediaWidgetItem.panelOpen = how === "open" ? true : !mediaWidgetItem.panelOpen
+        }
+    }
     property real currentPosition: 0
 
     readonly property var player: bar ? bar.activePlayer : null
@@ -149,7 +159,7 @@ PanelWindow {
         anchors.top: parent.top
         anchors.left: parent.left
         targetWidth: mediaWidgetItem.panelOpen ? 396
-                   : mediaWidgetRow.implicitWidth + 24 + 62 + Theme.pillPaddingH
+                   : mediaWidgetRow.implicitWidth + 24 + 74 + Theme.pillPaddingH
         targetHeight: mediaWidgetItem.panelOpen ? Math.min(mediaContentColumn.implicitHeight + 60, 640) : 64
     }
 
@@ -197,7 +207,9 @@ PanelWindow {
             anchors.left: parent.left
             anchors.top: parent.top
             anchors.bottom: parent.bottom
-            width: 112
+            // Only the pill's end: the cover has faded to nothing before the
+            // title starts, so a pale cover never sits under the text.
+            width: 70
             visible: opacity > 0
             opacity: mediaWidgetItem.panelOpen ? 0 : 1
 
@@ -217,8 +229,8 @@ PanelWindow {
                 gradient: Gradient {
                     orientation: Gradient.Horizontal
                     GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 1) }
-                    GradientStop { position: 0.38; color: Qt.rgba(1, 1, 1, 0.9) }
-                    GradientStop { position: 0.72; color: Qt.rgba(1, 1, 1, 0.3) }
+                    GradientStop { position: 0.45; color: Qt.rgba(1, 1, 1, 0.85) }
+                    GradientStop { position: 0.8; color: Qt.rgba(1, 1, 1, 0.2) }
                     GradientStop { position: 1.0; color: Qt.rgba(1, 1, 1, 0) }
                 }
             }
@@ -328,8 +340,8 @@ PanelWindow {
             id: mediaWidgetRow
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
-            // The title starts where the cover has mostly faded.
-            anchors.leftMargin: 62
+            // The title starts where the cover has gone.
+            anchors.leftMargin: 74
             spacing: 10
             visible: !mediaWidgetItem.panelOpen
             opacity: mediaWidgetItem.panelOpen ? 0 : 1
@@ -427,6 +439,126 @@ PanelWindow {
         }
 
         // ── Expanded panel ───────────────────────────────────────────────
+        //
+        // The cover across the top of the panel, edge to edge under the
+        // glass's rounded corners, fading down into it. The spectrum rises
+        // from where it fades; the title and the rest start below, where the
+        // picture has gone -- the same rule as the pill: no text on the cover.
+        Item {
+            id: hero
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            height: 230
+            visible: opacity > 0
+            opacity: mediaWidgetItem.panelOpen ? 1 : 0
+
+            Behavior on opacity {
+                NumberAnimation { duration: 200 }
+            }
+
+            readonly property bool hasArt: heroImage.status === Image.Ready
+
+            Rectangle {
+                id: heroMask
+                anchors.fill: parent
+                radius: 26
+                visible: false
+                gradient: Gradient {
+                    // Gone by 0.85 -- 195px down, just above the title.
+                    GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 1) }
+                    GradientStop { position: 0.4; color: Qt.rgba(1, 1, 1, 0.9) }
+                    GradientStop { position: 0.7; color: Qt.rgba(1, 1, 1, 0.22) }
+                    GradientStop { position: 0.85; color: Qt.rgba(1, 1, 1, 0) }
+                }
+            }
+
+            Image {
+                id: heroImage
+                anchors.fill: parent
+                source: bar.trackArtUrl
+                fillMode: Image.PreserveAspectCrop
+                // The middle of a square cover, not its top edge.
+                verticalAlignment: Image.AlignVCenter
+                asynchronous: true
+                sourceSize.width: 512
+                visible: false
+            }
+
+            OpacityMask {
+                anchors.fill: parent
+                visible: hero.hasArt
+                source: heroImage
+                maskSource: heroMask
+                cached: false
+
+                layer.enabled: true
+                layer.effect: MultiEffect {
+                    brightness: bar.isPlaying ? 0 : -0.3
+                    saturation: bar.isPlaying ? 0 : -0.35
+
+                    Behavior on brightness { NumberAnimation { duration: Theme.durMedium } }
+                    Behavior on saturation { NumberAnimation { duration: Theme.durMedium } }
+                }
+            }
+
+            // No cover: the note, large, where it would be.
+            IconGlyph {
+                visible: !hero.hasArt
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: 64
+                text: "󰎇"
+                color: Theme.textMuted
+                size: 44
+            }
+
+            // The spectrum: bars across the width, rising from where the
+            // cover fades out, in the album's colour. Mirrored about the
+            // middle, low bands at the centre.
+            Row {
+                id: bars
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 34
+                spacing: 3
+                visible: mediaWidgetItem.wantSpectrum
+
+                readonly property int count: 48
+
+                function level(i) {
+                    var b = Spectrum.bands
+                    var half = bars.count / 2
+                    var band = i < half ? half - 1 - i : i - half
+                    return (band >= 0 && band < b.length) ? b[band] : 0
+                }
+
+                Repeater {
+                    model: bars.count
+
+                    Rectangle {
+                        required property int index
+                        readonly property real level: bars.level(index)
+                        // Not readonly: Behavior smooths the step between the
+                        // helper's frames.
+                        property real len: 2 + level * 34
+
+                        anchors.bottom: parent.bottom
+                        width: 3
+                        height: len
+                        radius: 1.5
+                        color: Theme.alpha(AlbumColors.accent, 0.35 + level * 0.6)
+
+                        Behavior on len {
+                            NumberAnimation { duration: 70; easing.type: Easing.OutQuad }
+                        }
+                        Behavior on color {
+                            ColorAnimation { duration: 70 }
+                        }
+                    }
+                }
+            }
+        }
+
         Flickable {
             visible: mediaWidgetItem.panelOpen
             opacity: mediaWidgetItem.panelOpen ? 1 : 0
@@ -445,167 +577,45 @@ PanelWindow {
                 width: parent.width
                 spacing: 16
 
-                // Art and metadata
-                RowLayout {
+                // Clear of the cover: it has faded out by here.
+                Item {
                     width: parent.width
-                    spacing: 16
+                    height: 180
+                }
 
-                    Item {
-                        // 120 rather than 104: the extra ring gives the bars a
-                        // gap from the cover and room to travel. The panel grew
-                        // by the same amount so the metadata column is unchanged.
-                        Layout.preferredWidth: 120
-                        Layout.preferredHeight: 120
+                ColumnLayout {
+                    width: parent.width
+                    spacing: 3
 
-                        // Spectrum ring: each mark is a frequency band, growing
-                        // outward from just past the artwork. The 24 bands are
-                        // mirrored across the circle so the two halves match
-                        // instead of meeting at a seam. It still turns slowly,
-                        // which keeps it alive during quiet passages.
-                        Item {
-                            id: ring
-                            anchors.fill: parent
-
-                            readonly property int marks: 48
-                            // The cover is inset 18 of a 120 box, so its edge is
-                            // at radius 42. Bars start 6px clear of it and a full
-                            // band stops just inside the box.
-                            readonly property real base: width / 2 - 12
-                            readonly property real travel: 9
-
-                            function level(i) {
-                                var b = Spectrum.bands
-                                // Mirror: marks 0..23 run one way, 24..47 back.
-                                var band = i < b.length ? i : ring.marks - 1 - i
-                                return (band >= 0 && band < b.length) ? b[band] : 0
-                            }
-
-                            // wantSpectrum, not isPlaying. This is the panel's
-                            // ring, and the panel hides by drawing nothing
-                            // rather than by unmapping -- so on isPlaying alone
-                            // these 48 marks kept turning behind a closed panel,
-                            // dirtying the surface every frame for something
-                            // nobody could see. Measured at 70% of a core in
-                            // quickshell, plus Hyprland re-blurring the region,
-                            // while a game wanted that CPU.
-                            NumberAnimation on rotation {
-                                running: mediaWidgetItem.wantSpectrum
-                                from: 0
-                                to: 360
-                                duration: 48000
-                                loops: Animation.Infinite
-                            }
-
-                            Repeater {
-                                model: ring.marks
-
-                                Rectangle {
-                                    id: mark
-                                    required property int index
-                                    readonly property real angle: index * 2 * Math.PI / ring.marks
-                                    readonly property real level: ring.level(index)
-
-                                    // Not readonly: Behavior smooths the step
-                                    // between the helper's frames.
-                                    property real len: 2.5 + level * ring.travel
-
-                                    width: 2.5
-                                    height: len
-                                    radius: 1.25
-                                    color: Theme.alpha(AlbumColors.accent, 0.25 + level * 0.6)
-
-                                    x: ring.width / 2 + Math.cos(angle) * (ring.base + len / 2) - width / 2
-                                    y: ring.height / 2 + Math.sin(angle) * (ring.base + len / 2) - height / 2
-
-                                    // Point the bar outward along its radius.
-                                    rotation: angle * 180 / Math.PI + 90
-                                    transformOrigin: Item.Center
-
-                                    Behavior on len {
-                                        NumberAnimation { duration: 70; easing.type: Easing.OutQuad }
-                                    }
-                                    Behavior on color {
-                                        ColorAnimation { duration: 70 }
-                                    }
-                                }
-                            }
-                        }
-
-                        Rectangle {
-                            id: bigArtMask
-                            anchors.fill: parent
-                            anchors.margins: 18
-                            radius: width / 2
-                            visible: false
-                            layer.enabled: true
-                        }
-
-                        Image {
-                            id: bigArtImage
-                            anchors.fill: parent
-                            anchors.margins: 18
-                            source: bar.trackArtUrl
-                            fillMode: Image.PreserveAspectCrop
-                            asynchronous: true
-                            visible: status === Image.Ready
-                            layer.enabled: true
-                            layer.effect: MultiEffect {
-                                maskEnabled: true
-                                maskSource: bigArtMask
-                            }
-                        }
-
-                        Rectangle {
-                            anchors.fill: parent
-                            anchors.margins: 18
-                            radius: width / 2
-                            color: Theme.surfaceContainerHigh
-                            visible: bigArtImage.status !== Image.Ready
-
-                            IconGlyph {
-                                anchors.centerIn: parent
-                                text: "󰎇"
-                                color: Theme.textSecondary
-                                size: Theme.iconHero
-                            }
-                        }
+                    Text {
+                        text: bar.trackTitle
+                        color: Theme.textPrimary
+                        font.pixelSize: 17
+                        font.bold: true
+                        font.family: Theme.fontMono
+                        wrapMode: Text.WordWrap
+                        maximumLineCount: 2
+                        elide: Text.ElideRight
+                        Layout.fillWidth: true
                     }
 
-                    ColumnLayout {
+                    Text {
+                        text: bar.trackArtist
+                        color: Theme.textSecondary
+                        font.pixelSize: 12
+                        font.family: Theme.fontMono
+                        elide: Text.ElideRight
                         Layout.fillWidth: true
-                        Layout.alignment: Qt.AlignVCenter
-                        spacing: 3
+                    }
 
-                        Text {
-                            text: bar.trackTitle
-                            color: Theme.textPrimary
-                            font.pixelSize: 15
-                            font.bold: true
-                            font.family: Theme.fontMono
-                            wrapMode: Text.WordWrap
-                            maximumLineCount: 2
-                            elide: Text.ElideRight
-                            Layout.fillWidth: true
-                        }
-
-                        Text {
-                            text: bar.trackArtist
-                            color: Theme.textSecondary
-                            font.pixelSize: 12
-                            font.family: Theme.fontMono
-                            elide: Text.ElideRight
-                            Layout.fillWidth: true
-                        }
-
-                        Text {
-                            visible: text.length > 0
-                            text: mediaWidgetItem.player ? (mediaWidgetItem.player.trackAlbum || "") : ""
-                            color: Theme.textMuted
-                            font.pixelSize: 11
-                            font.family: Theme.fontMono
-                            elide: Text.ElideRight
-                            Layout.fillWidth: true
-                        }
+                    Text {
+                        visible: text.length > 0
+                        text: mediaWidgetItem.player ? (mediaWidgetItem.player.trackAlbum || "") : ""
+                        color: Theme.textMuted
+                        font.pixelSize: 11
+                        font.family: Theme.fontMono
+                        elide: Text.ElideRight
+                        Layout.fillWidth: true
                     }
                 }
 
@@ -776,43 +786,19 @@ PanelWindow {
                         size: Theme.iconSmall
                     }
 
-                    Item {
+                    SettingsSlider {
                         Layout.fillWidth: true
-                        height: 14
-
-                        Rectangle {
-                            id: volTrack
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: parent.width
-                            height: 4
-                            radius: 2
-                            color: Theme.track
-
-                            Rectangle {
-                                width: volTrack.width * (mediaWidgetItem.shownVolume / 100)
-                                height: parent.height
-                                radius: 2
-                                color: Theme.alpha(Theme.accent, 0.8)
-                            }
-                        }
-
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            // The list is polled on a timer, and a poll that
-                            // lands between the write and pactl catching up
-                            // reports the old volume -- which is the slider
-                            // jumping backwards under the pointer. Held off
-                            // for the length of the drag, the same way the
-                            // audio panel's sliders do it.
-                            onPressed: {
-                                AppState.audioStreamsDragging = true
-                                mediaWidgetItem.setShownVolume(mouseX / width)
-                            }
-                            onPositionChanged: if (pressed) mediaWidgetItem.setShownVolume(mouseX / width)
-                            onReleased: AppState.audioStreamsDragging = false
-                            onCanceled: AppState.audioStreamsDragging = false
-                        }
+                        compact: true
+                        live: true
+                        from: 0; to: 100; step: 1
+                        value: mediaWidgetItem.shownVolume
+                        // The list is polled on a timer, and a poll that lands
+                        // between the write and pactl catching up reports the
+                        // old volume -- the slider jumping backwards under the
+                        // pointer. Held off for the length of the drag, the
+                        // same way the audio panel's sliders do it.
+                        onDraggingChanged: AppState.audioStreamsDragging = dragging
+                        onMoved: v => mediaWidgetItem.setShownVolume(v / 100)
                     }
 
                     // Says which volume this is. A player that has dropped
@@ -821,7 +807,7 @@ PanelWindow {
                     // worth saying, since the two behave differently.
                     Text {
                         text: Math.round(mediaWidgetItem.shownVolume) + "%"
-                            + (mediaWidgetItem.onAppVolume ? "" : " · sistema")
+                            + (mediaWidgetItem.onAppVolume ? "" : " · system")
                         color: Theme.textMuted
                         font.pixelSize: 10
                         font.family: Theme.fontMono
