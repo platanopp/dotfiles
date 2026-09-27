@@ -10,5 +10,9 @@
   "gaps_in": {
     "value": 16,
     "base": 15
+  },
+  "shadow": {
+    "value": false,
+    "base": true
   }
 }

@@ -11,4 +11,9 @@ hl.config({
     input = {
         follow_mouse = 1,
     },
+    decoration = {
+        shadow = {
+            enabled = false,
+        },
+    },
 })
