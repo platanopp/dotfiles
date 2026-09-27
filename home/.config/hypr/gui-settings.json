@@ -10,5 +10,19 @@
   "shadow": {
     "value": false,
     "base": true
+  },
+  "gaps_out": {
+    "value": {
+      "top": 20,
+      "bottom": 3,
+      "left": 3,
+      "right": 3
+    },
+    "base": {
+      "top": 20,
+      "right": 30,
+      "bottom": 30,
+      "left": 30
+    }
   }
 }
