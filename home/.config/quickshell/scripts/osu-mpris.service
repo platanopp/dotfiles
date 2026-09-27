@@ -4,7 +4,7 @@
 # el nombre del bus segun osu este abierto o no, asi el widget lo muestra y lo
 # deja de mostrar solo.
 #
-# Instalado como symlink, igual que gamepad-mode.service:
+# Instalado como symlink:
 #   systemctl --user enable --now ~/.config/quickshell/scripts/osu-mpris.service
 [Unit]
 Description=osu! current beatmap as an MPRIS player

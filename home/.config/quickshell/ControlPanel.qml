@@ -603,18 +603,9 @@ PanelWindow {
 
                 ToggleTile {
                     Layout.fillWidth: true
-                    icon: AppState.gamepadConnected ? "\u{F0274}" : "\u{F0EB5}"
-                    label: "Controller"
-                    active: AppState.gamepadModeActive
-                    detail: AppState.gamepadMode === "stopped" ? "Service off"
-                          : !AppState.gamepadConnected ? "Not connected"
-                          : AppState.gamepadModeActive ? "Drives desktop"
-                          : "Gamepad only"
-                    onTapped: AppState.toggleGamepadMode()
-                }
-
-                ToggleTile {
-                    Layout.fillWidth: true
+                    // The fifth tile, so the width of the row rather than
+                    // half of it with a hole beside.
+                    Layout.columnSpan: 2
                     icon: "\u{F0DCB}"
                     label: "Tablet"
                     active: AppState.otdRunning

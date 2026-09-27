@@ -15,7 +15,7 @@
 # grafica se cae, los servicios se van con ella en vez de sobrevivir al
 # compositor.
 #
-# Instalado como symlink, igual que gamepad-mode.service:
+# Instalado como symlink:
 #   systemctl --user enable ~/.config/hypr/hyprland-session.target
 [Unit]
 Description=Hyprland session
