@@ -10,5 +10,19 @@
   "gaps_in": {
     "value": 16,
     "base": 15
+  },
+  "gaps_out": {
+    "value": {
+      "top": 20,
+      "bottom": 36,
+      "left": 36,
+      "right": 36
+    },
+    "base": {
+      "top": 20,
+      "right": 30,
+      "bottom": 30,
+      "left": 30
+    }
   }
 }
