@@ -211,8 +211,7 @@ PanelWindow {
         //
         // The cover fills the pill's left end, full height and following
         // its rounded edge, and fades out into the glass towards the title.
-        // How far along the song is runs as a hairline along the foot.
-        // Paused, the cover steps back under a pause mark and the line dims.
+        // Paused, the cover steps back under a pause mark.
         Item {
             id: compactArt
             anchors.left: parent.left
@@ -306,46 +305,6 @@ PanelWindow {
                     color: "#ffffff"
                     size: Theme.iconTiny
                 }
-            }
-        }
-
-        // How far along: a hairline along the foot of the pill, inside its
-        // rounded ends.
-        Item {
-            id: compactProgress
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            anchors.leftMargin: 16
-            anchors.rightMargin: 16
-            anchors.bottomMargin: 3
-            height: 2
-            visible: opacity > 0 && progress > 0
-            opacity: mediaWidgetItem.panelOpen ? 0 : 1
-
-            Behavior on opacity {
-                NumberAnimation { duration: 150 }
-            }
-
-            readonly property real progress: mediaWidgetItem.trackLength > 0
-                ? Math.max(0, Math.min(1, mediaWidgetItem.currentPosition / mediaWidgetItem.trackLength)) : 0
-
-            Rectangle {
-                anchors.fill: parent
-                radius: 1
-                color: Theme.alpha(Theme.foreground, 0.12)
-            }
-
-            Rectangle {
-                width: parent.width * compactProgress.progress
-                height: parent.height
-                radius: 1
-                color: Theme.alpha(Theme.foreground, bar.isPlaying ? 0.75 : 0.35)
-
-                // No Behavior on width: the position is read once a second, and
-                // an animation restarted every second never stops -- the window
-                // redrew ~54 times a second for as long as music played.
-                Behavior on color { ColorAnimation { duration: Theme.durMedium } }
             }
         }
 
@@ -467,9 +426,8 @@ PanelWindow {
         Timer {
             interval: 1000
             repeat: true
-            // The compact pill's progress line reads it too, so it runs
-            // whenever something is playing, not only with the panel open.
-            running: bar.isPlaying && !bar.barHidden
+            // Only the open panel shows how far along the song is.
+            running: bar.isPlaying && mediaWidgetItem.panelOpen
             triggeredOnStart: true
             onTriggered: if (mediaWidgetItem.player) mediaWidgetItem.currentPosition = mediaWidgetItem.player.position
         }
