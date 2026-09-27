@@ -5,7 +5,7 @@
 
 hl.config({
     decoration = {
-        active_opacity = 0.86,
+        active_opacity = 0.87,
         shadow = {
             enabled = false,
         },
