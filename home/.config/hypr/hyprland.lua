@@ -242,10 +242,11 @@ hl.bind("XF86AudioPause", hl.dsp.exec_cmd("playerctl play-pause"), { locked = tr
 hl.bind("XF86AudioPlay",  hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
 hl.bind("XF86AudioPrev",  hl.dsp.exec_cmd("playerctl previous"),   { locked = true })
 
+-- The name is dated by the shell when the key is pressed. It used to be
+-- built with os.date() here, which runs once, when this file is loaded: every
+-- screenshot between two reloads got the same name and overwrote the last.
 hl.bind("SUPER + SHIFT + P", hl.dsp.exec_cmd(
-    "grimblast --notify copysave area " ..
-    os.getenv("HOME") .. "/Pictures/Screenshots/screenshot_" ..
-    os.date("%Y-%m-%d_%H-%M-%S") .. ".png"
+    'grimblast --notify copysave area "$HOME/Pictures/Screenshots/screenshot_$(date +%Y-%m-%d_%H-%M-%S).png"'
 ))
 
 local suppressMaximizeRule = hl.window_rule({
