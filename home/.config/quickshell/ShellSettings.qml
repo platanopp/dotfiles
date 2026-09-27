@@ -33,6 +33,8 @@ Singleton {
     // and how bright, 10-100.
     readonly property bool keyboardRgb: adapter.keyboardRgb
     readonly property int keyboardRgbBrightness: adapter.keyboardRgbBrightness
+    // Sweep to the new colours when the wallpaper changes, or just switch.
+    readonly property bool keyboardRgbAnimate: adapter.keyboardRgbAnimate
 
     function set(key, value) {
         adapter[key] = value
@@ -61,6 +63,7 @@ Singleton {
             property string backupRepo: "~/dotfiles"
             property bool keyboardRgb: true
             property int keyboardRgbBrightness: 100
+            property bool keyboardRgbAnimate: true
         }
     }
 }

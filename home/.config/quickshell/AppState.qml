@@ -933,28 +933,37 @@ Singleton {
     readonly property string keyboardRgbScript:
         Quickshell.env("HOME") + "/.config/quickshell/scripts/keyboard_rgb.py"
 
-    function applyKeyboardRgb() {
+    // `animate`: sweep from the old colours to the new (a wallpaper change);
+    // without it they switch at once (brightness, a reapply).
+    function applyKeyboardRgb(animate) {
         if (!ShellSettings.keyboardRgb || root.wallpaperStill.length === 0) return
+        keyboardRgbDebounce.animate = keyboardRgbDebounce.animate || animate === true
         keyboardRgbDebounce.restart()
     }
 
     function resetKeyboardRgb() {
-        keyboardRgbProc.command = ["python3", root.keyboardRgbScript, "reset"]
-        keyboardRgbProc.running = true
+        root.keyboardRgbSend({ cmd: "reset" })
         root.keyboardRgbPalette = null
     }
 
-    function refreshKeyboardRgb() {
-        if (!keyboardRgbStatusProc.running) keyboardRgbStatusProc.running = true
+    function refreshKeyboardRgb() { root.keyboardRgbSend({ cmd: "status" }) }
+
+    // One line of JSON to the script's `serve` loop, which stays connected
+    // to the keyboard: finding it costs two seconds, paid once per session
+    // instead of before every change.
+    function keyboardRgbSend(obj) {
+        if (!keyboardRgbProc.running) keyboardRgbProc.running = true
+        keyboardRgbProc.write(JSON.stringify(obj) + "\n")
     }
 
-    onWallpaperStillChanged: root.applyKeyboardRgb()
+    onWallpaperStillChanged: root.applyKeyboardRgb(ShellSettings.keyboardRgbAnimate)
 
     // qs ipc call keyboard apply -- say, bound to a key, after switching
     // profiles on the keyboard (a profile switch covers these colours).
     IpcHandler {
         target: "keyboard"
-        function apply(): void { root.applyKeyboardRgb() }
+        function apply(): void { root.applyKeyboardRgb(false) }
+        function sweep(): void { root.applyKeyboardRgb(true) }
         function reset(): void { root.resetKeyboardRgb() }
         // What was last sent, key by key ("row,col": colour) -- or the error.
         function status(): string {
@@ -966,47 +975,45 @@ Singleton {
     Connections {
         target: ShellSettings
         function onKeyboardRgbChanged() {
-            if (ShellSettings.keyboardRgb) root.applyKeyboardRgb()
+            if (ShellSettings.keyboardRgb) root.applyKeyboardRgb(ShellSettings.keyboardRgbAnimate)
             else root.resetKeyboardRgb()
         }
-        function onKeyboardRgbBrightnessChanged() { root.applyKeyboardRgb() }
+        function onKeyboardRgbBrightnessChanged() { root.applyKeyboardRgb(false) }
     }
 
     // A wallpaper change settles (the crop is rendered, the video's poster is
     // cut) before the keyboard follows; one write, not several.
     Timer {
         id: keyboardRgbDebounce
-        interval: 600
+        property bool animate: false
+        interval: 500
         onTriggered: {
-            if (keyboardRgbProc.running) { keyboardRgbDebounce.restart(); return }
-            keyboardRgbProc.command = ["python3", root.keyboardRgbScript, "apply",
-                                       root.wallpaperStill, String(ShellSettings.keyboardRgbBrightness)]
-            keyboardRgbProc.running = true
+            root.keyboardRgbSend({ cmd: "apply", image: root.wallpaperStill,
+                                   brightness: ShellSettings.keyboardRgbBrightness,
+                                   animate: keyboardRgbDebounce.animate })
+            keyboardRgbDebounce.animate = false
         }
     }
 
     Process {
         id: keyboardRgbProc
-        running: false
-        stdout: StdioCollector {
-            onStreamFinished: {
-                var d
-                try { d = JSON.parse(text) } catch (e) { return }
-                root.keyboardRgbError = d.ok ? "" : (d.error || "")
-                if (d.ok && d.keys) root.keyboardRgbPalette = { keys: d.keys }
-            }
-        }
-    }
-
-    Process {
-        id: keyboardRgbStatusProc
         running: true
-        command: ["python3", root.keyboardRgbScript, "status"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try { root.keyboardRgbStatus = JSON.parse(text) } catch (e) {}
+        stdinEnabled: true
+        command: ["python3", root.keyboardRgbScript, "serve"]
+        stdout: SplitParser {
+            onRead: line => {
+                var d
+                try { d = JSON.parse(line) } catch (e) { return }
+                if (d.cmd === "status") {
+                    root.keyboardRgbStatus = d
+                    return
+                }
+                root.keyboardRgbError = d.ok ? "" : (d.error || "")
+                if (d.cmd === "apply" && d.ok && d.keys) root.keyboardRgbPalette = { keys: d.keys }
             }
         }
+        // Asked once it is up, so Settings knows whether there is a keyboard.
+        onStarted: keyboardRgbProc.write(JSON.stringify({ cmd: "status" }) + "\n")
     }
 
     readonly property string wallpaperStill: {

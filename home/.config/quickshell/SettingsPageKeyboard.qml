@@ -123,6 +123,17 @@ Column {
         }
 
         SettingsRow {
+            visible: ShellSettings.keyboardRgb
+            icon: "\u{F0D46}"
+            title: "Animate wallpaper changes"
+
+            SettingsSwitch {
+                checked: ShellSettings.keyboardRgbAnimate
+                onToggled: c => ShellSettings.set("keyboardRgbAnimate", c)
+            }
+        }
+
+        SettingsRow {
             visible: ShellSettings.keyboardRgb && page.status.connected === true
             icon: "\u{F0450}"
             title: "Paint it again"
@@ -130,7 +141,7 @@ Column {
 
             PillButton {
                 text: "Apply"
-                onClicked: AppState.applyKeyboardRgb()
+                onClicked: AppState.applyKeyboardRgb(ShellSettings.keyboardRgbAnimate)
             }
         }
     }

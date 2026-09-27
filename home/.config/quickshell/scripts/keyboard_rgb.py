@@ -10,11 +10,21 @@ without changing it: the profile's own colours come back on `reset`, a
 profile switch on the keyboard, or unplugging it. This script never calls
 wooting_rgb_close(), which would reset the colours on the way out.
 
-  apply IMAGE [BRIGHTNESS]   paint from IMAGE; BRIGHTNESS 10-100 (default 100)
+  apply IMAGE [BRIGHTNESS] [--animate]
+                             paint from IMAGE; BRIGHTNESS 10-100 (default
+                             100). --animate sweeps from the colours last
+                             sent to the new ones instead of switching.
   palette IMAGE              JSON: the colour of every key, without touching
                              the keyboard
   reset                      back to the profile's colours
   status                     JSON: whether a keyboard is there, and which
+  serve                      stay connected and take commands on stdin, one
+                             JSON object a line -- {"cmd": "apply", "image",
+                             "brightness", "animate"}, {"cmd": "reset"},
+                             {"cmd": "status"} -- answering each on stdout.
+                             What the shell runs: finding the keyboard costs
+                             two seconds (the SDK probes every model it
+                             knows), paid once here instead of per change.
 
 Prints JSON: {"ok": true, ...} or {"ok": false, "error": ...}.
 """
@@ -23,7 +33,9 @@ import colorsys
 import ctypes
 import json
 import os
+import select
 import sys
+import time
 
 LIB_CANDIDATES = [
     os.path.expanduser("~/.local/lib/libwooting-rgb-sdk.so"),
@@ -47,6 +59,11 @@ LAYOUT = [
     [(1.25, 0), (1.25, 1), (1.25, 2), (6.25, 6), (1.25, 10), (1.25, 11), (1.25, 12), (1.25, 13)],
 ]
 UNITS = 15
+
+# The colours last sent (sRGB, full brightness), for the next sweep to start
+# from. A cache, not a setting: without it the sweep starts from dark.
+LAST = os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")),
+                    "quickshell", "keyboard-rgb.json")
 
 
 class Meta(ctypes.Structure):
@@ -150,6 +167,74 @@ def for_leds(rgb, brightness):
     return tuple(int(round(lin(v) * 255 * k)) for v in rgb)
 
 
+def linear(rgb):
+    return tuple(v / 255 for v in for_leds(rgb, 100))
+
+
+def centres():
+    """{key: (x, row)}: where each key's middle is, in key units."""
+    out = {}
+    for r, row in enumerate(LAYOUT):
+        x = 0.0
+        for width, col in row:
+            out[(r + 1, col)] = (x + width / 2, r)
+            x += width
+    return out
+
+
+def sweep(lib, old, new, brightness, duration=1.4):
+    """A slanted front crosses the board left to right. Behind it keys have
+    turned to the new colours; on it they flare, lit brighter in the new
+    colour; ahead of it they keep the old ones. Mixed in linear light, the
+    way two lights actually add."""
+    at = centres()
+    k = brightness / 100
+    old_l = {key: linear(old.get(key, (0, 0, 0))) for key in new}
+    new_l = {key: linear(rgb) for key, rgb in new.items()}
+    width = 2.2                      # how many keys the change takes to pass
+    start, end = -width - 3, UNITS + width + 1
+    # Driven by the clock, not a frame count: a frame costs about 32 ms to
+    # send to a 60HE, so the board shows as many as it can take and the
+    # sweep lasts `duration` either way.
+    t0 = time.monotonic()
+    while True:
+        p = min(1.0, (time.monotonic() - t0) / duration)
+        p = p * p * (3 - 2 * p) * 0.35 + p * 0.65      # eases in and out a little
+        front = start + (end - start) * p
+        for key, (x, row) in at.items():
+            if key not in new_l:
+                continue
+            pos = x + row * 0.7          # the slant
+            u = max(0.0, min(1.0, (front - pos) / width))
+            u = u * u * (3 - 2 * u)
+            flare = max(0.0, 1 - abs(front - pos - width * 0.5) / 1.4)
+            a, b = old_l[key], new_l[key]
+            c = [a[i] + (b[i] - a[i]) * u for i in range(3)]
+            # The flare: the new colour, brighter, towards white at its peak.
+            c = [min(1.0, v + flare * (0.55 * b[i] + 0.25)) for i, v in enumerate(c)]
+            lib.wooting_rgb_array_set_single(key[0], key[1], *(int(round(v * 255 * k)) for v in c))
+        lib.wooting_rgb_array_update_keyboard()
+        if front >= end:
+            break
+
+
+def load_last():
+    try:
+        with open(LAST) as fh:
+            return {tuple(int(p) for p in key.split(",")): tuple(rgb) for key, rgb in json.load(fh).items()}
+    except (OSError, ValueError):
+        return {}
+
+
+def save_last(colours):
+    try:
+        os.makedirs(os.path.dirname(LAST), exist_ok=True)
+        with open(LAST, "w") as fh:
+            json.dump({f"{r},{c}": list(rgb) for (r, c), rgb in colours.items()}, fh)
+    except OSError:
+        pass
+
+
 # ── Commands ─────────────────────────────────────────────────────────────
 
 def connect():
@@ -161,8 +246,8 @@ def connect():
     return lib, ""
 
 
-def cmd_status():
-    lib, err = connect()
+def cmd_status(lib=None):
+    lib, err = (lib, "") if lib else connect()
     if not lib:
         return {"ok": True, "connected": False, "sdk": err != "the Wooting RGB SDK is not installed", "error": err}
     meta = lib.wooting_rgb_device_info().contents
@@ -180,40 +265,120 @@ def cmd_palette(image):
     return describe(for_screen(sample(image)))
 
 
-def cmd_apply(image, brightness):
+def cmd_apply(image, brightness, animate=False, lib=None):
     if not os.path.isfile(image):
         return {"ok": False, "error": "no such image"}
-    lib, err = connect()
+    lib, err = (lib, "") if lib else connect()
     if not lib:
         return {"ok": False, "error": err}
     colours = for_screen(sample(image))
     lib.wooting_rgb_array_auto_update(False)
+    if animate:
+        sweep(lib, load_last(), colours, brightness)
     for (row, col), rgb in colours.items():
         lib.wooting_rgb_array_set_single(row, col, *for_leds(rgb, brightness))
     if not lib.wooting_rgb_array_update_keyboard():
         return {"ok": False, "error": "the keyboard did not take the colours"}
+    save_last(colours)
     return describe(colours)
 
 
-def cmd_reset():
-    lib, err = connect()
+def cmd_reset(lib=None):
+    lib, err = (lib, "") if lib else connect()
     if not lib:
         return {"ok": False, "error": err}
-    return {"ok": bool(lib.wooting_rgb_reset())}
+    try:
+        os.unlink(LAST)
+    except OSError:
+        pass
+    return {"ok": bool(lib.wooting_rgb_reset_rgb())}
+
+
+def serve():
+    """The long-running form (see `serve` above). Commands that pile up
+    while a sweep runs are not played one after another: only the last
+    apply is, the wallpaper actually up by then. Leaving on end of input
+    keeps the colours on the keys."""
+    sdk = load_sdk()
+    if sdk is None:
+        print(json.dumps({"ok": False, "error": "the Wooting RGB SDK is not installed"}), flush=True)
+        return
+    fd = sys.stdin.fileno()
+    pending = b""
+
+    def lines(block):
+        nonlocal pending
+        while b"\n" not in pending:
+            ready, _, _ = select.select([fd], [], [], None if block else 0)
+            if not ready:
+                return None
+            chunk = os.read(fd, 65536)
+            if not chunk:
+                raise EOFError
+            pending += chunk
+        line, pending = pending.split(b"\n", 1)
+        return line
+
+    while True:
+        try:
+            batch = [lines(True)]
+            while True:
+                more = lines(False)
+                if more is None:
+                    break
+                batch.append(more)
+        except EOFError:
+            return
+        commands = []
+        for raw in batch:
+            try:
+                commands.append(json.loads(raw))
+            except ValueError:
+                continue
+        # Of the applies waiting, only the latest; everything else in order.
+        last_apply = max((i for i, c in enumerate(commands) if c.get("cmd") == "apply"), default=-1)
+        for i, c in enumerate(commands):
+            cmd = c.get("cmd")
+            if cmd == "apply" and i != last_apply:
+                continue
+            # Cheap once connected; after an unplug, finds it again.
+            lib = sdk if sdk.wooting_rgb_kbd_connected() else None
+            try:
+                if cmd == "status":
+                    out = cmd_status(lib) if lib else {"ok": True, "connected": False, "sdk": True,
+                                                       "error": "no Wooting keyboard found"}
+                elif not lib:
+                    out = {"ok": False, "error": "no Wooting keyboard found"}
+                elif cmd == "apply":
+                    b = max(10, min(100, int(c.get("brightness", 100))))
+                    out = cmd_apply(os.path.expanduser(c.get("image", "")), b, bool(c.get("animate")), lib)
+                elif cmd == "reset":
+                    out = cmd_reset(lib)
+                else:
+                    out = {"ok": False, "error": f"unknown command {cmd}"}
+            except (OSError, ValueError) as e:
+                out = {"ok": False, "error": str(e)}
+            out["cmd"] = cmd
+            print(json.dumps(out), flush=True)
 
 
 def main():
     a = sys.argv[1:]
     try:
         if a[:1] == ["apply"] and len(a) >= 2:
+            animate = "--animate" in a
+            a = [x for x in a if x != "--animate"]
             b = max(10, min(100, int(float(a[2])))) if len(a) > 2 else 100
-            out = cmd_apply(os.path.expanduser(a[1]), b)
+            out = cmd_apply(os.path.expanduser(a[1]), b, animate)
         elif a[:1] == ["palette"] and len(a) == 2:
             out = cmd_palette(os.path.expanduser(a[1]))
         elif a == ["reset"]:
             out = cmd_reset()
         elif a in ([], ["status"]):
             out = cmd_status()
+        elif a == ["serve"]:
+            serve()
+            return
         else:
             sys.exit(__doc__)
     except (OSError, ValueError) as e:
