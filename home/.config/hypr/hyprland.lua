@@ -337,11 +337,9 @@ hl.window_rule({
 
 -- ── Steam's notification toasts ─────────────────────────────────────
 --
--- "A friend is now playing..." is a small X window Steam places itself, in
--- X coordinates that do not match this layout (the Samsung sits left of and
--- lower than the Xiaomi), so it landed well above the corner. Pinned here to
--- the bottom-right of the monitor in use, on the same 13px gap as windows,
--- and never taking focus from the game or the window you are typing in.
+-- "A friend is now playing..." is a small X window, kept floating, pinned to
+-- whatever workspace you are on and never taking focus from the game or the
+-- window you are typing in.
 --
 -- The `.*` matters: Hyprland matches a rule's regex against the whole title,
 -- not a prefix of it, so "^notificationtoasts" alone matched no toast
@@ -352,8 +350,51 @@ hl.window_rule({
     float    = true,
     pin      = true,
     no_focus = true,
-    move     = "monitor_w-window_w-13 monitor_h-window_h-13",
 })
+
+-- Where it goes is not up to a rule. Steam moves the toast itself right
+-- after it maps -- it slides it up into what it takes for the bottom-right
+-- corner, over about a third of a second -- and a floating X window gets the
+-- moves it asks for, so a rule's `move` held for 60ms. Steam works that
+-- corner out in X coordinates, where both monitors sit at y=0; here the
+-- Samsung is 240px lower and the Xiaomi 242px higher, so the slide ended in
+-- the middle of the right edge. Mapped with a rule's `move`, the Xiaomi's
+-- corner came out off-screen as well (monitor_h, without its offset).
+--
+-- So: into the bottom-right corner of the monitor in use, 13px in like the
+-- windows, and back there every 10ms for as long as the toast is up -- a
+-- check that moves nothing once Steam has stopped. One timer per toast, and
+-- it ends with the toast.
+local function pinToastToCorner(win)
+    local mon = hl.get_active_monitor()
+    if not mon then return end
+    local sel = "address:" .. win.address
+    local function place()
+        local w = hl.get_window(sel)
+        if not w or not w.mapped then return false end
+        local x = mon.x + mon.width - w.size.x - 13
+        local y = mon.y + mon.height - w.size.y - 13
+        if w.at.x ~= x or w.at.y ~= y then
+            hl.dispatch(hl.dsp.window.move({ x = x, y = y, window = sel }))
+        end
+        return true
+    end
+    if not place() then return end
+    local elapsed = 0
+    local timer
+    timer = hl.timer(function()
+        elapsed = elapsed + 10
+        -- Steam's toasts last about six seconds; the cap is only for one
+        -- that stays up, so it is not watched forever.
+        if not place() or elapsed > 15000 then timer:set_enabled(false) end
+    end, { timeout = 10, type = "repeat" })
+end
+
+hl.on("window.open", function(win)
+    if win.class == "steam" and win.title:find("^notificationtoasts") then
+        pinToastToCorner(win)
+    end
+end)
 
 hl.window_rule({
     name  = "move-hyprland-run",
