@@ -8,7 +8,7 @@
     "base": 1
   },
   "shadow": {
-    "value": false,
+    "value": true,
     "base": true
   },
   "gaps_out": {
