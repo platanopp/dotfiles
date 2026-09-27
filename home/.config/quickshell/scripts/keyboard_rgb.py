@@ -333,6 +333,7 @@ PKT_CONTROLLER_DATA = 1
 PKT_PROTOCOL_VERSION = 40
 PKT_CLIENT_NAME = 50
 PKT_DEVICE_LIST_UPDATED = 100
+PKT_RESCAN_DEVICES = 140
 PKT_UPDATE_LEDS = 1050
 PKT_SET_CUSTOM_MODE = 1100
 DEVICE_KEYBOARD = 5
@@ -449,6 +450,12 @@ class OpenRGB:
         total = r.take("H")
         return dev_type, name, vendor, zones, total
 
+    def rescan(self):
+        """Have the server look for devices again: it does not notice a
+        keyboard plugged in or out on its own. It answers, when done, with
+        a "device list updated" note."""
+        self.send(0, PKT_RESCAN_DEVICES)
+
     def custom_mode(self, index):
         self.send(index, PKT_SET_CUSTOM_MODE)
 
@@ -522,6 +529,16 @@ class Keyboards:
         self.orgb = None
         self.orgb_devices = []
         self.last_scan = 0.0
+        self.usb = self.usb_signature()
+        self.rescan_asked = 0.0
+
+    @staticmethod
+    def usb_signature():
+        """What is plugged in, cheaply: the USB device directory."""
+        try:
+            return tuple(sorted(os.listdir("/sys/bus/usb/devices")))
+        except OSError:
+            return ()
 
     def devices(self):
         return ([self.wooting] if self.wooting else []) + self.orgb_devices
@@ -535,9 +552,31 @@ class Keyboards:
                 self.wooting = Wooting(self.sdk)
         else:
             self.wooting = None
-        # OpenRGB: every few seconds, or when the server says the list moved.
+        # Something plugged in or out: OpenRGB is asked to look again, and
+        # says so ("device list updated") once it has.
         now = time.monotonic()
+        usb = self.usb_signature()
+        if usb != self.usb:
+            self.usb = usb
+            if self.orgb:
+                try:
+                    self.orgb.rescan()
+                    self.rescan_asked = now
+                except OSError:
+                    pass
+        # OpenRGB: every few seconds, or when the server says the list moved.
+        if self.orgb and self.rescan_asked and not self.orgb.list_changed:
+            try:
+                # Pick up the note if it has arrived, without waiting for it.
+                self.orgb.sock.settimeout(0.01)
+                self.orgb.receive(-1)
+            except (OSError, socket.timeout):
+                pass
+            finally:
+                if self.orgb:
+                    self.orgb.sock.settimeout(2)
         if force or now - self.last_scan > 5 or (self.orgb and self.orgb.list_changed):
+            self.rescan_asked = 0.0
             self.last_scan = now
             self.scan_openrgb()
         return before != [d.key for d in self.devices()]
