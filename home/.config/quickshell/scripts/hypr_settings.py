@@ -57,7 +57,7 @@ SPEC = {
     "gaps_in":          ("general:gaps_in", "int", (0, 40), "Gap between windows"),
     "gaps_out":         ("general:gaps_out", "sides", (0, 80), "Gap to the screen edge"),
     # The top edge of the same option, on a slider of its own: the bar sits
-    # in it, and the shell's pills follow it down (AppState.gapTop). Stored
+    # in it, and the shell's pills follow it down (Hypr.gapTop). Stored
     # inside gaps_out's entry -- one option, one line in gui-settings.lua.
     "gaps_top":         ("general:gaps_out", "top", (0, 80), "Gap to the top edge"),
     "border_size":      ("general:border_size", "int", (0, 8), "Border"),

@@ -207,7 +207,7 @@ def kill():
 
 # Each mpvpaper's mpv answers on a socket of its own, named for its monitor,
 # so the shell can pause the video on one monitor and not the other (see
-# cmd_pause and AppState.syncVideoPause).
+# cmd_pause and Wallpaper.syncVideoPause).
 def socket_for(output):
     return os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), f"mpvpaper-{output}.sock")
 

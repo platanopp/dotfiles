@@ -223,7 +223,7 @@ hl.bind(mainMod .. " + SHIFT + R", hl.dsp.global("quickshell:record"))
 -- ── While the shell's launcher, overview, wallpapers or shortcuts are up ─
 --
 -- Quickshell switches to this submap as one opens and back as it closes
--- (AppState.modalOpen). In it only the keys that close them do anything: the rest -- above all Super+drag, which moved and resized the
+-- (Panels.modalOpen). In it only the keys that close them do anything: the rest -- above all Super+drag, which moved and resized the
 -- windows behind the overview -- waits until they are gone. Keys the
 -- overlays handle themselves (Esc, arrows, typing) reach them as usual.
 --

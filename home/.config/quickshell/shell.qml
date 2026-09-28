@@ -1,6 +1,5 @@
 //@ pragma UseQApplication
 
-import "."
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
@@ -9,9 +8,23 @@ import Quickshell.Services.Mpris
 import QtQuick
 import QtQuick.Effects
 import QtQuick.Layouts
+import qs.bar
+import qs.config
+import qs.lock
+import qs.overlays
+import qs.services
 
 Scope {
     id: root
+
+    // Services are singletons, and a singleton starts the first time
+    // something reads it. Named here so they all start with the shell: some
+    // are only read from a panel or a Settings page, and what they do on
+    // their own -- the IPC targets, the keyboard's colours following the
+    // wallpaper -- has to be running before that.
+    readonly property var services: [Audio, Bluetooth, Clock, Display, Hypr, KeyboardRgb, Keybinds,
+                                     Network, Notes, Panels, Power, Profile, Recorder, System, Tablet,
+                                     Wallpaper]
 
     Variants {
         model: Quickshell.screens
@@ -40,7 +53,7 @@ Scope {
 	    // read as flatter and shorter than the rest. The reserved space is
 	    // pinned to the strip, and so is input, so the extra room neither
 	    // moves the windows nor takes clicks from their top edge.
-	    readonly property int stripHeight: AppState.gapTop + leftPill.implicitHeight + 3
+	    readonly property int stripHeight: Hypr.gapTop + leftPill.implicitHeight + 3
 	    implicitHeight: stripHeight + 16
 	    exclusionMode: ExclusionMode.Normal
 	    exclusiveZone: stripHeight
@@ -71,7 +84,7 @@ Scope {
 
             WlrLayershell.namespace: "quickshell:bar-blur"
             WlrLayershell.layer: WlrLayer.Overlay
-            WlrLayershell.keyboardFocus: (statusWidget.expandedPanel === "wifi" && AppState.wifiExpandedSsid.length > 0) ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+            WlrLayershell.keyboardFocus: (statusWidget.expandedPanel === "wifi" && Network.wifiExpandedSsid.length > 0) ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
             property var monitor: Hyprland.monitorFor(modelData)
 
@@ -253,8 +266,8 @@ Scope {
                 anchors.top: parent.top
                 // The one pill anchored to the screen rather than to a
                 // neighbour, so it is where the left edge of the row is set.
-                anchors.leftMargin: AppState.gapLeft
-                anchors.topMargin: AppState.gapTop
+                anchors.leftMargin: Hypr.gapLeft
+                anchors.topMargin: Hypr.gapTop
                 implicitWidth: leftRow.implicitWidth + Theme.pillPaddingH * 2
                 implicitHeight: 40
 
@@ -373,7 +386,7 @@ Scope {
     // own surface on every screen by itself -- a per-screen copy would have
     // each of them trying to claim the one session lock.
     //
-    // Raised by Super + L through AppState.lockSession(), by the control
+    // Raised by Super + L through Power.lockSession(), by the control
     // panel, by `loginctl lock-session` from anywhere, and once on the first
     // start after a boot -- see the claim in LockEngine, which is what stands
     // in for a greeter on a seat that is handed over already logged in.
@@ -387,11 +400,11 @@ Scope {
         target: "screens"
 
         function blank(names: string): void {
-            AppState.blankedScreens = names.split(/[\s,]+/).filter(n => n.length > 0)
+            Power.blankedScreens = names.split(/[\s,]+/).filter(n => n.length > 0)
         }
 
         function unblank(): void {
-            AppState.blankedScreens = []
+            Power.blankedScreens = []
         }
     }
 
@@ -403,17 +416,17 @@ Scope {
         name: "keybinds"
         description: "Show the keyboard shortcuts"
 
-        onPressed: AppState.toggleKeybinds()
+        onPressed: Panels.toggleKeybinds()
     }
 
-    // Escape while a bar panel is open -- bound by AppState only for as
+    // Escape while a bar panel is open -- bound by Panels only for as
     // long as one is (see escapeBind there).
     GlobalShortcut {
         appid: "quickshell"
         name: "dismiss"
         description: "Close the open panel"
 
-        onPressed: AppState.dismissPanels()
+        onPressed: Panels.dismissPanels()
     }
 
     GlobalShortcut {
@@ -421,7 +434,7 @@ Scope {
         name: "settings"
         description: "Open or close Settings"
 
-        onPressed: AppState.toggleSettings()
+        onPressed: Panels.toggleSettings()
     }
 
     GlobalShortcut {
@@ -429,7 +442,7 @@ Scope {
         name: "wallpapers"
         description: "Choose the wallpaper"
 
-        onPressed: AppState.toggleWallpapers()
+        onPressed: Panels.toggleWallpapers()
     }
 
     GlobalShortcut {
@@ -437,7 +450,7 @@ Scope {
         name: "launcher"
         description: "Search and launch an application"
 
-        onPressed: AppState.toggleLauncher()
+        onPressed: Panels.toggleLauncher()
     }
 
     GlobalShortcut {
@@ -445,7 +458,7 @@ Scope {
         name: "record"
         description: "Start or stop recording the screen"
 
-        onPressed: AppState.toggleRecording("")
+        onPressed: Recorder.toggleRecording("")
     }
 
     GlobalShortcut {
@@ -453,18 +466,18 @@ Scope {
         name: "overview"
         description: "Show every workspace and its windows"
 
-        onPressed: AppState.toggleOverview()
+        onPressed: Panels.toggleOverview()
     }
 
     // The lock is this shell's own surface, so the bind has to reach the shell
-    // rather than run a locker of its own -- see AppState.lockSession(), which
+    // rather than run a locker of its own -- see Power.lockSession(), which
     // is also where the control panel and its suspend go.
     GlobalShortcut {
         appid: "quickshell"
         name: "lock"
         description: "Lock the screen"
 
-        onPressed: AppState.lockSession()
+        onPressed: Power.lockSession()
     }
 
     // Routed through the shell rather than run as a bare wpctl bind, so the
@@ -476,6 +489,6 @@ Scope {
         name: "micmute"
         description: "Mute or unmute the microphone"
 
-        onPressed: AppState.toggleMicMute()
+        onPressed: Audio.toggleMicMute()
     }
 }

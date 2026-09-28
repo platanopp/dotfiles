@@ -1,0 +1,418 @@
+import Quickshell
+import Quickshell.Wayland
+import Quickshell.Hyprland
+import Quickshell.Widgets
+import Quickshell.Services.Notifications
+import QtQuick
+import QtQuick.Effects
+import QtQuick.Layouts
+import qs.components
+import qs.config
+import qs.services
+
+// Toasts: how a notification arrives. They stack under the right-hand end of
+// the bar, in the bar's glass, as wide as the control panel they sit under.
+// Each shows for five seconds -- the line along its foot runs down to show
+// how long is left -- and then leaves the screen for the centre (the bell),
+// not for good. Hovering or dragging holds it; the cross or a drag to the
+// right sends it on at once; tapping it does what the notification is for.
+// Critical ones stay until dealt with, and have no line.
+PanelWindow {
+    id: popups
+
+    property var bar: null
+    screen: bar ? bar.screen : null
+
+    readonly property int cardWidth: 372 - 24
+    readonly property int lifetime: Notifications.lifetime
+
+    // What a card shows for the instant between its notification closing and
+    // the card going, so no binding reads a field of nothing.
+    readonly property var emptyNotif: ({ summary: "", body: "", appName: "", appIcon: "", image: "",
+                                         actions: [], urgency: NotificationUrgency.Normal,
+                                         invoke: function () {} })
+
+    WlrLayershell.namespace: "quickshell:bar-blur"
+    WlrLayershell.layer: WlrLayer.Overlay
+    exclusionMode: ExclusionMode.Ignore
+
+    anchors {
+        top: true
+        right: true
+    }
+    // Under the bar's pills by the same gap the pills keep between each
+    // other, the right edge in line with theirs. The 12 is the inset every
+    // surface here draws its content at.
+    margins.top: Hypr.gapTop + 40 + 10 - 12
+    margins.right: Hypr.gapRight - 12
+
+    // One stack per screen would show the same notification on every monitor,
+    // so only the focused one draws it.
+    readonly property bool onFocusedMonitor: {
+        if (!bar || !bar.monitor) return false
+        var focused = Hyprland.focusedMonitor
+        return !!focused && focused.id === bar.monitor.id
+    }
+
+    visible: Notifications.popups.count > 0 && onFocusedMonitor
+    color: "transparent"
+
+    // A fixed size, never animated: a surface that resizes every frame
+    // stutters (see PillStage). The stack moves inside; input is kept to it.
+    implicitWidth: cardWidth + 24
+    implicitHeight: screen ? Math.min(screen.height - 120, 820) : 700
+
+    mask: Region {
+        item: stack
+    }
+
+    Column {
+        id: stack
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.margins: 12
+        width: popups.cardWidth
+        spacing: 10
+
+        move: Transition {
+            NumberAnimation { properties: "y"; duration: Theme.durMedium; easing.type: Easing.OutCubic }
+        }
+
+        Repeater {
+            model: Notifications.popups
+
+            Item {
+                id: card
+                required property int key
+                required property int index
+                // Held on to: an app closing its notification drops it from
+                // Notifications at once, and the card still has to leave.
+                property var live: null
+                readonly property var current: Notifications.get(card.key)
+                onCurrentChanged: if (card.current) card.live = card.current
+                Component.onCompleted: {
+                    card.live = card.current
+                    entrance.start()
+                }
+                readonly property var n: card.live || popups.emptyNotif
+
+                // Only the newest few show; the rest wait, their time not yet
+                // running (see the countdown).
+                readonly property bool shown: card.index < Notifications.maxVisible && card.live !== null
+                visible: card.shown
+                width: popups.cardWidth
+                // Collapses to nothing on the way out, so the cards below
+                // slide up into its place instead of jumping.
+                property real collapse: 1
+                height: (card.shown ? glass.height : 0) * card.collapse
+
+                // ── Leaving ─────────────────────────────────────────────────
+                //
+                // Off to the right and fading, then the space it took closes;
+                // then Notifications drops the row (finishLeave).
+                readonly property bool leaving: !!card.live && card.live.leaving
+                onLeavingChanged: {
+                    if (card.leaving) exit.restart()
+                    else if (exit.running) {           // raised again: back in
+                        exit.stop()
+                        card.collapse = 1
+                        card.opacity = 1
+                        card.x = 0
+                    }
+                }
+
+                SequentialAnimation {
+                    id: exit
+                    ParallelAnimation {
+                        NumberAnimation { target: card; property: "x"; to: 90; duration: 240; easing.type: Easing.InCubic }
+                        NumberAnimation { target: card; property: "opacity"; to: 0; duration: 220; easing.type: Easing.InQuad }
+                    }
+                    NumberAnimation { target: card; property: "collapse"; to: 0; duration: 200; easing.type: Easing.OutCubic }
+                    ScriptAction { script: Notifications.finishLeave(card.key) }
+                }
+
+                readonly property bool sticky: card.n.urgency === NotificationUrgency.Critical
+                readonly property var defaultAction: {
+                    for (var i = 0; i < card.n.actions.length; i++)
+                        if (card.n.actions[i].identifier === "default") return card.n.actions[i]
+                    return null
+                }
+
+                // ── Its own time ────────────────────────────────────────────
+                //
+                // Kept on the notification (expiresAt), not in this card: the
+                // card can be rebuilt, the time cannot be restarted by it. It
+                // starts when the toast first shows, stops while the pointer
+                // is on it or it is being dragged -- the pause is added to its
+                // end -- and when it runs out the toast leaves for the centre.
+                readonly property bool held: hover.hovered || drag.active
+                property real remaining: 1
+
+                function tick() {
+                    var n = card.live
+                    if (!n || card.sticky) return
+                    var now = Date.now()
+                    if (n.expiresAt === 0) n.expiresAt = now + popups.lifetime
+                    if (card.held) {
+                        if (n.pausedAt === 0) n.pausedAt = now
+                        return
+                    }
+                    if (n.pausedAt !== 0) {
+                        n.expiresAt += now - n.pausedAt
+                        n.pausedAt = 0
+                    }
+                    card.remaining = Math.max(0, Math.min(1, (n.expiresAt - now) / popups.lifetime))
+                    // Off the screen, into the centre -- not gone.
+                    if (card.remaining <= 0) Notifications.expire(n)
+                }
+
+                Timer {
+                    running: card.shown && !card.sticky
+                    interval: 30
+                    repeat: true
+                    triggeredOnStart: true
+                    onTriggered: card.tick()
+                }
+                onHeldChanged: card.tick()
+
+                // Entrance: in from the right, settling.
+                opacity: 0
+                x: 48
+
+                ParallelAnimation {
+                    id: entrance
+                    NumberAnimation { target: card; property: "opacity"; to: 1; duration: Theme.durMedium }
+                    NumberAnimation { target: card; property: "x"; to: 0; duration: Theme.durLong; easing.type: Easing.OutCubic }
+                }
+
+                HoverHandler {
+                    id: hover
+                    cursorShape: card.defaultAction ? Qt.PointingHandCursor : Qt.ArrowCursor
+                }
+
+                // What tapping a notification means; done, it has served.
+                TapHandler {
+                    enabled: card.defaultAction !== null
+                    onTapped: {
+                        card.n.invoke("default")
+                        Notifications.dismiss(card.n)
+                    }
+                }
+
+                // Drag right past a third of the card to send it on, like the
+                // cross.
+                DragHandler {
+                    id: drag
+                    target: card
+                    yAxis.enabled: false
+                    xAxis.minimum: 0
+
+                    onActiveChanged: {
+                        if (drag.active) return
+                        if (card.x > popups.cardWidth * 0.33) Notifications.expire(card.n)
+                        else settleBack.start()
+                    }
+                }
+
+                NumberAnimation {
+                    id: settleBack
+                    target: card
+                    property: "x"
+                    to: 0
+                    duration: Theme.durMedium
+                    easing.type: Easing.OutCubic
+                }
+
+                // ── The glass, as the bar's pills have it ───────────────────
+                Rectangle {
+                    id: glass
+                    width: parent.width
+                    height: content.implicitHeight + 30
+                    radius: 22
+                    color: Theme.glass
+                    visible: false
+                    layer.enabled: true
+                }
+
+                MultiEffect {
+                    source: glass
+                    anchors.fill: glass
+                    shadowEnabled: true
+                    shadowColor: "#000000"
+                    shadowOpacity: 0.5
+                    shadowBlur: 0.7
+                    shadowVerticalOffset: 4
+                    autoPaddingEnabled: true
+                }
+
+                // A touch lighter under the pointer, like every button here.
+                Rectangle {
+                    anchors.fill: glass
+                    radius: glass.radius
+                    color: Theme.foreground
+                    opacity: hover.hovered && card.defaultAction ? Theme.hoverOpacity * 0.6 : 0
+
+                    Behavior on opacity { NumberAnimation { duration: Theme.durShort } }
+                }
+
+                ColumnLayout {
+                    id: content
+                    anchors.left: glass.left
+                    anchors.right: glass.right
+                    anchors.top: glass.top
+                    anchors.leftMargin: 16
+                    anchors.rightMargin: 12
+                    anchors.topMargin: 14
+                    spacing: 10
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 12
+
+                        ClippingRectangle {
+                            Layout.alignment: Qt.AlignTop
+                            Layout.preferredWidth: 36
+                            Layout.preferredHeight: 36
+                            radius: 11
+                            color: Theme.surfaceContainerHigh
+
+                            IconImage {
+                                id: appImage
+                                anchors.fill: parent
+                                mipmap: true
+                                visible: status === Image.Ready
+                                source: {
+                                    if (card.n.image.length > 0) return card.n.image
+                                    if (card.n.appIcon.length > 0) return Quickshell.iconPath(card.n.appIcon, true)
+                                    return Quickshell.iconPath(card.n.appName.toLowerCase(), true)
+                                }
+                            }
+
+                            IconGlyph {
+                                anchors.centerIn: parent
+                                visible: appImage.status !== Image.Ready
+                                text: "\u{F009A}"
+                                size: Theme.iconMedium
+                                color: Theme.textMuted
+                            }
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 2
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 6
+
+                                // Critical, as a dot beside the app's name.
+                                Rectangle {
+                                    visible: card.sticky
+                                    Layout.alignment: Qt.AlignVCenter
+                                    implicitWidth: 6
+                                    implicitHeight: 6
+                                    radius: 3
+                                    color: Theme.error
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: (card.n.appName || "Notification") + "  ·  now"
+                                    color: Theme.textMuted
+                                    font.pixelSize: 10
+                                    font.family: Theme.fontMono
+                                    elide: Text.ElideRight
+                                }
+
+                                IconButton {
+                                    icon: "\u{F0156}"
+                                    size: 22
+                                    glyphSize: Theme.iconSmall
+                                    iconColor: Theme.textMuted
+                                    opacity: hover.hovered ? 1 : 0
+                                    onTapped: Notifications.expire(card.n)
+
+                                    Behavior on opacity { NumberAnimation { duration: Theme.durShort } }
+                                }
+                            }
+
+                            Text {
+                                visible: text.length > 0
+                                Layout.fillWidth: true
+                                text: card.n.summary
+                                color: Theme.textPrimary
+                                font.pixelSize: 13
+                                font.bold: true
+                                font.family: Theme.fontMono
+                                wrapMode: Text.WordWrap
+                                maximumLineCount: 2
+                                elide: Text.ElideRight
+                            }
+
+                            Text {
+                                visible: text.length > 0
+                                Layout.fillWidth: true
+                                text: card.n.body
+                                color: Theme.textSecondary
+                                font.pixelSize: 12
+                                font.family: Theme.fontMono
+                                textFormat: Text.PlainText
+                                wrapMode: Text.WordWrap
+                                maximumLineCount: 3
+                                elide: Text.ElideRight
+                            }
+                        }
+                    }
+
+                    // Its other actions; "default" is the card itself.
+                    Flow {
+                        visible: card.n.actions.some(a => a.identifier !== "default")
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 48
+                        spacing: 6
+
+                        Repeater {
+                            model: card.n.actions.filter(a => a.identifier !== "default")
+
+                            PillButton {
+                                required property var modelData
+                                text: modelData.text
+                                onClicked: {
+                                    card.n.invoke(modelData.identifier)
+                                    Notifications.dismiss(card.n)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ── Time left ───────────────────────────────────────────────
+                //
+                // Along the foot of the card, running down from full to
+                // nothing over the five seconds; it holds while the pointer is
+                // on the card.
+                Rectangle {
+                    visible: !card.sticky
+                    anchors.left: glass.left
+                    anchors.right: glass.right
+                    anchors.bottom: glass.bottom
+                    anchors.leftMargin: 18
+                    anchors.rightMargin: 18
+                    anchors.bottomMargin: 8
+                    height: 3
+                    radius: 1.5
+                    color: Theme.track
+
+                    Rectangle {
+                        width: parent.width * card.remaining
+                        height: parent.height
+                        radius: parent.radius
+                        color: Theme.alpha(Theme.foreground, card.held ? 0.45 : 0.75)
+
+                        Behavior on color { ColorAnimation { duration: Theme.durShort } }
+                    }
+                }
+            }
+        }
+    }
+}
