@@ -39,6 +39,21 @@ Singleton {
     // The others keep the colours they were given in Wootility.
     readonly property int keyboardRgbProfile: adapter.keyboardRgbProfile
 
+    // Screen recording (Settings -> Recording, scripts/screen_record.sh).
+    // Where recordings go: "" for ~/Vídeos/Recordings.
+    readonly property string recordFolder: adapter.recordFolder
+    // The height recorded at, the width following the monitor: "native",
+    // "2160", "1440", "1080" or "720".
+    readonly property string recordResolution: adapter.recordResolution
+    readonly property int recordFps: adapter.recordFps
+    // gpu-screen-recorder's scale: "medium", "high", "very_high", "ultra".
+    readonly property string recordQuality: adapter.recordQuality
+    // "h264" plays everywhere; "hevc" is about half the size.
+    readonly property string recordCodec: adapter.recordCodec
+    // "none", "system" (what the computer plays), "mic", or "both".
+    readonly property string recordAudio: adapter.recordAudio
+    readonly property bool recordCursor: adapter.recordCursor
+
     function set(key, value) {
         adapter[key] = value
     }
@@ -68,6 +83,13 @@ Singleton {
             property int keyboardRgbBrightness: 100
             property bool keyboardRgbAnimate: true
             property int keyboardRgbProfile: -1
+            property string recordFolder: ""
+            property string recordResolution: "1080"
+            property int recordFps: 60
+            property string recordQuality: "very_high"
+            property string recordCodec: "h264"
+            property string recordAudio: "system"
+            property bool recordCursor: true
         }
     }
 }

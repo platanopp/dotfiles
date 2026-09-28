@@ -1730,8 +1730,9 @@ Singleton {
 
     // ── Screen recording ─────────────────────────────────────────────────
     //
-    // One monitor at a time, 1080p 60 fps H.264 MP4 with the computer's
-    // sound, encoded on the GPU (scripts/screen_record.sh). Started and
+    // One monitor at a time, as Settings -> Recording says (by default 1080p
+    // 60 fps H.264 MP4 with the computer's sound), encoded on the GPU
+    // (scripts/screen_record.sh). Started and
     // stopped from the control panel's Record tile, the red dot the control
     // pill shows while it runs, Super+Shift+R, or `qs ipc call record ...`.
     // Stopped with SIGINT, which is what makes the recorder finish the file.
@@ -1746,10 +1747,41 @@ Singleton {
         root.recordingFile = ""
         root.recordingMonitor = monitor || root.focusedScreenName()
         recordProc.command = [Quickshell.env("HOME") + "/.config/quickshell/scripts/screen_record.sh",
-                              root.recordingMonitor]
+                              "--monitor", root.recordingMonitor,
+                              "--height", ShellSettings.recordResolution,
+                              "--fps", String(ShellSettings.recordFps),
+                              "--quality", ShellSettings.recordQuality,
+                              "--codec", ShellSettings.recordCodec,
+                              "--audio", ShellSettings.recordAudio,
+                              "--cursor", ShellSettings.recordCursor ? "yes" : "no",
+                              "--dir", ShellSettings.recordFolder]
         root.recordingSince = Date.now()
         root.recordingSeconds = 0
         recordProc.running = true
+    }
+
+    // Where recordings are going, for the Settings page.
+    readonly property string recordingFolder: ShellSettings.recordFolder.length > 0
+        ? ShellSettings.recordFolder
+        : Quickshell.env("HOME") + "/Vídeos/Recordings"
+
+    // A folder picked in a dialog (zenity); cancelling it changes nothing.
+    function chooseRecordingFolder() {
+        if (folderPickProc.running) return
+        folderPickProc.running = true
+    }
+
+    Process {
+        id: folderPickProc
+        running: false
+        command: ["zenity", "--file-selection", "--directory", "--title=Where recordings are saved",
+                  "--filename=" + root.recordingFolder + "/"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var d = text.trim()
+                if (d.length > 0) ShellSettings.set("recordFolder", d)
+            }
+        }
     }
 
     function stopRecording() {

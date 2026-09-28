@@ -226,6 +226,8 @@ PanelWindow {
           keywords: ["avatar", "picture", "photo", "user", "perfil", "foto"] },
         { id: "shell", name: "Shell", glyph: "\u{F10AC}",
           keywords: ["bar", "clock", "lock", "backup", "barra", "reloj"] },
+        { id: "recording", name: "Recording", glyph: "\u{F044B}",
+          keywords: ["record", "screen", "capture", "video", "fps", "grabar", "grabacion", "pantalla"] },
         { id: "power", name: "Power & idle", glyph: "\u{F0241}",
           keywords: ["idle", "suspend", "sleep", "power", "energia", "suspender"] },
         { id: "about", name: "About", glyph: "\u{F02FD}",
@@ -244,6 +246,9 @@ PanelWindow {
         { id: "notifications", name: "Notifications", glyph: "\u{F009A}",
           keywords: ["notifications", "notificaciones"],
           run: function() { AppState.notificationsRequested("open", AppState.launcherScreen) } },
+        { id: "record", name: "Record the screen", glyph: "\u{F044B}",
+          keywords: ["record", "screen", "capture", "grabar", "pantalla"],
+          run: function() { AppState.toggleRecording(AppState.launcherScreen) } },
         { id: "settings", name: "Settings", glyph: "\u{F0493}",
           keywords: ["preferences", "ajustes", "configuracion"],
           run: function() { AppState.openSettings("", AppState.launcherScreen) } }
