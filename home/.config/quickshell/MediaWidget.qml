@@ -192,6 +192,7 @@ PanelWindow {
     // The pill's box, animated inside a window that is not (see PillStage).
     PillStage {
         id: stage
+        collapsed: bar.barHidden
         anchors.top: parent.top
         anchors.left: parent.left
         targetWidth: mediaWidgetItem.panelOpen ? 396

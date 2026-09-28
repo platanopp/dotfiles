@@ -78,6 +78,7 @@ PanelWindow {
     // An icon coming or going animates the box, not the window (PillStage).
     PillStage {
         id: stage
+        collapsed: bar.barHidden
         anchors.top: parent.top
         anchors.right: parent.right
         targetWidth: trayRow.implicitWidth + 24 + Theme.pillPaddingH * 2

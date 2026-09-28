@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Layouts
 
 // Settings -> Sound: where sound goes out and comes in, how loud each is, and
 // how loud each application is. The output side and the per-application

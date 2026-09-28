@@ -11,15 +11,10 @@ Singleton {
     property color background: "#101014"
     property color foreground: "#f2f2f2"
 
-    property color color0: "#101014"
     property color color1: "#e06c75"
     property color color2: "#98c379"
     property color color3: "#e5c07b"
     property color color4: "#d8d8d8"
-    property color color5: "#c678dd"
-    property color color6: "#56b6c2"
-    property color color7: "#f2f2f2"
-    property color color8: "#5c6370"
 
     // ── Semantic tokens ──────────────────────────────────────────────────
     readonly property color accent: color4
@@ -93,17 +88,12 @@ Singleton {
     readonly property int pillPaddingH: 16
 
     // ── Motion ───────────────────────────────────────────────────────────
-    // Material 3 duration and easing scale, so every animation in the shell
-    // is picked from the same set instead of an ad-hoc magic number.
+    // One duration scale, so every animation in the shell is picked from the
+    // same set instead of an ad-hoc magic number.
     readonly property int durShort: 100
     readonly property int durMedium: 200
     readonly property int durLong: 300
     readonly property int durExtraLong: 450
-
-    readonly property var easeStandard: [0.2, 0.0, 0.0, 1.0, 1, 1]
-    readonly property var easeDecelerate: [0.05, 0.7, 0.1, 1.0, 1, 1]
-    readonly property var easeAccelerate: [0.3, 0.0, 0.8, 0.15, 1, 1]
-    readonly property var easeSpring: [0.34, 1.3, 0.64, 1.0, 1, 1]
 
     // State layer opacities for hover / press feedback.
     readonly property real hoverOpacity: 0.08

@@ -55,13 +55,17 @@ PanelWindow {
                                                      : WlrKeyboardFocus.None
 
     // Spans the screen; the pill places itself inside with `leftMargin`,
-    // which the shell sets from the clock's right edge.
+    // which the shell sets from the clock's right edge. Down to a pixel of
+    // height while the bar is hidden (a fullscreen window), when nothing is
+    // drawn: a full-screen transparent surface was being composited over the
+    // game every frame (see PillStage.collapsed).
     anchors {
         top: true
-        bottom: true
+        bottom: !bar.barHidden
         left: true
         right: true
     }
+    implicitHeight: 1
     // The content inside insets itself by 12, so the window sits back by
     // that much and the drawn edge lands exactly on Hyprland's gap.
     margins.top: Math.max(0, AppState.gapTop - 12)

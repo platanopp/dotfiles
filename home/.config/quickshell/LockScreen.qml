@@ -4,7 +4,6 @@ import QtQuick.Layouts
 import Qt5Compat.GraphicalEffects
 import Quickshell
 import Quickshell.Wayland
-import Quickshell.Widgets
 import Quickshell.Services.Mpris
 
 // The session lock's face. Every piece of state it draws -- PAM's turn, the

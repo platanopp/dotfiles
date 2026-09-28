@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Layouts
 
 // Settings -> Keyboard: RGB keyboards lit with the wallpaper itself -- a
 // Wooting through its own SDK, any other brand through OpenRGB --

@@ -47,19 +47,30 @@ PanelWindow {
     // Connections rather than an `onOpenChanged` here, because two of these
     // files already declare one and a second on the same object is a
     // "Property value set multiple times" error.
-    visible: overlay.open || unmapDelay.running
+    //
+    // `shown` rather than `open || unmapDelay.running`: that was false for
+    // the moment between `open` going false and the timer starting, and the
+    // sheet blinked out for two frames before fading (see AppLauncher).
+    property bool shown: false
+    visible: overlay.shown
 
     Timer {
         id: unmapDelay
         // The inner fades run on durMedium; the margin covers the frame the
         // Behavior needs to get going.
         interval: Theme.durMedium + 80
+        onTriggered: overlay.shown = false
     }
 
     Connections {
         target: overlay
         function onOpenChanged() {
-            if (!overlay.open) unmapDelay.restart()
+            if (overlay.open) {
+                unmapDelay.stop()
+                overlay.shown = true
+            } else {
+                unmapDelay.restart()
+            }
         }
     }
 
@@ -69,10 +80,11 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Overlay
     exclusionMode: ExclusionMode.Ignore
 
-    // Exclusive only while open, so Escape reaches us and every other key
-    // goes back to whatever the user was working in.
-    WlrLayershell.keyboardFocus: overlay.open ? WlrKeyboardFocus.Exclusive
-                                              : WlrKeyboardFocus.None
+    // Exclusive while up, so Escape reaches us; held through the fade out,
+    // since changing it on a surface that stays mapped drops that surface
+    // for two frames (see AppLauncher).
+    WlrLayershell.keyboardFocus: overlay.shown ? WlrKeyboardFocus.Exclusive
+                                               : WlrKeyboardFocus.None
 
     anchors {
         top: true

@@ -74,7 +74,6 @@ Scope {
             WlrLayershell.keyboardFocus: (statusWidget.expandedPanel === "wifi" && AppState.wifiExpandedSsid.length > 0) ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
             property var monitor: Hyprland.monitorFor(modelData)
-            property int workspaceId: monitor && monitor.activeWorkspace ? monitor.activeWorkspace.id : 0
 
             // Right edge of the workspace pill. The media widget is its own
             // window and has to start past it, and the pill's width changes

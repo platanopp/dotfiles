@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Layouts
 
 // Settings -> Hyprland -> Input: the pointer, the keyboard's repeat, scrolling
 // and the cursor. Same rules as the Look page (scripts/hypr_settings.py).

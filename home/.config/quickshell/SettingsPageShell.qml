@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Layouts
 
 // Settings -> Shell: how the bar, the clock and the lock screen behave --
 // choices that used to be written into the code. Kept in

@@ -180,6 +180,7 @@ PanelWindow {
     // the move and gives it back at the end, and the glass grows in between.
     PillStage {
         id: stage
+        collapsed: bar.barHidden
         anchors.top: parent.top
         anchors.right: parent.right
         // Sized for Settings (and the tallest the panel gets) from the start

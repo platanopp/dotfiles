@@ -32,7 +32,6 @@ Singleton {
     // Kept as aliases onto Theme so existing bindings recolor with the
     // wallpaper; new code should read Theme directly.
     readonly property string themeAccent: Theme.accent
-    readonly property string themeBgHex: Theme.background.toString().substring(1)
     property var wifiNetworks: []
     property string wifiExpandedSsid: ""
     property string wifiStatusMessage: ""
@@ -56,28 +55,11 @@ Singleton {
     property var audioSinks: []
     property var audioStreams: []
     property bool audioStreamsDragging: false
-    property real cpuPercent: 0
-    property real ramPercent: 0
-    property real diskPercent: 0
-    property real tempCelsius: 0
     property bool micMuted: false
     property bool batteryPresent: false
     property real batteryPercent: 0
 
-    property string hostname: ""
     property string distro: ""
-    property real uptimeSeconds: 0
-
-    readonly property string uptimeText: {
-        var total = Math.floor(root.uptimeSeconds)
-        if (total <= 0) return ""
-        var days = Math.floor(total / 86400)
-        var hours = Math.floor((total % 86400) / 3600)
-        var minutes = Math.floor((total % 3600) / 60)
-        if (days > 0) return days + "d " + hours + "h"
-        if (hours > 0) return hours + "h " + minutes + "m"
-        return minutes + "m"
-    }
 
     function toggleMicMute() {
         micToggleProc.command = ["bash", "-c", "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"]
@@ -695,25 +677,9 @@ Singleton {
     Process {
         id: sysInfoProc
         running: true
-        command: ["bash", "-c", "printf '%s|%s' \"$(uname -n)\" \"$(. /etc/os-release 2>/dev/null && printf '%s' \"$PRETTY_NAME\")\""]
+        command: ["sh", "-c", ". /etc/os-release 2>/dev/null && printf '%s' \"$PRETTY_NAME\""]
         stdout: StdioCollector {
-            onStreamFinished: {
-                var parts = text.split("|")
-                root.hostname = parts[0] ? parts[0].trim() : ""
-                root.distro = parts.length > 1 ? parts[1].trim() : ""
-            }
-        }
-    }
-
-    Process {
-        id: uptimeProc
-        running: false
-        command: ["bash", "-c", "cut -d' ' -f1 /proc/uptime"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                var v = parseFloat(text.trim())
-                if (!isNaN(v)) root.uptimeSeconds = v
-            }
+            onStreamFinished: root.distro = text.trim()
         }
     }
 
@@ -1441,54 +1407,6 @@ Singleton {
         }
     }
 
-    Process {
-        id: cpuProc
-        running: false
-        command: ["bash", "-c", "read cpu a b c idle rest < /proc/stat; t1=$((a+b+c+idle)); i1=$idle; sleep 0.4; read cpu a b c idle rest < /proc/stat; t2=$((a+b+c+idle)); i2=$idle; dt=$((t2-t1)); di=$((i2-i1)); if [ \"$dt\" -gt 0 ]; then echo $(( (100*(dt-di))/dt )); else echo 0; fi"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                var v = parseInt(text.trim())
-                if (!isNaN(v)) root.cpuPercent = v
-            }
-        }
-    }
-
-    Process {
-        id: ramProc
-        running: false
-        command: ["bash", "-c", "free | awk '/Mem:/{printf \"%d\", ($3/$2)*100}'"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                var v = parseInt(text.trim())
-                if (!isNaN(v)) root.ramPercent = v
-            }
-        }
-    }
-
-    Process {
-        id: diskProc
-        running: false
-        command: ["bash", "-c", "df --output=pcent / | tail -1 | tr -d '% '"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                var v = parseInt(text.trim())
-                if (!isNaN(v)) root.diskPercent = v
-            }
-        }
-    }
-
-    Process {
-        id: tempProc
-        running: false
-        command: ["bash", "-c", "cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null | awk '{printf \"%d\", $1/1000}'"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                var v = parseInt(text.trim())
-                if (!isNaN(v)) root.tempCelsius = v
-            }
-        }
-    }
-
     // Dragging the volume slider calls setVolume() on every mouse move, and
     // each one costs a process. This used to be a 150ms debounce that
     // restart()ed on every move -- which never fires *during* a drag, only
@@ -1715,6 +1633,7 @@ Singleton {
     property string keybindsScreen: ""
 
     onKeybindsOpenChanged: {
+        root.syncSubmap()
         if (!root.keybindsOpen) return
         var monitor = Hyprland.focusedMonitor
         root.keybindsScreen = monitor ? monitor.name : ""
@@ -1792,13 +1711,14 @@ Singleton {
         function close(): void { root.overviewOpen = false }
     }
 
-    // The launcher, the overview and the wallpaper picker put Hyprland in
-    // its "shell-modal" submap while one is up (hyprland.lua), where Super+drag and the
+    // The launcher, the overview, the wallpaper picker and the shortcut
+    // sheet put Hyprland in its "shell-modal" submap while one is up (hyprland.lua), where Super+drag and the
     // other binds do nothing -- they reached the windows behind the overlay.
     // Set again on every change of either: Super+Tab or Super+Space drop
     // the submap themselves, and one may be opening as the other closes.
     // Reset once as the shell starts, in case one died with it set.
     readonly property bool modalOpen: root.overviewOpen || root.launcherOpen || root.wallpapersOpen
+                                      || root.keybindsOpen
 
     // One call, with where things ended up, a moment after they settle --
     // not one per change: two changes close together (the launcher closing

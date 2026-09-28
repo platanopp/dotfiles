@@ -81,6 +81,16 @@ Item {
         }
     }
 
-    readonly property real windowWidth: Math.ceil(Math.max(stage.minWindowWidth, stage.targetWidth, stage.heldWidth))
-    readonly property real windowHeight: Math.ceil(Math.max(stage.minWindowHeight, stage.targetHeight, stage.heldHeight))
+    // Set while the bar is hidden (a fullscreen window): the pill draws
+    // nothing then, so its window drops to a pixel -- these windows are
+    // sized for their largest state (a 790x1032 control panel, a 640-high
+    // media panel) and stay mapped, and Hyprland was compositing all that
+    // transparent area over the game every frame. Shrinking while nothing is
+    // drawn cannot show the one empty frame a resize costs.
+    property bool collapsed: false
+
+    readonly property real windowWidth: stage.collapsed ? 1
+        : Math.ceil(Math.max(stage.minWindowWidth, stage.targetWidth, stage.heldWidth))
+    readonly property real windowHeight: stage.collapsed ? 1
+        : Math.ceil(Math.max(stage.minWindowHeight, stage.targetHeight, stage.heldHeight))
 }

@@ -1,6 +1,5 @@
 import QtQuick
 import QtQuick.Effects
-import QtQuick.Layouts
 import Quickshell.Widgets
 
 // Settings -> Hyprland -> Look: gaps, borders, corners, transparency and

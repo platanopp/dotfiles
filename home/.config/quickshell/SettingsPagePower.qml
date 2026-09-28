@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Layouts
 
 // Settings -> Power & idle: how hard the CPU works, and what happens when the
 // desk is left alone. The timing lives in hypridle.conf and the side

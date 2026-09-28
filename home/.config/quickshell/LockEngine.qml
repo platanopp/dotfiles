@@ -24,7 +24,6 @@ Singleton {
     // the lock draws over a blurred wallpaper, so its cards stay translucent
     // and let the colour of the day through instead of sitting on flat black
     readonly property color card: Theme.alpha(Theme.background, 0.52)
-    readonly property color cardHigh: Theme.alpha(Theme.surfaceContainerHigh, 0.45)
     readonly property color hairline: Theme.alpha(Theme.outline, 0.45)
 
     // ── who is being asked ─────────────────────────────────────────────────
@@ -239,14 +238,6 @@ Singleton {
             root.focused = true;
 
         idleBack.restart();
-    }
-
-    function disengage() {
-        root.focused = false;
-        idleBack.stop();
-        if (root.phase === "failed" || root.phase === "error")
-            root.phase = "idle";
-
     }
 
     // ── authentication ─────────────────────────────────────────────────────
@@ -499,14 +490,6 @@ Singleton {
     readonly property bool ethernet: !!(root.wiredDevice && root.wiredDevice.connected)
     readonly property bool wifiUp: root.wifiDevice ? root.wifiDevice.connected : false
     property var activeNetwork: null
-    // signalStrength is 0-1 on this backend, not a percentage
-    readonly property int wifiPercent: {
-        if (!root.activeNetwork || root.activeNetwork.signalStrength === undefined)
-            return 0;
-
-        const raw = root.activeNetwork.signalStrength;
-        return Math.round(raw <= 1 ? raw * 100 : raw);
-    }
     readonly property string netGlyph: root.ethernet ? "ethernet" : (root.wifiUp ? "wifi" : "wifiOff")
     readonly property string netLabel: {
         if (root.ethernet)

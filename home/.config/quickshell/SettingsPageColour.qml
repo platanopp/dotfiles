@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Layouts
 
 // Settings -> Colour: saturation per display, and the tone of the whole
 // picture. Saturation is NVIDIA's digital vibrance, per connector through

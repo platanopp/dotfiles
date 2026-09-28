@@ -220,7 +220,7 @@ hl.bind(mainMod .. " + space", hl.dsp.global("quickshell:launcher"))
 hl.bind(mainMod .. " + Tab", hl.dsp.global("quickshell:overview"))
 hl.bind(mainMod .. " + SHIFT + R", hl.dsp.global("quickshell:record"))
 
--- ── While the shell's launcher, overview or wallpaper picker is up ─────
+-- ── While the shell's launcher, overview, wallpapers or shortcuts are up ─
 --
 -- Quickshell switches to this submap as one opens and back as it closes
 -- (AppState.modalOpen). In it only the keys that close them do anything: the rest -- above all Super+drag, which moved and resized the
@@ -242,6 +242,10 @@ hl.define_submap("shell-modal", function()
     hl.bind(mainMod .. " + W", function()
         hl.dispatch(hl.dsp.submap("reset"))
         hl.dispatch(hl.dsp.global("quickshell:wallpapers"))
+    end)
+    hl.bind(mainMod .. " + F", function()
+        hl.dispatch(hl.dsp.submap("reset"))
+        hl.dispatch(hl.dsp.global("quickshell:keybinds"))
     end)
 end)
 hl.bind(mainMod .. " + F", hl.dsp.global("quickshell:keybinds"))

@@ -102,6 +102,8 @@ PanelWindow {
 
     PillStage {
         id: stage
+
+        collapsed: bar.barHidden
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
         duration: Theme.durLong
