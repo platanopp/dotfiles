@@ -1691,6 +1691,29 @@ Singleton {
         root.launcherOpen = !root.launcherOpen
     }
 
+    // The workspace overview (Super+Tab): every workspace, with its windows.
+    // Pinned to the screen it was opened on, like the launcher.
+    property bool overviewOpen: false
+    property string overviewScreen: ""
+
+    onOverviewOpenChanged: {
+        if (!root.overviewOpen) return
+        var monitor = Hyprland.focusedMonitor
+        root.overviewScreen = monitor ? monitor.name : ""
+    }
+
+    function toggleOverview() {
+        if (!root.overviewOpen) root.launcherOpen = false
+        root.overviewOpen = !root.overviewOpen
+    }
+
+    IpcHandler {
+        target: "overview"
+        function toggle(): void { root.toggleOverview() }
+        function open(): void { if (!root.overviewOpen) root.toggleOverview() }
+        function close(): void { root.overviewOpen = false }
+    }
+
     // Text to start the field with, taken by the launcher as it opens.
     property string launcherPreset: ""
 

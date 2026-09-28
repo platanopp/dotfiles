@@ -217,6 +217,7 @@ hl.bind(mainMod .. " + V", hl.dsp.window.float({ action = "toggle" }))
 -- itself: LockEngine and LockScreen. Nothing outside the shell to run.
 hl.bind(mainMod .. " + L", hl.dsp.global("quickshell:lock"))
 hl.bind(mainMod .. " + space", hl.dsp.global("quickshell:launcher"))
+hl.bind(mainMod .. " + Tab", hl.dsp.global("quickshell:overview"))
 hl.bind(mainMod .. " + F", hl.dsp.global("quickshell:keybinds"))
 hl.bind(mainMod .. " + W", hl.dsp.global("quickshell:wallpapers"))
 hl.bind(mainMod .. " + O", hl.dsp.global("quickshell:settings"))
@@ -468,6 +469,18 @@ hl.layer_rule({
 -- The launcher fades itself in (100ms). Hyprland's own layer fade on top of
 -- that stretched its arrival to about 230ms from the keypress -- the slowest
 -- part of Super+Space.
+-- The workspace overview dims the desktop and has it blurred behind: the
+-- real windows (xray off, as for the cheatsheet), under a threshold low
+-- enough for the dim. It fades itself, so no layer animation on top.
+hl.layer_rule({
+    name         = "quickshell-overview",
+    match        = { namespace = "^quickshell:overview$" },
+    blur         = true,
+    ignore_alpha = 0.02,
+    xray         = false,
+    no_anim      = true,
+})
+
 hl.layer_rule({
     name    = "quickshell-launcher",
     match   = { namespace = "^quickshell:launcher$" },

@@ -355,6 +355,10 @@ Scope {
             // Last, so its surface is created last and sits on top of every
             // other overlay this shell puts up -- the fade has to cover the
             // bar and any open panel, not slide in behind them.
+            WorkspaceOverview {
+                bar: bar
+            }
+
             AppLauncher {
                 bar: bar
             }
@@ -435,6 +439,14 @@ Scope {
         description: "Search and launch an application"
 
         onPressed: AppState.toggleLauncher()
+    }
+
+    GlobalShortcut {
+        appid: "quickshell"
+        name: "overview"
+        description: "Show every workspace and its windows"
+
+        onPressed: AppState.toggleOverview()
     }
 
     // The lock is this shell's own surface, so the bind has to reach the shell

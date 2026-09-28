@@ -292,6 +292,12 @@ local function describe(action)
         if name == "quickshell:launcher" then
             return { action = "Application launcher", category = "System" }
         end
+        if name == "quickshell:overview" then
+            return { action = "Workspace overview", category = "Workspaces" }
+        end
+        if name == "quickshell:settings" then
+            return { action = "Open or close Settings", category = "System" }
+        end
         return { action = "Global shortcut: " .. name, category = "System" }
     end
     if disp == "layout" then
