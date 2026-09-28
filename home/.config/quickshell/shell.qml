@@ -359,6 +359,10 @@ Scope {
                 bar: bar
             }
 
+            RecordCountdown {
+                bar: bar
+            }
+
             AppLauncher {
                 bar: bar
             }

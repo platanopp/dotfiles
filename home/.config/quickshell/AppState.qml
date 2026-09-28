@@ -1788,9 +1788,54 @@ Singleton {
         if (recordProc.running) recordProc.signal(2)
     }
 
+    // Record, with a count of three first (RecordCountdown shows it on the
+    // monitor about to be recorded): time to get to what is to be recorded.
+    // Pressing record again during the count, Esc, or a click calls it off.
+    // Stop, if recording already.
     function toggleRecording(monitor) {
         if (recordProc.running) root.stopRecording()
-        else root.startRecording(monitor)
+        else if (root.recordCountdown > 0) root.cancelRecordingCountdown()
+        else root.countdownRecording(monitor)
+    }
+
+    // 3, 2, 1 while counting; 0 otherwise.
+    property int recordCountdown: 0
+    property string recordCountdownMonitor: ""
+
+    function countdownRecording(monitor) {
+        if (recordProc.running || root.recordCountdown > 0) return
+        root.recordCountdownMonitor = monitor || root.focusedScreenName()
+        root.recordCountdown = 3
+        countdownTick.restart()
+    }
+
+    function cancelRecordingCountdown() {
+        countdownTick.stop()
+        countdownGo.stop()
+        root.recordCountdown = 0
+    }
+
+    Timer {
+        id: countdownTick
+        interval: 1000
+        repeat: true
+        onTriggered: {
+            if (root.recordCountdown > 1) {
+                root.recordCountdown -= 1
+                return
+            }
+            // The count comes off the screen first, and the recording starts
+            // a moment later -- so its first frame is not the "1".
+            countdownTick.stop()
+            root.recordCountdown = 0
+            countdownGo.restart()
+        }
+    }
+
+    Timer {
+        id: countdownGo
+        interval: 150
+        onTriggered: root.startRecording(root.recordCountdownMonitor)
     }
 
     // "4:07", or "1:02:33" past the hour.
@@ -1836,7 +1881,8 @@ Singleton {
     IpcHandler {
         target: "record"
         function toggle(): void { root.toggleRecording("") }
-        function start(): void { root.startRecording("") }
+        // With the count first, as the tile and the shortcut do.
+        function start(): void { root.countdownRecording("") }
         function stop(): void { root.stopRecording() }
         function status(): string { return recordProc.running ? "recording " + root.recordingFile : "idle" }
     }

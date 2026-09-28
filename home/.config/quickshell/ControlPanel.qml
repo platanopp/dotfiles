@@ -408,12 +408,6 @@ PanelWindow {
         }
     }
 
-    Timer {
-        id: recordStart
-        interval: 400
-        onTriggered: AppState.startRecording(settingsItem.screen ? settingsItem.screen.name : "")
-    }
-
     HyprlandFocusGrab {
         id: controlPanelGrab
         windows: [settingsItem]
@@ -671,16 +665,19 @@ PanelWindow {
                     active: AppState.recording
                     detail: AppState.recording
                             ? AppState.recordingClock(AppState.recordingSeconds) + "  ·  tap to stop"
-                            : "1080p  ·  60 fps"
+                            : AppState.recordCountdown > 0 ? "Starting in " + AppState.recordCountdown
+                            : (ShellSettings.recordResolution === "native" ? "Native" : ShellSettings.recordResolution + "p")
+                              + "  ·  " + ShellSettings.recordFps + " fps"
                     onTapped: {
                         if (AppState.recording) {
                             AppState.stopRecording()
                             return
                         }
                         // The panel out of the way first, so it is not the
-                        // first thing the recording shows.
+                        // first thing the recording shows; the count of three
+                        // follows on this screen.
                         settingsItem.panelOpen = false
-                        recordStart.restart()
+                        AppState.countdownRecording(settingsItem.screen ? settingsItem.screen.name : "")
                     }
                 }
 
