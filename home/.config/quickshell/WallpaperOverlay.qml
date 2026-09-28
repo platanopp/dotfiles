@@ -115,7 +115,15 @@ PanelWindow {
         function onOpenChanged() {
             if (overlay.open) {
                 unmapDelay.stop()
+                // Always on the wallpaper in use, in the middle. Asked for
+                // before the row is built (it is built as the picker maps,
+                // see the carousel's model), so the build lands on it --
+                // and again after, for a picker reopened mid-fade whose row
+                // is still there.
+                overlay.section = overlay.sectionInUse()
+                overlay.pendingFocus = overlay.current
                 overlay.shown = true
+                overlay.restoreFocus()
             } else {
                 unmapDelay.restart()
             }
@@ -398,9 +406,19 @@ PanelWindow {
 
     function restoreFocus() {
         if (overlay.pendingFocus === "") return
+        // Not while the row is empty -- it is only built while the picker is
+        // up. Set then, the index fell to the first panel and the request was
+        // spent, and the picker opened on the first wallpaper rather than on
+        // the one in use. Kept until the row exists (onCountChanged).
+        if (carousel.count === 0) return
         var i = overlay.files.indexOf(overlay.pendingFocus)
         if (i < 0) return
+        // Straight there, not travelled to: the row has only just been
+        // built, and animating across it now is what left the middle of the
+        // row and the index a slot apart (see the note on opening below).
+        carousel.highlightMoveDuration = 0
         carousel.currentIndex = i
+        Qt.callLater(function() { carousel.highlightMoveDuration = Theme.durMedium })
 
         // Once honoured it stops applying, so a refresh that lands later
         // does not drag the user back out of wherever they have browsed to.
