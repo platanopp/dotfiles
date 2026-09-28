@@ -482,14 +482,6 @@ hl.layer_rule({
     no_anim      = true,
 })
 
--- The count before a recording: gone the moment it ends, not faded out by
--- Hyprland -- a fade would still be on screen as the recording starts.
-hl.layer_rule({
-    name    = "quickshell-countdown",
-    match   = { namespace = "^quickshell:countdown$" },
-    no_anim = true,
-})
-
 hl.layer_rule({
     name    = "quickshell-launcher",
     match   = { namespace = "^quickshell:launcher$" },

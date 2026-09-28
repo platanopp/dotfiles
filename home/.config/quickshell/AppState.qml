@@ -1788,10 +1788,11 @@ Singleton {
         if (recordProc.running) recordProc.signal(2)
     }
 
-    // Record, with a count of three first (RecordCountdown shows it on the
-    // monitor about to be recorded): time to get to what is to be recorded.
-    // Pressing record again during the count, Esc, or a click calls it off.
-    // Stop, if recording already.
+    // Record, with a count of three first, shown on the control pill where
+    // the recording's time then runs -- nothing over the screen, so the
+    // three seconds are there to get to what is to be recorded. Pressing
+    // record again during the count, or the pill, calls it off. Stop, if
+    // recording already.
     function toggleRecording(monitor) {
         if (recordProc.running) root.stopRecording()
         else if (root.recordCountdown > 0) root.cancelRecordingCountdown()
@@ -1811,7 +1812,6 @@ Singleton {
 
     function cancelRecordingCountdown() {
         countdownTick.stop()
-        countdownGo.stop()
         root.recordCountdown = 0
     }
 
@@ -1824,19 +1824,12 @@ Singleton {
                 root.recordCountdown -= 1
                 return
             }
-            // The count comes off the screen first, and the recording starts
-            // a moment later -- so its first frame is not the "1".
             countdownTick.stop()
             root.recordCountdown = 0
-            countdownGo.restart()
+            root.startRecording(root.recordCountdownMonitor)
         }
     }
 
-    Timer {
-        id: countdownGo
-        interval: 150
-        onTriggered: root.startRecording(root.recordCountdownMonitor)
-    }
 
     // "4:07", or "1:02:33" past the hour.
     function recordingClock(sec) {

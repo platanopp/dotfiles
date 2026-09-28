@@ -266,12 +266,13 @@ PanelWindow {
             NumberAnimation { duration: 150 }
         }
 
-        // Recording: a red dot and the time, while the screen is being
-        // recorded -- so it is never forgotten running -- and a click on it
-        // stops it.
+        // Recording: the count of three before it starts, then a red dot and
+        // the time while the screen is being recorded -- so it is never
+        // forgotten running. A click calls off the count, or stops it.
         Item {
             id: recIndicator
-            visible: AppState.recording
+            readonly property bool counting: AppState.recordCountdown > 0 && !AppState.recording
+            visible: AppState.recording || recIndicator.counting
             width: recRow.implicitWidth + 16
             height: 30
 
@@ -289,16 +290,19 @@ PanelWindow {
                 anchors.centerIn: parent
                 spacing: 6
 
+                // Hollow while counting, filled and breathing once it records.
                 Rectangle {
                     anchors.verticalCenter: parent.verticalCenter
                     width: 8
                     height: 8
                     radius: 4
-                    color: Theme.error
+                    color: recIndicator.counting ? "transparent" : Theme.error
+                    border.width: recIndicator.counting ? 1.5 : 0
+                    border.color: Theme.error
 
                     // A slow breath rather than a blink.
                     SequentialAnimation on opacity {
-                        running: recIndicator.visible
+                        running: AppState.recording
                         loops: Animation.Infinite
                         NumberAnimation { to: 0.35; duration: 900; easing.type: Easing.InOutSine }
                         NumberAnimation { to: 1; duration: 900; easing.type: Easing.InOutSine }
@@ -306,11 +310,23 @@ PanelWindow {
                 }
 
                 Text {
+                    id: recText
                     anchors.verticalCenter: parent.verticalCenter
-                    text: AppState.recordingClock(AppState.recordingSeconds)
+                    text: recIndicator.counting ? String(AppState.recordCountdown)
+                                                : AppState.recordingClock(AppState.recordingSeconds)
                     color: Theme.textPrimary
                     font.pixelSize: 12
+                    font.bold: recIndicator.counting
                     font.family: Theme.fontMono
+
+                    // Each number of the count drops in.
+                    onTextChanged: if (recIndicator.counting) countDrop.restart()
+
+                    ParallelAnimation {
+                        id: countDrop
+                        NumberAnimation { target: recText; property: "scale"; from: 1.6; to: 1; duration: 360; easing.type: Easing.OutBack }
+                        NumberAnimation { target: recText; property: "opacity"; from: 0; to: 1; duration: 180 }
+                    }
                 }
             }
 
@@ -319,7 +335,7 @@ PanelWindow {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: AppState.stopRecording()
+                onClicked: AppState.toggleRecording("")
             }
         }
 
