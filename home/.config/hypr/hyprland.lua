@@ -641,6 +641,26 @@ hl.config({
         -- off Hyprland only marked it urgent (the pulse on the workspaces
         -- pill) and you stayed where you were.
         focus_on_activate = true,
+
+        -- Variable refresh (FreeSync / G-Sync compatible), for fullscreen
+        -- windows only -- games. Off, a game running below the monitor's
+        -- refresh (240 Hz on the Samsung) showed every dip as judder; with
+        -- it the monitor follows the frame rate, as it did under Windows.
+        -- Not on the desktop, where some panels flicker at low refresh.
+        vrr = 2,
+    },
+
+    render = {
+        -- A fullscreen game's frames go straight to the screen instead of
+        -- being composited first: less GPU work and less latency. 1 (any
+        -- fullscreen window) rather than 2 (content type "game"): games under
+        -- Proton report no content type, and 2 never applied to them.
+        --
+        -- It only engages with nothing to draw over the game, and the
+        -- shell's pill surfaces stay mapped (transparent) over fullscreen --
+        -- hyprctl monitors says "blockedBy: CANDIDATE" while they do. Set so
+        -- it applies the moment that is no longer so.
+        direct_scanout = 1,
     },
 })
 
