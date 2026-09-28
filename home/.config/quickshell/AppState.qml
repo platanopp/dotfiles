@@ -1682,6 +1682,7 @@ Singleton {
     property string launcherScreen: ""
 
     onLauncherOpenChanged: {
+        root.syncSubmap()
         if (!root.launcherOpen) return
         var monitor = Hyprland.focusedMonitor
         root.launcherScreen = monitor ? monitor.name : ""
@@ -1697,6 +1698,7 @@ Singleton {
     property string overviewScreen: ""
 
     onOverviewOpenChanged: {
+        root.syncSubmap()
         if (!root.overviewOpen) return
         var monitor = Hyprland.focusedMonitor
         root.overviewScreen = monitor ? monitor.name : ""
@@ -1712,6 +1714,25 @@ Singleton {
         function toggle(): void { root.toggleOverview() }
         function open(): void { if (!root.overviewOpen) root.toggleOverview() }
         function close(): void { root.overviewOpen = false }
+    }
+
+    // The launcher and the overview put Hyprland in its "shell-modal"
+    // submap while either is up (hyprland.lua), where Super+drag and the
+    // other binds do nothing -- they reached the windows behind the overlay.
+    // Set again on every change of either: Super+Tab or Super+Space drop
+    // the submap themselves, and one may be opening as the other closes.
+    // Reset once as the shell starts, in case one died with it set.
+    readonly property bool modalOpen: root.overviewOpen || root.launcherOpen
+
+    function syncSubmap() {
+        Quickshell.execDetached(["hyprctl", "eval", "hl.dispatch(hl.dsp.submap('"
+                                 + (root.modalOpen ? "shell-modal" : "reset") + "'))"])
+    }
+
+    Timer {
+        running: true
+        interval: 0
+        onTriggered: Quickshell.execDetached(["hyprctl", "eval", "hl.dispatch(hl.dsp.submap('reset'))"])
     }
 
     // Text to start the field with, taken by the launcher as it opens.
