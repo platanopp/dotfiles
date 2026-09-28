@@ -40,6 +40,41 @@ PanelWindow {
     property var bar: null
     screen: bar.screen
 
+    // A key and what it does -- the launcher's footer, the same keycaps.
+    component KeyHint: Row {
+        id: hint
+        property string key: ""
+        property string label: ""
+        spacing: 6
+
+        Rectangle {
+            anchors.verticalCenter: parent.verticalCenter
+            width: Math.max(20, keyText.implicitWidth + 12)
+            height: 20
+            radius: 6
+            color: Theme.glass
+            border.width: 1
+            border.color: Theme.outline
+
+            Text {
+                id: keyText
+                anchors.centerIn: parent
+                text: hint.key
+                color: Theme.textSecondary
+                font.pixelSize: 10
+                font.family: Theme.fontMono
+            }
+        }
+
+        Text {
+            anchors.verticalCenter: parent.verticalCenter
+            text: hint.label
+            color: Theme.textMuted
+            font.pixelSize: 10
+            font.family: Theme.fontMono
+        }
+    }
+
     readonly property bool onOpeningScreen: {
         if (!bar.monitor) return true
         if (AppState.overviewScreen === "") return bar.monitor.focused
@@ -155,7 +190,13 @@ PanelWindow {
         // has named it; the monitor's is what the bar's pill reads too.)
         var focusedId = bar.monitor && bar.monitor.activeWorkspace ? bar.monitor.activeWorkspace.id : -1
         var wss = Hyprland.workspaces.values.filter(function(w) { return w.id > 0 })
-        wss.sort(function(a, b) { return a.id - b.id })
+        // Grouped by monitor, left to right as they stand, and by number
+        // within each: a workspace lives on one monitor, and the row says so.
+        var monX = function(w) { var g = overview.geometryOf(w.monitor); return g.x }
+        wss.sort(function(a, b) {
+            var dx = monX(a) - monX(b)
+            return dx !== 0 ? dx : a.id - b.id
+        })
         var tops = Hyprland.toplevels.values
         var out = []
         var maxId = 0
@@ -180,21 +221,42 @@ PanelWindow {
                 return b.recency - a.recency
             })
             var mon = ws.monitor
+            // The apps in it, each once, most recently used first.
+            var apps = []
+            var byRecency = wins.slice().sort(function(a, b) { return a.recency - b.recency })
+            for (var a = 0; a < byRecency.length; a++)
+                if (apps.indexOf(byRecency[a].cls) === -1) apps.push(byRecency[a].cls)
             out.push({ key: ws.id, id: ws.id, name: ws.name, geom: overview.geometryOf(mon),
-                       monitor: mon ? mon.name : "",
+                       monitor: mon ? mon.name : "", monitorLabel: overview.monitorLabel(mon), apps: apps,
                        focused: ws.id === focusedId,
                        active: !!(mon && mon.activeWorkspace && mon.activeWorkspace.id === ws.id),
                        windows: wins, isNew: false })
         }
         out.push({ key: -1, id: maxId + 1, name: String(maxId + 1), geom: overview.geometryOf(bar.monitor),
-                   monitor: "", focused: false, active: false, windows: [], isNew: true })
+                   monitor: "", monitorLabel: "", apps: [], focused: false, active: false, windows: [], isNew: true })
+        // Where each monitor's run of cards starts and ends: the first gets
+        // the monitor's name over it, the last a wider gap after it.
+        var monitors = {}
+        for (var j = 0; j < out.length; j++) if (!out[j].isNew) monitors[out[j].monitor] = true
+        var several = Object.keys(monitors).length > 1
+        for (var k = 0; k < out.length; k++) {
+            out[k].groupStart = several && !out[k].isNew && (k === 0 || out[k - 1].monitor !== out[k].monitor)
+            out[k].groupEnd = !out[k].isNew && k + 1 < out.length && out[k + 1].monitor !== out[k].monitor
+        }
         return out
+    }
+
+    // "Samsung Odyssey G40B" for "Samsung Electric Company Odyssey G40B".
+    function monitorLabel(monitor) {
+        var o = monitor ? monitor.lastIpcObject : null
+        var d = o && o.description ? o.description : (monitor ? monitor.name : "")
+        return d.replace(/ (Electric Company|Corporation|Technologies|Technology|Inc\.?|Co\.?,? ?Ltd\.?)/g, "")
     }
 
     // What a card shows, as a string: two builds that agree on it keep the
     // first card object, so its windows are not rebuilt and re-captured.
     function signature(c) {
-        return JSON.stringify([c.id, c.focused, c.active, c.monitor, c.geom, c.windows.map(function(w) {
+        return JSON.stringify([c.id, c.focused, c.active, c.monitor, c.geom, c.groupStart, c.groupEnd, c.windows.map(function(w) {
             return [w.address, w.x, w.y, w.w, w.h, w.floating, w.fullscreen]
         })])
     }
@@ -303,7 +365,10 @@ PanelWindow {
         var aspects = 0
         for (var i = 0; i < overview.cardList.length; i++)
             aspects += overview.cardList[i].geom.w / overview.cardList[i].geom.h
-        var room = overview.width * 0.9 - overview.cardSpacing * Math.max(0, overview.cardList.length - 1)
+        var gaps = 0
+        for (var g = 0; g + 1 < overview.cardList.length; g++)
+            gaps += overview.cardList[g].groupEnd ? overview.groupSpacing : overview.cardSpacing
+        var room = overview.width * 0.9 - gaps
         return Math.round(Math.max(60, Math.min(overview.height * 0.3, 300, aspects > 0 ? room / aspects : 300)))
     }
     // Eased when a card comes or goes, so the row grows and shrinks rather
@@ -315,6 +380,8 @@ PanelWindow {
     }
 
     readonly property int cardSpacing: 26
+    // Between one monitor's workspaces and the next's.
+    readonly property int groupSpacing: 64
     readonly property int cardRadius: 18
 
     property int selected: 0
@@ -496,7 +563,7 @@ PanelWindow {
         Column {
             anchors.centerIn: parent
             anchors.verticalCenterOffset: -overview.height * 0.03
-            spacing: 30
+            spacing: 44
 
             // The panels' section label.
             Text {
@@ -553,7 +620,8 @@ PanelWindow {
                         // resize, instead of jumping once it is gone.
                         readonly property real faceWidth: Math.round(overview.shownHeight * card.geom.w / card.geom.h)
                         property real grow: 1
-                        width: Math.round((card.faceWidth + (card.key === -1 ? 0 : overview.cardSpacing)) * card.grow)
+                        width: Math.round((card.faceWidth + (card.key === -1 ? 0
+                                           : card.d.groupEnd ? overview.groupSpacing : overview.cardSpacing)) * card.grow)
                         height: overview.shownHeight + 52
 
                         // Comes in one after another on opening, rises into
@@ -599,6 +667,31 @@ PanelWindow {
 
                         transform: Translate { y: card.rise }
 
+                        // The monitor's name, over its first workspace.
+                        Row {
+                            visible: !!card.d.groupStart
+                            x: 4
+                            y: -30
+                            spacing: 7
+
+                            IconGlyph {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "\u{F0379}"
+                                color: Theme.textMuted
+                                size: Theme.iconTiny
+                            }
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: card.d.monitorLabel || ""
+                                color: Theme.textMuted
+                                font.pixelSize: 10
+                                font.bold: true
+                                font.letterSpacing: 1.2
+                                font.capitalization: Font.AllUppercase
+                                font.family: Theme.fontMono
+                            }
+                        }
+
                         // Lifts a little under the pointer.
                         Item {
                             id: face
@@ -612,6 +705,19 @@ PanelWindow {
 
                             // One cheap shadow (a signed-distance rectangle,
                             // not a blurred layer), deeper when lifted.
+                            // The chosen card glows in the accent, softly,
+                            // under the ring.
+                            RectangularShadow {
+                                anchors.fill: parent
+                                radius: overview.cardRadius
+                                blur: 34
+                                spread: 2
+                                color: Theme.alpha(AppState.themeAccent, 0.4)
+                                opacity: card.chosen ? 1 : 0
+
+                                Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutQuad } }
+                            }
+
                             RectangularShadow {
                                 anchors.fill: parent
                                 radius: overview.cardRadius
@@ -625,7 +731,37 @@ PanelWindow {
                             Rectangle {
                                 anchors.fill: parent
                                 radius: overview.cardRadius
-                                color: Theme.glass
+                                color: card.d.isNew ? Theme.alpha(Theme.background, card.hovered ? 0.5 : 0.3) : Theme.glass
+
+                                Behavior on color { ColorAnimation { duration: 180 } }
+                            }
+
+                            // The new card's outline, dashed: a place for a
+                            // workspace, not one yet.
+                            Canvas {
+                                anchors.fill: parent
+                                visible: card.d.isNew
+                                opacity: card.hovered || card.chosen ? 0.9 : 0.45
+                                onWidthChanged: requestPaint()
+                                onHeightChanged: requestPaint()
+                                onPaint: {
+                                    var ctx = getContext("2d")
+                                    ctx.reset()
+                                    var r = overview.cardRadius - 1, w = width - 2, h = height - 2
+                                    ctx.strokeStyle = Theme.textSecondary
+                                    ctx.lineWidth = 1.5
+                                    ctx.setLineDash([6, 6])
+                                    ctx.beginPath()
+                                    ctx.moveTo(1 + r, 1)
+                                    ctx.arcTo(1 + w, 1, 1 + w, 1 + h, r)
+                                    ctx.arcTo(1 + w, 1 + h, 1, 1 + h, r)
+                                    ctx.arcTo(1, 1 + h, 1, 1, r)
+                                    ctx.arcTo(1, 1, 1 + w, 1, r)
+                                    ctx.closePath()
+                                    ctx.stroke()
+                                }
+
+                                Behavior on opacity { NumberAnimation { duration: 180 } }
                             }
 
                             // A click anywhere on the card that nothing on it
@@ -659,6 +795,18 @@ PanelWindow {
                                     opacity: card.d.focused ? 0.85 : 0.6
 
                                     Behavior on opacity { NumberAnimation { duration: 200 } }
+                                }
+
+                                // Nothing on it.
+                                Text {
+                                    anchors.centerIn: parent
+                                    visible: !card.d.isNew && card.d.windows.length === 0
+                                    text: "Empty"
+                                    color: Theme.textSecondary
+                                    font.pixelSize: 12
+                                    font.family: Theme.fontMono
+                                    style: Text.Raised
+                                    styleColor: Qt.rgba(0, 0, 0, 0.4)
                                 }
 
                                 // A new workspace: a plus where the windows would be.
@@ -932,12 +1080,27 @@ PanelWindow {
                                 visible: !!card.d.focused
                             }
 
+                            // Its apps, up to four, then how many more.
+                            Repeater {
+                                model: (card.d.apps || []).slice(0, 4)
+
+                                delegate: IconImage {
+                                    required property var modelData
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    implicitSize: 16
+                                    mipmap: true
+                                    source: {
+                                        var e = DesktopEntries.heuristicLookup(modelData)
+                                        return Quickshell.iconPath(e ? e.icon : String(modelData).toLowerCase(),
+                                                                   "application-x-executable")
+                                    }
+                                }
+                            }
+
                             Text {
                                 anchors.verticalCenter: parent.verticalCenter
-                                visible: !card.d.isNew
-                                text: card.d.windows.length === 0 ? "empty"
-                                    : card.d.windows.length === 1 ? "1 window"
-                                    : card.d.windows.length + " windows"
+                                visible: (card.d.apps || []).length > 4
+                                text: "+" + ((card.d.apps || []).length - 4)
                                 color: Theme.textMuted
                                 font.pixelSize: 11
                                 font.family: Theme.fontMono
@@ -947,12 +1110,16 @@ PanelWindow {
                 }
             }
 
-            Text {
+            Row {
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: "click to go  ·  × or del closes  ·  n new  ·  1-9  ·  esc"
-                color: Theme.textMuted
-                font.pixelSize: 10
-                font.family: Theme.fontMono
+                spacing: 18
+
+                KeyHint { key: "\u2190\u2192"; label: "Choose" }
+                KeyHint { key: "\u21B5"; label: "Go" }
+                KeyHint { key: "del"; label: "Close" }
+                KeyHint { key: "n"; label: "New" }
+                KeyHint { key: "1-9"; label: "Jump" }
+                KeyHint { key: "esc"; label: "Back" }
             }
         }
     }
