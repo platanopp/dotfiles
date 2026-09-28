@@ -1201,11 +1201,86 @@ Singleton {
         running: true
         command: ["python3", Quickshell.env("HOME") + "/.config/quickshell/scripts/video_wallpaper.py",
                   "restore"]
+        // And paused where something fullscreen covers it (see syncVideoPause).
+        onExited: {
+            root.videoPaused = ({})
+            videoPauseStart.restart()
+        }
     }
 
     Process {
         id: videoControlProc
         running: false
+        // A video just started: its monitors are fresh, none paused yet, and
+        // each is to be paused if something fullscreen covers it.
+        onExited: {
+            root.videoPaused = ({})
+            if (root.activeVideoWallpaper !== "") videoPauseStart.restart()
+        }
+    }
+
+    // ── A video wallpaper, paused where it cannot be seen ────────────────
+    //
+    // One mpvpaper per monitor (scripts/video_wallpaper.py), each paused
+    // while its monitor shows a fullscreen window -- a game has no use for a
+    // video decoded behind it -- and playing on the other monitor meanwhile.
+    // mpvpaper's own --auto-mode FULL paused on any fullscreen window
+    // anywhere, which froze the video on the monitor in plain sight; its
+    // --auto-pause alone never fires here (Hyprland keeps drawing the layer).
+    // So the shell, which knows which monitor has what, says so: only when a
+    // monitor's state changes, through each mpv's own socket.
+    property var videoPaused: ({})
+
+    function syncVideoPause() {
+        if (root.activeVideoWallpaper === "") return
+        videoPauseRefresh.restart()
+    }
+
+    Timer {
+        id: videoPauseStart
+        // The sockets appear a moment after mpvpaper starts.
+        interval: 1500
+        onTriggered: root.syncVideoPause()
+    }
+
+    Timer {
+        id: videoPauseRefresh
+        interval: 200
+        onTriggered: {
+            Hyprland.refreshWorkspaces()
+            Hyprland.refreshMonitors()
+            videoPauseApply.restart()
+        }
+    }
+
+    Timer {
+        id: videoPauseApply
+        interval: 200
+        onTriggered: {
+            if (root.activeVideoWallpaper === "") return
+            var next = Object.assign({}, root.videoPaused)
+            var ms = Hyprland.monitors.values
+            for (var i = 0; i < ms.length; i++) {
+                var ws = ms[i].activeWorkspace
+                var full = !!(ws && ws.lastIpcObject && ws.lastIpcObject.hasfullscreen)
+                if (next[ms[i].name] === full) continue
+                next[ms[i].name] = full
+                Quickshell.execDetached(["python3", root.videoWallpaperScript, "pause",
+                                         ms[i].name, full ? "on" : "off"])
+            }
+            root.videoPaused = next
+        }
+    }
+
+    Connections {
+        target: Hyprland
+        function onRawEvent(event) {
+            switch (event.name) {
+            case "fullscreen": case "workspacev2": case "focusedmonv2": case "activespecial":
+            case "openwindow": case "closewindow": case "movewindowv2":
+                root.syncVideoPause()
+            }
+        }
     }
 
     Process {

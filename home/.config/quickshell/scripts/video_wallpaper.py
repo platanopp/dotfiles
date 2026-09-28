@@ -62,17 +62,20 @@ THUMB_HEIGHT = 560
 #                    the wallpaper plays. Warnings and errors still get there.
 MPV_OPTIONS = "no-audio loop-file=inf hwdec=auto-safe panscan=1.0 quiet"
 
-# And mpvpaper itself:
+# And mpvpaper itself, one per monitor (see start):
 #
-#   --auto-pause --auto-mode FULL
-#       pause while any window is fullscreen. A game covering the screen has
-#       no use for a video being decoded behind it, and osu! wants every frame
-#       of GPU time it can get.
+#   --auto-pause
+#       pause while the wallpaper is hidden: a game or any window covering the
+#       whole monitor has no use for a video being decoded behind it, and osu!
+#       wants every frame of GPU time it can get. Without --auto-mode FULL,
+#       which paused on *any* fullscreen window anywhere -- and with one
+#       mpvpaper for ALL monitors, a game fullscreen on one froze the video on
+#       the other, in plain sight: the video wallpaper "did not play".
 #   --layer bottom
 #       above hyprpaper's background layer and below every window. hyprpaper
 #       keeps running for the image wallpapers, and on the same layer the two
 #       would be stacked in whatever order they happened to start.
-MPVPAPER_ARGS = ["--auto-pause", "--auto-mode", "FULL", "--layer", "bottom"]
+MPVPAPER_ARGS = ["--auto-pause", "--layer", "bottom"]
 
 
 # ── Frames ───────────────────────────────────────────────────────────────
@@ -202,17 +205,37 @@ def kill():
     subprocess.run(["pkill", "-9", "-x", "mpvpaper"], capture_output=True)
 
 
+# Each mpvpaper's mpv answers on a socket of its own, named for its monitor,
+# so the shell can pause the video on one monitor and not the other (see
+# cmd_pause and AppState.syncVideoPause).
+def socket_for(output):
+    return os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), f"mpvpaper-{output}.sock")
+
+
+def monitors():
+    try:
+        out = subprocess.run(["hyprctl", "monitors", "-j"], capture_output=True, text=True).stdout
+        return [m["name"] for m in json.loads(out) if not m.get("disabled")]
+    except (OSError, ValueError, KeyError):
+        return []
+
+
 def start(path):
     os.makedirs(STATE_DIR, exist_ok=True)
     # Truncated on every start: it only has to explain the current run.
     log = open(LOG, "wb")
-    # Its own session, so it outlives this script and is not taken down with
-    # whatever process asked for it -- quickshell restarts on every save.
-    subprocess.Popen(
-        ["mpvpaper", *MPVPAPER_ARGS, "-o", MPV_OPTIONS, "ALL", path],
-        stdin=subprocess.DEVNULL, stdout=log, stderr=log,
-        start_new_session=True,
-    )
+    # One per monitor rather than one for ALL: each pauses when its own
+    # monitor is covered and keeps playing where it can be seen.
+    #
+    # Their own session, so they outlive this script and are not taken down
+    # with whatever process asked for them -- quickshell restarts on every save.
+    for output in monitors() or ["ALL"]:
+        opts = MPV_OPTIONS + " input-ipc-server=" + socket_for(output)
+        subprocess.Popen(
+            ["mpvpaper", *MPVPAPER_ARGS, "-o", opts, output, path],
+            stdin=subprocess.DEVNULL, stdout=log, stderr=log,
+            start_new_session=True,
+        )
 
 
 # ── Commands ─────────────────────────────────────────────────────────────
@@ -260,6 +283,21 @@ def cmd_restore():
     start(path)
 
 
+def cmd_pause(output, on):
+    """Pauses (on) or resumes the video on one monitor. Quiet when there is
+    no video there: the shell asks whenever a monitor's fullscreen state
+    changes, video wallpaper or not."""
+    import socket
+    try:
+        s = socket.socket(socket.AF_UNIX)
+        s.settimeout(1)
+        s.connect(socket_for(output))
+        s.sendall((json.dumps({"command": ["set_property", "pause", on]}) + "\n").encode())
+        s.close()
+    except OSError:
+        pass
+
+
 def main():
     cmd = sys.argv[1] if len(sys.argv) > 1 else "list"
     if cmd == "list":
@@ -272,6 +310,8 @@ def main():
         cmd_restore()
     elif cmd == "current":
         print(remembered())
+    elif cmd == "pause" and len(sys.argv) > 3:
+        cmd_pause(sys.argv[2], sys.argv[3] == "on")
     else:
         sys.exit(__doc__)
 

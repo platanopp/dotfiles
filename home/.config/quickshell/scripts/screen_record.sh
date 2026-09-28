@@ -18,6 +18,11 @@
 # on this RTX 3060), so a recording costs next to no CPU and nothing a game
 # would notice. Always MP4 at a constant frame rate (-fm cfr): what editors
 # and phones expect, where a variable rate stutters.
+#
+# And with the index at the front (movflags=faststart; "+faststart" makes the
+# recorder fail to write the header). Written at the end, as it is by
+# default, a browser's player -- Discord's, WhatsApp's -- cannot start until
+# it has the whole file, and an uploaded clip sat at 0:00 and would not play.
 set -euo pipefail
 
 monitor="" height="1080" fps="60" quality="very_high" codec="h264"
@@ -74,6 +79,7 @@ exec gpu-screen-recorder \
     -f "$fps" -fm cfr \
     -k "$codec" -q "$quality" \
     -cursor "$cursor" \
+    -ffmpeg-opts "movflags=faststart" \
     -v no \
     "${args[@]}" \
     -o "$out"
