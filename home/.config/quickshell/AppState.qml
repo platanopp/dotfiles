@@ -1728,6 +1728,87 @@ Singleton {
         function close(): void { root.launcherOpen = false }
     }
 
+    // ── Screen recording ─────────────────────────────────────────────────
+    //
+    // One monitor at a time, 1080p 60 fps H.264 MP4 with the computer's
+    // sound, encoded on the GPU (scripts/screen_record.sh). Started and
+    // stopped from the control panel's Record tile, the red dot the control
+    // pill shows while it runs, Super+Shift+R, or `qs ipc call record ...`.
+    // Stopped with SIGINT, which is what makes the recorder finish the file.
+    readonly property bool recording: recordProc.running
+    property string recordingFile: ""
+    property string recordingMonitor: ""
+    property real recordingSince: 0
+    property int recordingSeconds: 0
+
+    function startRecording(monitor) {
+        if (recordProc.running) return
+        root.recordingFile = ""
+        root.recordingMonitor = monitor || root.focusedScreenName()
+        recordProc.command = [Quickshell.env("HOME") + "/.config/quickshell/scripts/screen_record.sh",
+                              root.recordingMonitor]
+        root.recordingSince = Date.now()
+        root.recordingSeconds = 0
+        recordProc.running = true
+    }
+
+    function stopRecording() {
+        if (recordProc.running) recordProc.signal(2)
+    }
+
+    function toggleRecording(monitor) {
+        if (recordProc.running) root.stopRecording()
+        else root.startRecording(monitor)
+    }
+
+    // "4:07", or "1:02:33" past the hour.
+    function recordingClock(sec) {
+        var h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60
+        var ss = (s < 10 ? "0" : "") + s
+        return h > 0 ? h + ":" + (m < 10 ? "0" : "") + m + ":" + ss : m + ":" + ss
+    }
+
+    Process {
+        id: recordProc
+        running: false
+        stdout: SplitParser {
+            // The script's first line is the file it records to.
+            onRead: line => { if (root.recordingFile === "") root.recordingFile = line.trim() }
+        }
+        stderr: StdioCollector { id: recordErr }
+        onExited: (code, status) => {
+            var file = root.recordingFile
+            var short = file.replace(Quickshell.env("HOME"), "~")
+            if (file.length > 0 && root.recordingSeconds >= 1) {
+                // Saved: said so, with a button that opens it.
+                Quickshell.execDetached(["bash", "-c",
+                    'a=$(notify-send -a "Screen recorder" -i video-x-generic -A open=Open "Recording saved" "$2"); '
+                    + '[ "$a" = open ] && xdg-open "$1"', "_", file, short])
+            } else {
+                var why = recordErr.text.trim().split("\n").pop()
+                Quickshell.execDetached(["notify-send", "-a", "Screen recorder", "-i", "dialog-error",
+                                         "Recording failed", why.length > 0 ? why : "The recorder stopped at once."])
+            }
+            root.recordingSince = 0
+        }
+    }
+
+    // The clock the tile and the pill show; only runs while recording.
+    Timer {
+        interval: 1000
+        repeat: true
+        running: recordProc.running
+        onTriggered: root.recordingSeconds = Math.floor((Date.now() - root.recordingSince) / 1000)
+    }
+
+    IpcHandler {
+        target: "record"
+        function toggle(): void { root.toggleRecording("") }
+        function start(): void { root.startRecording("") }
+        function stop(): void { root.stopRecording() }
+        function status(): string { return recordProc.running ? "recording " + root.recordingFile : "idle" }
+    }
+
     // ── Driver de tablet ─────────────────────────────────────────────────
     //
     // opentabletdriver.service lee la tablet por HID crudo y publica un

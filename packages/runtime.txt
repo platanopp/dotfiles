@@ -28,3 +28,4 @@ ddcutil
 ffmpeg
 python-pillow
 openrgb
+gpu-screen-recorder

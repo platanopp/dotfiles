@@ -292,6 +292,9 @@ local function describe(action)
         if name == "quickshell:launcher" then
             return { action = "Application launcher", category = "System" }
         end
+        if name == "quickshell:record" then
+            return { action = "Record the screen (start / stop)", category = "System" }
+        end
         if name == "quickshell:overview" then
             return { action = "Workspace overview", category = "Workspaces" }
         end

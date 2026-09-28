@@ -266,6 +266,63 @@ PanelWindow {
             NumberAnimation { duration: 150 }
         }
 
+        // Recording: a red dot and the time, while the screen is being
+        // recorded -- so it is never forgotten running -- and a click on it
+        // stops it.
+        Item {
+            id: recIndicator
+            visible: AppState.recording
+            width: recRow.implicitWidth + 16
+            height: 30
+
+            Rectangle {
+                anchors.fill: parent
+                radius: height / 2
+                color: Theme.error
+                opacity: recArea.pressed ? 0.32 : recArea.containsMouse ? 0.24 : 0.16
+
+                Behavior on opacity { NumberAnimation { duration: Theme.durShort } }
+            }
+
+            Row {
+                id: recRow
+                anchors.centerIn: parent
+                spacing: 6
+
+                Rectangle {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 8
+                    height: 8
+                    radius: 4
+                    color: Theme.error
+
+                    // A slow breath rather than a blink.
+                    SequentialAnimation on opacity {
+                        running: recIndicator.visible
+                        loops: Animation.Infinite
+                        NumberAnimation { to: 0.35; duration: 900; easing.type: Easing.InOutSine }
+                        NumberAnimation { to: 1; duration: 900; easing.type: Easing.InOutSine }
+                    }
+                }
+
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: AppState.recordingClock(AppState.recordingSeconds)
+                    color: Theme.textPrimary
+                    font.pixelSize: 12
+                    font.family: Theme.fontMono
+                }
+            }
+
+            MouseArea {
+                id: recArea
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: AppState.stopRecording()
+            }
+        }
+
         Repeater {
             model: [
                 { key: "notifications" },
@@ -349,6 +406,12 @@ PanelWindow {
         Behavior on opacity {
             NumberAnimation { duration: 200 }
         }
+    }
+
+    Timer {
+        id: recordStart
+        interval: 400
+        onTriggered: AppState.startRecording(settingsItem.screen ? settingsItem.screen.name : "")
     }
 
     HyprlandFocusGrab {
@@ -603,9 +666,26 @@ PanelWindow {
 
                 ToggleTile {
                     Layout.fillWidth: true
-                    // The fifth tile, so the width of the row rather than
-                    // half of it with a hole beside.
-                    Layout.columnSpan: 2
+                    icon: AppState.recording ? "\u{F04DB}" : "\u{F044B}"
+                    label: AppState.recording ? "Recording" : "Record"
+                    active: AppState.recording
+                    detail: AppState.recording
+                            ? AppState.recordingClock(AppState.recordingSeconds) + "  ·  tap to stop"
+                            : "1080p  ·  60 fps"
+                    onTapped: {
+                        if (AppState.recording) {
+                            AppState.stopRecording()
+                            return
+                        }
+                        // The panel out of the way first, so it is not the
+                        // first thing the recording shows.
+                        settingsItem.panelOpen = false
+                        recordStart.restart()
+                    }
+                }
+
+                ToggleTile {
+                    Layout.fillWidth: true
                     icon: "\u{F0DCB}"
                     label: "Tablet"
                     active: AppState.otdRunning

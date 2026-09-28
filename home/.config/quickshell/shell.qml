@@ -443,6 +443,14 @@ Scope {
 
     GlobalShortcut {
         appid: "quickshell"
+        name: "record"
+        description: "Start or stop recording the screen"
+
+        onPressed: AppState.toggleRecording("")
+    }
+
+    GlobalShortcut {
+        appid: "quickshell"
         name: "overview"
         description: "Show every workspace and its windows"
 
