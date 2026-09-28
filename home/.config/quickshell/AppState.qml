@@ -1724,9 +1724,54 @@ Singleton {
     // Reset once as the shell starts, in case one died with it set.
     readonly property bool modalOpen: root.overviewOpen || root.launcherOpen
 
+    // One call, with where things ended up, a moment after they settle --
+    // not one per change: two changes close together (the launcher closing
+    // as the overview opens, an overview opened and closed at once) sent two
+    // hyprctl processes that could land in either order, and the submap was
+    // left set with nothing open. Serialised too: the next waits for the last.
     function syncSubmap() {
-        Quickshell.execDetached(["hyprctl", "eval", "hl.dispatch(hl.dsp.submap('"
-                                 + (root.modalOpen ? "shell-modal" : "reset") + "'))"])
+        submapSync.restart()
+    }
+
+    Timer {
+        id: submapSync
+        interval: 40
+        onTriggered: {
+            if (submapProc.running) {
+                submapSync.restart()
+                return
+            }
+            submapProc.command = ["hyprctl", "eval", "hl.dispatch(hl.dsp.submap('"
+                                  + (root.modalOpen ? "shell-modal" : "reset") + "'))"]
+            submapProc.running = true
+        }
+    }
+
+    Process {
+        id: submapProc
+        running: false
+        // Once it has run, the state may have moved on again meanwhile.
+        onExited: {
+            var want = root.modalOpen ? "shell-modal" : "default"
+            submapCheck.command = ["hyprctl", "submap"]
+            submapCheck.want = want
+            submapCheck.running = true
+        }
+    }
+
+    // And checked: if Hyprland's submap is not what the shell's state says,
+    // it is set again.
+    Process {
+        id: submapCheck
+        property string want: "default"
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var now = text.trim()
+                var want = root.modalOpen ? "shell-modal" : "default"
+                if (now !== want) submapSync.restart()
+            }
+        }
     }
 
     Timer {
