@@ -17,6 +17,7 @@ import QtQuick.Layouts
 // It finds more than applications, each kind under its own label:
 //   Frequent      on an empty field, what you open most (LauncherHistory)
 //   Applications  ranked by how well the name matches, then by use
+//   Games         installed Steam games and non-Steam shortcuts (SteamGames)
 //   Windows       open windows, to switch to (focus follows to its workspace)
 //   Settings      the shell's Settings pages, by name or by what is on them
 //   Actions       lock, suspend, wallpapers, keybinds, notifications
@@ -343,6 +344,14 @@ PanelWindow {
                  name: e.name, detail: e.genericName || "", icon: e.icon, entry: e }
     }
 
+    function gameItem(g) {
+        return { kind: "game", section: "Games", score: 0, key: "game:" + g.id,
+                 name: g.name, id: g.id,
+                 detail: g.kind === "shortcut" ? "Steam  ·  non-Steam" : g.update ? "Steam  ·  update pending" : "Steam",
+                 iconUrl: g.icon ? "file://" + g.icon : "", icon: "steam",
+                 run: g.run, historyId: "steam:" + g.id }
+    }
+
     function sortByScore(list) {
         list.sort(function(a, b) {
             if (a.score !== b.score) return b.score - a.score
@@ -361,8 +370,11 @@ PanelWindow {
         var apps = DesktopEntries.applications.values.filter(function(e) {
             // NoDisplay is the entry asking not to be listed: mime handlers,
             // per-app settings panels, the halves of a split package.
-            return !e.noDisplay
+            // And the shortcuts Steam writes for a game: every game is under
+            // Games already, and some had one, some not, and some two.
+            return !e.noDisplay && (e.execString || "").indexOf("steam://rungameid/") === -1
         })
+        var games = SteamGames.games.map(overlay.gameItem)
         var q = overlay.q
 
         // ── Empty: what you use, then everything ──
@@ -375,12 +387,24 @@ PanelWindow {
                 if (f > 0.05) frequent.push(overlay.appItem(apps[i], "Frequent", f))
                 else rest.push(overlay.appItem(apps[i], "Applications", 0))
             }
+            for (var gi = 0; gi < games.length; gi++) {
+                var gf = LauncherHistory.frecency(games[gi].historyId)
+                if (gf > 0.05) frequent.push(Object.assign({}, games[gi], { section: "Frequent", score: gf }))
+            }
             overlay.sortByScore(frequent)
             // Past six the rest go back among the others, alphabetically.
-            rest = rest.concat(frequent.slice(6).map(function(it) {
+            rest = rest.concat(frequent.slice(6).filter(function(it) {
+                return it.kind === "app"
+            }).map(function(it) {
                 return Object.assign({}, it, { section: "Applications", score: 0 })
             }))
-            return frequent.slice(0, 6).concat(overlay.sortByScore(rest))
+            // Then the games, all of them -- a short list, and the reason to
+            // open the launcher as often as any app -- then the apps.
+            var top = frequent.slice(0, 6)
+            var shownGames = top.filter(function(it) { return it.kind === "game" })
+                                .map(function(it) { return it.key })
+            var gameList = games.filter(function(g) { return shownGames.indexOf(g.key) === -1 })
+            return top.concat(overlay.sortByScore(gameList), overlay.sortByScore(rest))
         }
 
         // ── Typing: every kind, each ranked, the kinds by their best ──
@@ -400,13 +424,25 @@ PanelWindow {
         // rest are one more letter away.
         groups.push(overlay.sortByScore(appHits).slice(0, 8))
 
+        var gameHits = []
+        for (var gg = 0; gg < games.length; gg++) {
+            var gs = overlay.score(games[gg], q)
+            if (gs > 0) gameHits.push(Object.assign({}, games[gg], {
+                score: gs + overlay.useBonus(games[gg].historyId) }))
+        }
+        groups.push(overlay.sortByScore(gameHits).slice(0, 8))
+
         var winHits = []
         var tops = Hyprland.toplevels.values
         for (var t = 0; t < tops.length; t++) {
             var o = tops[t].lastIpcObject || {}
             var title = tops[t].title || o.title || ""
             var cls = o.class || ""
-            if (title.length === 0 && cls.length === 0) continue
+            // No class, or not mapped: a window Hyprland has not reported on
+            // since it opened -- Steam's hidden helpers ("Steam Client
+            // Service", "SteamVR Status") -- which hyprctl does not list
+            // and there is nothing to switch to.
+            if (cls.length === 0 || o.mapped === false || o.hidden === true) continue
             var owner = cls.length > 0 ? DesktopEntries.heuristicLookup(cls) : null
             var appName = owner ? owner.name : cls
             var ws = tops[t].workspace ? tops[t].workspace.name : ""
@@ -484,6 +520,7 @@ PanelWindow {
 
     function verb(item) {
         switch (item.kind) {
+        case "game": return "Play"
         case "window": return "Switch"
         case "calc": return "Copy"
         case "web": return "Search"
@@ -521,6 +558,14 @@ PanelWindow {
             // a window that fast -- it waited 90ms here for nothing.
             AppState.focusCursorMonitor()
             item.entry.execute()
+            return
+        case "game":
+            overlay.launchedAt = Date.now()
+            LauncherHistory.record(item.historyId)
+            AppState.focusCursorMonitor()
+            // Handed to the Steam already running, which starts the game --
+            // or starts Steam first, if it is not.
+            Quickshell.execDetached(["steam", item.run])
             return
         case "web":
             overlay.launchedAt = Date.now()
@@ -621,6 +666,8 @@ PanelWindow {
     onOpenChanged: {
         if (!overlay.open) return
         overlay.launching = false
+        // Fresh window details for the Windows section (see results).
+        Hyprland.refreshToplevels()
         overlay.query = AppState.launcherPreset
         overlay.selected = 0
         AppState.launcherPreset = ""
@@ -784,7 +831,7 @@ PanelWindow {
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
                         visible: searchInput.text.length === 0
-                        text: "Search apps, windows, settings…"
+                        text: "Search apps, games, windows, settings…"
                         color: Theme.textMuted
                         font.pixelSize: 22
                         font.family: overlay.fontDisplay
@@ -856,6 +903,7 @@ PanelWindow {
                 readonly property bool header: overlay.startsSection(row.index)
                 readonly property bool glyphIcon: row.modelData.kind !== "app"
                                                   && row.modelData.kind !== "window"
+                                                  && row.modelData.kind !== "game"
 
                 width: list.width
                 height: overlay.rowHeight + (row.header ? overlay.headerHeight : 0)
@@ -899,6 +947,7 @@ PanelWindow {
                                 implicitSize: 28
                                 mipmap: true
                                 source: row.glyphIcon ? ""
+                                      : row.modelData.iconUrl ? row.modelData.iconUrl
                                       : Quickshell.iconPath(row.modelData.icon || "", "application-x-executable")
                             }
 
