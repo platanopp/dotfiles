@@ -28,6 +28,12 @@ import QtQuick.Effects
 // Cheap while it is not up: nothing is captured, the card list is empty and
 // its views destroyed. While up, each window is captured once, when its card
 // is built, not streamed.
+//
+// The clickable things inside a card are MouseAreas, not TapHandlers: a
+// TapHandler's grab is passive, so a click on a card's × (or a window's)
+// was also a click on the card under it, which went to that workspace and
+// closed the overview before the × could do anything. A MouseArea keeps the
+// click it takes.
 PanelWindow {
     id: overview
 
@@ -47,7 +53,8 @@ PanelWindow {
     property bool shown: false
     // Closing to go somewhere: hidden at once, keyboard let go at once.
     property bool leaving: false
-    // Set while the cards come in, so they come in one after another.
+    // Set while the cards come in, so they come in one after another and
+    // the row does not animate its sizes while it fills.
     property bool opening: false
 
     visible: overview.shown
@@ -60,20 +67,13 @@ PanelWindow {
             cardModel.clear()
             overview.cardData = ({})
             overview.cardList = []
+            overview.goingKeys = []
         }
-    }
-
-    // The selection ring waits for the first cards to be on their way in.
-    Timer {
-        id: ringIn
-        property bool done: false
-        interval: 140
-        onTriggered: done = true
     }
 
     Timer {
         id: openingDone
-        interval: 600
+        interval: 650
         onTriggered: overview.opening = false
     }
 
@@ -85,12 +85,11 @@ PanelWindow {
                 overview.leaving = false
                 overview.dragged = null
                 overview.confirmId = -2
+                overview.goingKeys = []
                 overview.pointerSteers = false
                 overview.lastPointer = Qt.point(-1, -1)
                 overview.opening = true
                 openingDone.restart()
-                ringIn.done = false
-                ringIn.restart()
                 cardModel.clear()
                 overview.shown = true
                 overview.refresh()
@@ -201,6 +200,10 @@ PanelWindow {
         })])
     }
 
+    // Cards on their way out: they shrink and fade in place, and only then
+    // leave the row, which closes up behind them.
+    property var goingKeys: []
+
     function rebuild() {
         if (!overview.shown) return
         var cards = overview.computeCards()
@@ -210,25 +213,55 @@ PanelWindow {
             if (old && overview.signature(old) === overview.signature(cards[i])) cards[i] = old
             map[cards[i].key] = cards[i]
         }
+        var keys = cards.map(function(c) { return c.key })
+        // A card that is going stays in the data until it has gone.
+        var going = []
+        for (var r = 0; r < cardModel.count; r++) {
+            var k0 = cardModel.get(r).key
+            if (keys.indexOf(k0) === -1) {
+                going.push(k0)
+                if (overview.cardData[k0]) map[k0] = overview.cardData[k0]
+            }
+        }
         overview.cardData = map
         overview.cardList = cards
-        // Row by row, so a card that stays keeps its view (and its capture),
-        // and the ones that come and go get their transitions.
-        var keys = cards.map(function(c) { return c.key })
-        for (var r = cardModel.count - 1; r >= 0; r--)
-            if (keys.indexOf(cardModel.get(r).key) === -1) cardModel.remove(r)
-        for (var k = 0; k < keys.length; k++) {
-            var at = -1
-            for (var m = 0; m < cardModel.count; m++)
-                if (cardModel.get(m).key === keys[k]) { at = m; break }
-            if (at === -1) cardModel.insert(k, { key: keys[k] })
-            else if (at !== k) cardModel.move(at, k, 1)
+        overview.goingKeys = going
+        // The rest row by row, so a card that stays keeps its view (and its
+        // capture); new ones go in where they belong among those staying.
+        var staying = []
+        for (var s = 0; s < cardModel.count; s++) {
+            var ks = cardModel.get(s).key
+            if (going.indexOf(ks) === -1) staying.push(ks)
         }
+        for (var k = 0; k < keys.length; k++) {
+            if (staying.indexOf(keys[k]) !== -1) continue
+            // Before the first staying card that comes after it.
+            var at = cardModel.count
+            for (var m = 0; m < cardModel.count; m++) {
+                var km = cardModel.get(m).key
+                if (going.indexOf(km) !== -1) continue
+                if (keys.indexOf(km) > k) { at = m; break }
+            }
+            cardModel.insert(at, { key: keys[k] })
+        }
+        if (going.length > 0) goneTimer.restart()
         overview.revision++
         if (overview.selected >= cards.length) overview.selected = cards.length - 1
         if (overview.confirmId > -2 && !map[overview.confirmId]) overview.confirmId = -2
     }
 
+    Timer {
+        id: goneTimer
+        interval: 300
+        onTriggered: {
+            for (var r = cardModel.count - 1; r >= 0; r--)
+                if (overview.goingKeys.indexOf(cardModel.get(r).key) !== -1) cardModel.remove(r)
+            overview.goingKeys = []
+        }
+    }
+
+    // The card at a row position, as the keyboard and the pointer count
+    // them: the ones on their way out are skipped.
     function indexOfFocused() {
         for (var i = 0; i < overview.cardList.length; i++)
             if (overview.cardList[i].focused) return i
@@ -274,6 +307,14 @@ PanelWindow {
         var room = overview.width * 0.9 - overview.cardSpacing * Math.max(0, overview.cardList.length - 1)
         return Math.round(Math.max(60, Math.min(overview.height * 0.3, 300, aspects > 0 ? room / aspects : 300)))
     }
+    // Eased when a card comes or goes, so the row grows and shrinks rather
+    // than snapping; not while the row first fills.
+    property real shownHeight: overview.cardHeight
+    Behavior on shownHeight {
+        enabled: !overview.opening
+        NumberAnimation { duration: 280; easing.type: Easing.OutCubic }
+    }
+
     readonly property int cardSpacing: 26
     readonly property int cardRadius: 18
 
@@ -368,6 +409,9 @@ PanelWindow {
             return
         }
         overview.confirmId = -2
+        // The selection stays near: on the card before the one going.
+        var cur = overview.cardList[overview.selected]
+        if (cur && cur.key === card.key) overview.selected = Math.max(0, overview.selected - 1)
         for (var i = 0; i < card.windows.length; i++)
             overview.closeWindow(card.windows[i].address)
         if (card.active) {
@@ -381,17 +425,18 @@ PanelWindow {
     property point dragPoint: Qt.point(0, 0)
     property size dragSize: Qt.size(0, 0)
 
-    function cardAt(point) {
-        for (var i = 0; i < cardModel.count; i++) {
-            var card = cardView.itemAtIndex(i)
-            if (!card) continue
+    // The card key under a point, or null.
+    function cardKeyAt(point) {
+        for (var i = 0; i < cardRepeater.count; i++) {
+            var card = cardRepeater.itemAt(i)
+            if (!card || card.going) continue
             var p = card.mapFromItem(content, point.x, point.y)
-            if (p.x >= 0 && p.y >= 0 && p.x <= card.width && p.y <= overview.cardHeight) return i
+            if (p.x >= 0 && p.y >= 0 && p.x <= card.faceWidth && p.y <= overview.shownHeight) return card.key
         }
-        return -1
+        return null
     }
 
-    readonly property int dropTarget: overview.dragged ? overview.cardAt(overview.dragPoint) : -1
+    readonly property var dropKey: overview.dragged ? overview.cardKeyAt(overview.dragPoint) : null
 
     // ── Drawing ──────────────────────────────────────────────────────────
 
@@ -406,8 +451,12 @@ PanelWindow {
             NumberAnimation { duration: 200; easing.type: Easing.OutQuad }
         }
 
-        TapHandler {
-            onTapped: overview.close()
+        MouseArea {
+            anchors.fill: parent
+            onClicked: {
+                if (overview.confirmId > -2) overview.confirmId = -2
+                else overview.close()
+            }
         }
     }
 
@@ -440,7 +489,7 @@ PanelWindow {
             id: keys
             focus: true
             Keys.onPressed: event => {
-                var n = cardModel.count
+                var n = overview.cardList.length
                 var card = overview.cardList[overview.selected]
                 if (overview.confirmId > -2) {
                     // The "close N windows?" question has the keys.
@@ -489,367 +538,409 @@ PanelWindow {
                 font.family: Theme.fontMono
             }
 
-            ListView {
-                id: cardView
+            // A plain row: it always knows where its cards are. (A ListView
+            // here, with its transitions and a sliding highlight, lost track
+            // when the cards changed width as one came or went -- cards
+            // piled up on each other and the ring drifted off them.)
+            Row {
+                id: cardRow
                 anchors.horizontalCenter: parent.horizontalCenter
-                width: contentWidth
-                height: overview.cardHeight + 52
-                orientation: ListView.Horizontal
-                spacing: overview.cardSpacing
-                interactive: false
-                model: cardModel
-                currentIndex: overview.selected
-                // Never scrolled: the row is always as wide as its cards.
-                // (Animating that width let the view scroll to keep the
-                // chosen card in sight while it was narrower, and the cards
-                // before it were left piled up at the left.)
-                contentX: 0
+                height: overview.shownHeight + 52
 
-                // The selection: one ring that slides from card to card, the
-                // way the workspace pill's highlight does.
-                highlightFollowsCurrentItem: true
-                highlightMoveDuration: 240
-                highlightMoveVelocity: -1
-                highlightResizeDuration: 240
-                highlightResizeVelocity: -1
-                highlight: Item {
-                    z: 2
-                    Rectangle {
-                        width: parent.width + 10
-                        height: overview.cardHeight + 10
-                        x: -5
-                        y: -5
-                        radius: overview.cardRadius + 5
-                        color: "transparent"
-                        border.width: 2
-                        border.color: AppState.themeAccent
-                        // In with the cards rather than ahead of them.
-                        opacity: overview.dragged || overview.opening && !ringIn.done ? 0 : 0.95
+                Repeater {
+                    id: cardRepeater
+                    model: cardModel
 
-                        Behavior on opacity { NumberAnimation { duration: 150 } }
-                    }
-                }
+                    delegate: Item {
+                        id: card
+                        required property int key
+                        required property int index
 
-                // Coming in one after another on opening; one at a time
-                // after that, as workspaces are made and removed.
-                add: Transition {
-                    id: addT
-                    SequentialAnimation {
-                        PropertyAction { property: "opacity"; value: 0 }
-                        PropertyAction { property: "scale"; value: 0.9 }
-                        PauseAnimation { duration: overview.opening ? addT.ViewTransition.index * 40 : 0 }
+                        readonly property var d: {
+                            overview.revision
+                            return overview.cardData[card.key] || { id: 0, name: "", geom: { x: 0, y: 0, w: 16, h: 9 },
+                                                                     windows: [], isNew: true, monitor: "" }
+                        }
+                        readonly property var geom: card.d.geom
+                        readonly property bool going: overview.goingKeys.indexOf(card.key) !== -1
+                        // Its place among the cards the keyboard walks.
+                        readonly property int place: {
+                            overview.revision
+                            for (var i = 0; i < overview.cardList.length; i++)
+                                if (overview.cardList[i].key === card.key) return i
+                            return -1
+                        }
+                        readonly property bool chosen: !card.going && overview.selected === card.place
+                        readonly property bool hovered: cardHover.hovered
+                        readonly property bool dropping: overview.dropKey === card.key && !!overview.dragged
+                                                         && overview.dragged.workspace !== card.d.id
+                        readonly property bool confirming: overview.confirmId === card.d.id && !card.d.isNew
+
+                        // Each card carries the gap after it (the last,
+                        // "New", has none), and hands over its whole width as
+                        // it goes -- or takes it as it comes -- so the row
+                        // closes up and opens out smoothly while the others
+                        // resize, instead of jumping once it is gone.
+                        readonly property real faceWidth: Math.round(overview.shownHeight * card.geom.w / card.geom.h)
+                        property real grow: 1
+                        width: Math.round((card.faceWidth + (card.key === -1 ? 0 : overview.cardSpacing)) * card.grow)
+                        height: overview.shownHeight + 52
+
+                        // Comes in one after another on opening, rises into
+                        // place; goes by shrinking where it is.
+                        opacity: 0
+                        scale: 0.9
+                        property real rise: 26
+
+                        // Set once, not bound: a card that arrives after the
+                        // row has filled grows in from nothing.
+                        Component.onCompleted: {
+                            entrance.start()
+                            if (!overview.opening) {
+                                card.grow = 0
+                                growIn.start()
+                            }
+                        }
+
+                        NumberAnimation {
+                            id: growIn
+                            target: card; property: "grow"; to: 1
+                            duration: 300; easing.type: Easing.OutCubic
+                        }
+
+                        SequentialAnimation {
+                            id: entrance
+                            PauseAnimation { duration: overview.opening ? Math.max(0, card.index) * 40 : 0 }
+                            ParallelAnimation {
+                                NumberAnimation { target: card; property: "opacity"; to: 1; duration: 220; easing.type: Easing.OutQuad }
+                                NumberAnimation { target: card; property: "scale"; to: 1; duration: 380; easing.type: Easing.OutBack; easing.overshoot: 1.1 }
+                                NumberAnimation { target: card; property: "rise"; to: 0; duration: 380; easing.type: Easing.OutCubic }
+                            }
+                        }
+
+                        onGoingChanged: if (going) { entrance.stop(); exit.start() }
+
                         ParallelAnimation {
-                            NumberAnimation { property: "opacity"; to: 1; duration: 220; easing.type: Easing.OutQuad }
-                            NumberAnimation { property: "scale"; to: 1; duration: 380; easing.type: Easing.OutBack; easing.overshoot: 1.1 }
-                            NumberAnimation { property: "y"; from: 26; to: 0; duration: 380; easing.type: Easing.OutCubic }
-                        }
-                    }
-                }
-                remove: Transition {
-                    ParallelAnimation {
-                        NumberAnimation { property: "opacity"; to: 0; duration: 200; easing.type: Easing.OutQuad }
-                        NumberAnimation { property: "scale"; to: 0.85; duration: 240; easing.type: Easing.OutCubic }
-                    }
-                }
-                displaced: Transition {
-                    NumberAnimation { properties: "x,y"; duration: 300; easing.type: Easing.OutCubic }
-                    NumberAnimation { property: "opacity"; to: 1; duration: 150 }
-                    NumberAnimation { property: "scale"; to: 1; duration: 150 }
-                }
-
-                delegate: Item {
-                    id: card
-                    required property int key
-                    required property int index
-
-                    readonly property var d: {
-                        overview.revision
-                        return overview.cardData[card.key] || { id: 0, name: "", geom: { x: 0, y: 0, w: 16, h: 9 },
-                                                                 windows: [], isNew: true, monitor: "" }
-                    }
-                    readonly property var geom: card.d.geom
-                    readonly property bool chosen: overview.selected === card.index
-                    readonly property bool hovered: cardHover.hovered
-                    readonly property bool dropping: overview.dropTarget === card.index
-                                                     && !!overview.dragged
-                                                     && overview.dragged.workspace !== card.d.id
-                    readonly property bool confirming: overview.confirmId === card.d.id && !card.d.isNew
-
-                    width: Math.round(overview.cardHeight * card.geom.w / card.geom.h)
-                    height: cardView.height
-
-                    // Lifts a little under the pointer or a dragged window.
-                    Item {
-                        id: face
-                        width: parent.width
-                        height: overview.cardHeight
-                        y: card.hovered || card.dropping ? -4 : 0
-                        scale: card.dropping ? 1.04 : card.hovered ? 1.015 : 1
-
-                        Behavior on y { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-                        Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
-
-                        // One cheap shadow (a signed-distance rectangle, not
-                        // a blurred layer), deeper when lifted.
-                        RectangularShadow {
-                            anchors.fill: parent
-                            radius: overview.cardRadius
-                            blur: card.hovered || card.dropping ? 30 : 20
-                            offset.y: card.hovered || card.dropping ? 10 : 6
-                            color: Qt.rgba(0, 0, 0, 0.45)
-
-                            Behavior on blur { NumberAnimation { duration: 200 } }
+                            id: exit
+                            NumberAnimation { target: card; property: "opacity"; to: 0; duration: 180; easing.type: Easing.OutQuad }
+                            NumberAnimation { target: card; property: "scale"; to: 0.85; duration: 220; easing.type: Easing.OutCubic }
+                            NumberAnimation { target: card; property: "grow"; to: 0; duration: 280; easing.type: Easing.OutCubic }
                         }
 
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: overview.cardRadius
-                            color: Theme.glass
-                        }
+                        transform: Translate { y: card.rise }
 
-                        ClippingRectangle {
-                            id: screenArea
-                            anchors.fill: parent
-                            anchors.margins: 4
-                            radius: overview.cardRadius - 4
-                            color: "transparent"
+                        // Lifts a little under the pointer or a dragged window.
+                        Item {
+                            id: face
+                            width: card.faceWidth
+                            height: overview.shownHeight
+                            y: card.hovered || card.dropping ? -4 : 0
+                            scale: card.dropping ? 1.04 : card.hovered ? 1.015 : 1
 
-                            // The desktop the windows sit on.
-                            Image {
+                            Behavior on y { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                            Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+
+                            // One cheap shadow (a signed-distance rectangle,
+                            // not a blurred layer), deeper when lifted.
+                            RectangularShadow {
                                 anchors.fill: parent
-                                visible: !card.d.isNew
-                                source: AppState.wallpaperStill.length > 0 ? "file://" + AppState.wallpaperStill : ""
-                                fillMode: Image.PreserveAspectCrop
-                                asynchronous: true
-                                cache: true
-                                sourceSize.width: 512
-                                opacity: card.d.focused ? 0.85 : 0.6
+                                radius: overview.cardRadius
+                                blur: card.hovered || card.dropping ? 30 : 20
+                                offset.y: card.hovered || card.dropping ? 10 : 6
+                                color: Qt.rgba(0, 0, 0, 0.45)
 
-                                Behavior on opacity { NumberAnimation { duration: 200 } }
+                                Behavior on blur { NumberAnimation { duration: 200 } }
                             }
 
-                            // A new workspace: a plus where the windows would be.
-                            Column {
-                                anchors.centerIn: parent
-                                visible: card.d.isNew
-                                spacing: 6
-                                opacity: card.hovered || card.chosen || card.dropping ? 1 : 0.55
-
-                                Behavior on opacity { NumberAnimation { duration: 180 } }
-
-                                IconGlyph {
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    text: "\u{F0415}"
-                                    color: Theme.textSecondary
-                                    size: 26
-                                }
-                                Text {
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    text: overview.dragged ? "Drop here" : "New"
-                                    color: Theme.textMuted
-                                    font.pixelSize: 11
-                                    font.family: Theme.fontMono
-                                }
-                            }
-
-                            Repeater {
-                                model: card.d.windows
-
-                                delegate: Item {
-                                    id: win
-                                    required property var modelData
-
-                                    readonly property real sx: screenArea.width / card.geom.w
-                                    readonly property real sy: screenArea.height / card.geom.h
-                                    readonly property bool whole: win.modelData.fullscreen
-                                    readonly property bool held: !!overview.dragged
-                                                                 && overview.dragged.address === win.modelData.address
-
-                                    x: whole ? 0 : Math.round((win.modelData.x - card.geom.x) * sx)
-                                    y: whole ? 0 : Math.round((win.modelData.y - card.geom.y) * sy)
-                                    width: whole ? parent.width : Math.max(14, Math.round(win.modelData.w * sx))
-                                    height: whole ? parent.height : Math.max(10, Math.round(win.modelData.h * sy))
-                                    // Fades in when its capture has arrived,
-                                    // rather than popping in over a blank.
-                                    opacity: win.held ? 0.25 : shot.hasContent ? 1 : 0
-                                    scale: winHover.hovered && !overview.dragged ? 1.03 : 1
-
-                                    Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutQuad } }
-                                    Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
-
-                                    ClippingRectangle {
-                                        anchors.fill: parent
-                                        radius: 7
-                                        color: Theme.surfaceContainerHigh
-
-                                        ScreencopyView {
-                                            id: shot
-                                            anchors.fill: parent
-                                            captureSource: overview.shown ? win.modelData.toplevel.wayland : null
-                                            live: false
-                                        }
-                                    }
-
-                                    // Its app, over the middle.
-                                    Rectangle {
-                                        anchors.centerIn: parent
-                                        width: 30
-                                        height: 30
-                                        radius: 15
-                                        color: Qt.rgba(0, 0, 0, 0.45)
-                                        visible: win.width > 48 && win.height > 40
-
-                                        IconImage {
-                                            anchors.centerIn: parent
-                                            implicitSize: 20
-                                            mipmap: true
-                                            source: {
-                                                var e = DesktopEntries.heuristicLookup(win.modelData.cls)
-                                                return Quickshell.iconPath(e ? e.icon : win.modelData.cls.toLowerCase(),
-                                                                           "application-x-executable")
-                                            }
-                                        }
-                                    }
-
-                                    Rectangle {
-                                        anchors.fill: parent
-                                        radius: 7
-                                        color: "transparent"
-                                        border.width: winHover.hovered ? 2 : 1
-                                        border.color: winHover.hovered ? AppState.themeAccent : Qt.rgba(1, 1, 1, 0.1)
-
-                                        Behavior on border.color { ColorAnimation { duration: 140 } }
-                                    }
-
-                                    // Close this window.
-                                    Rectangle {
-                                        anchors.top: parent.top
-                                        anchors.right: parent.right
-                                        anchors.margins: 4
-                                        width: 18
-                                        height: 18
-                                        radius: 9
-                                        color: winClose.hovered ? Theme.error : Qt.rgba(0, 0, 0, 0.55)
-                                        visible: win.width > 60 && win.height > 40
-                                        opacity: winHover.hovered && !overview.dragged ? 1 : 0
-
-                                        Behavior on opacity { NumberAnimation { duration: 140 } }
-                                        Behavior on color { ColorAnimation { duration: 120 } }
-
-                                        IconGlyph {
-                                            anchors.centerIn: parent
-                                            text: "\u{F0156}"
-                                            color: "#ffffff"
-                                            size: 9
-                                        }
-
-                                        HoverHandler { id: winClose }
-                                        TapHandler {
-                                            enabled: parent.opacity > 0.5
-                                            onTapped: overview.closeWindow(win.modelData.address)
-                                        }
-                                    }
-
-                                    HoverHandler {
-                                        id: winHover
-                                        cursorShape: Qt.PointingHandCursor
-                                    }
-
-                                    TapHandler {
-                                        onTapped: overview.goToWindow(win.modelData.address)
-                                    }
-
-                                    TapHandler {
-                                        acceptedButtons: Qt.MiddleButton
-                                        onTapped: overview.closeWindow(win.modelData.address)
-                                    }
-
-                                    DragHandler {
-                                        target: null
-                                        onActiveChanged: {
-                                            if (active) {
-                                                overview.dragSize = Qt.size(win.width, win.height)
-                                                overview.dragged = Object.assign({}, win.modelData,
-                                                                                 { workspace: card.d.id })
-                                            } else if (overview.dragged) {
-                                                var to = overview.dropTarget
-                                                var w = overview.dragged
-                                                overview.dragged = null
-                                                var target = overview.cardList[to]
-                                                if (target && target.id !== w.workspace)
-                                                    overview.moveWindow(w.address, target.id)
-                                            }
-                                        }
-                                        onCentroidChanged: {
-                                            if (active)
-                                                overview.dragPoint = win.mapToItem(content, centroid.position.x,
-                                                                                   centroid.position.y)
-                                        }
-                                    }
-                                }
-                            }
-
-                            // "Close N windows?" -- the one question asked
-                            // before a workspace goes.
                             Rectangle {
                                 anchors.fill: parent
-                                color: Qt.rgba(0, 0, 0, 0.62)
-                                opacity: card.confirming ? 1 : 0
-                                visible: opacity > 0
+                                radius: overview.cardRadius
+                                color: Theme.glass
+                            }
 
-                                Behavior on opacity { NumberAnimation { duration: 160 } }
+                            // A click anywhere on the card that nothing on it
+                            // takes: go to that workspace. First, so every
+                            // button and window above it gets its click first.
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    if (card.confirming) overview.confirmId = -2
+                                    else overview.goToWorkspace(card.d.id)
+                                }
+                            }
 
-                                // Swallows clicks, so a click on the dim is
-                                // not a click on the workspace under it.
-                                TapHandler { onTapped: overview.confirmId = -2 }
+                            ClippingRectangle {
+                                id: screenArea
+                                anchors.fill: parent
+                                anchors.margins: 4
+                                radius: overview.cardRadius - 4
+                                color: "transparent"
 
+                                // The desktop the windows sit on.
+                                Image {
+                                    anchors.fill: parent
+                                    visible: !card.d.isNew
+                                    source: AppState.wallpaperStill.length > 0 ? "file://" + AppState.wallpaperStill : ""
+                                    fillMode: Image.PreserveAspectCrop
+                                    asynchronous: true
+                                    cache: true
+                                    sourceSize.width: 512
+                                    opacity: card.d.focused ? 0.85 : 0.6
+
+                                    Behavior on opacity { NumberAnimation { duration: 200 } }
+                                }
+
+                                // A new workspace: a plus where the windows would be.
                                 Column {
                                     anchors.centerIn: parent
-                                    spacing: 12
+                                    visible: card.d.isNew
+                                    spacing: 6
+                                    opacity: card.hovered || card.chosen || card.dropping ? 1 : 0.55
 
+                                    Behavior on opacity { NumberAnimation { duration: 180 } }
+
+                                    IconGlyph {
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        text: "\u{F0415}"
+                                        color: Theme.textSecondary
+                                        size: 26
+                                    }
                                     Text {
                                         anchors.horizontalCenter: parent.horizontalCenter
-                                        text: card.d.windows.length === 1 ? "Close its window?"
-                                            : "Close its " + card.d.windows.length + " windows?"
-                                        color: Theme.textPrimary
-                                        font.pixelSize: 13
-                                        font.bold: true
+                                        text: overview.dragged ? "Drop here" : "New"
+                                        color: Theme.textMuted
+                                        font.pixelSize: 11
                                         font.family: Theme.fontMono
                                     }
+                                }
 
-                                    Row {
-                                        anchors.horizontalCenter: parent.horizontalCenter
-                                        spacing: 8
+                                Repeater {
+                                    model: card.d.windows
 
-                                        Repeater {
-                                            model: [{ label: "Remove", danger: true }, { label: "Keep", danger: false }]
+                                    delegate: Item {
+                                        id: win
+                                        required property var modelData
 
-                                            delegate: Rectangle {
-                                                id: btn
-                                                required property var modelData
-                                                width: btnText.implicitWidth + 26
-                                                height: 28
-                                                radius: 14
-                                                color: btn.modelData.danger ? Theme.alpha(Theme.error, btnHover.hovered ? 0.9 : 0.7)
-                                                                            : Theme.alpha(Theme.foreground, btnHover.hovered ? 0.2 : 0.12)
+                                        readonly property real sx: screenArea.width / card.geom.w
+                                        readonly property real sy: screenArea.height / card.geom.h
+                                        readonly property bool whole: win.modelData.fullscreen
+                                        readonly property bool held: !!overview.dragged
+                                                                     && overview.dragged.address === win.modelData.address
 
-                                                Behavior on color { ColorAnimation { duration: 120 } }
+                                        // Clamped to the card: a window partly
+                                        // off its monitor stays inside the picture.
+                                        x: whole ? 0 : Math.max(0, Math.min(parent.width - width,
+                                                                             Math.round((win.modelData.x - card.geom.x) * sx)))
+                                        y: whole ? 0 : Math.max(0, Math.min(parent.height - height,
+                                                                             Math.round((win.modelData.y - card.geom.y) * sy)))
+                                        width: whole ? parent.width : Math.min(parent.width, Math.max(14, Math.round(win.modelData.w * sx)))
+                                        height: whole ? parent.height : Math.min(parent.height, Math.max(10, Math.round(win.modelData.h * sy)))
+                                        // Fades in when its capture has arrived,
+                                        // rather than popping in over a blank.
+                                        opacity: win.held ? 0.25 : shot.hasContent ? 1 : 0
+                                        scale: winArea.containsMouse && !overview.dragged ? 1.03 : 1
 
-                                                Text {
-                                                    id: btnText
-                                                    anchors.centerIn: parent
-                                                    text: btn.modelData.label
-                                                    color: "#ffffff"
-                                                    font.pixelSize: 11
-                                                    font.bold: true
-                                                    font.family: Theme.fontMono
+                                        Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutQuad } }
+                                        Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+
+                                        ClippingRectangle {
+                                            anchors.fill: parent
+                                            radius: 7
+                                            color: Theme.surfaceContainerHigh
+
+                                            ScreencopyView {
+                                                id: shot
+                                                anchors.fill: parent
+                                                captureSource: overview.shown ? win.modelData.toplevel.wayland : null
+                                                live: false
+                                            }
+                                        }
+
+                                        // Its app, over the middle.
+                                        Rectangle {
+                                            anchors.centerIn: parent
+                                            width: 30
+                                            height: 30
+                                            radius: 15
+                                            color: Qt.rgba(0, 0, 0, 0.45)
+                                            visible: win.width > 48 && win.height > 40
+
+                                            IconImage {
+                                                anchors.centerIn: parent
+                                                implicitSize: 20
+                                                mipmap: true
+                                                source: {
+                                                    var e = DesktopEntries.heuristicLookup(win.modelData.cls)
+                                                    return Quickshell.iconPath(e ? e.icon : win.modelData.cls.toLowerCase(),
+                                                                               "application-x-executable")
                                                 }
+                                            }
+                                        }
 
-                                                HoverHandler { id: btnHover; cursorShape: Qt.PointingHandCursor }
-                                                TapHandler {
-                                                    onTapped: {
-                                                        if (btn.modelData.danger) overview.removeWorkspace(card.d, true)
-                                                        else overview.confirmId = -2
+                                        Rectangle {
+                                            anchors.fill: parent
+                                            radius: 7
+                                            color: "transparent"
+                                            border.width: winArea.containsMouse ? 2 : 1
+                                            border.color: winArea.containsMouse ? AppState.themeAccent : Qt.rgba(1, 1, 1, 0.1)
+
+                                            Behavior on border.color { ColorAnimation { duration: 140 } }
+                                        }
+
+                                        // Click to go to it, middle click to
+                                        // close it, drag to move it: one area,
+                                        // so a drag is never also a click.
+                                        MouseArea {
+                                            id: winArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+                                            cursorShape: Qt.PointingHandCursor
+                                            enabled: !card.confirming
+
+                                            property point pressAt
+                                            property bool dragging: false
+
+                                            onPressed: mouse => {
+                                                pressAt = Qt.point(mouse.x, mouse.y)
+                                                dragging = false
+                                            }
+                                            onPositionChanged: mouse => {
+                                                if (!pressed || !(pressedButtons & Qt.LeftButton)) return
+                                                if (!dragging && Math.hypot(mouse.x - pressAt.x, mouse.y - pressAt.y) > 6) {
+                                                    dragging = true
+                                                    overview.dragSize = Qt.size(win.width, win.height)
+                                                    overview.dragged = Object.assign({}, win.modelData,
+                                                                                     { workspace: card.d.id })
+                                                }
+                                                if (dragging)
+                                                    overview.dragPoint = win.mapToItem(content, mouse.x, mouse.y)
+                                            }
+                                            onReleased: mouse => {
+                                                if (dragging) {
+                                                    var key = overview.dropKey
+                                                    var w = overview.dragged
+                                                    overview.dragged = null
+                                                    dragging = false
+                                                    var target = key === null ? null : overview.cardData[key]
+                                                    if (target && target.id !== w.workspace)
+                                                        overview.moveWindow(w.address, target.id)
+                                                    return
+                                                }
+                                                if (mouse.button === Qt.MiddleButton) overview.closeWindow(win.modelData.address)
+                                                else overview.goToWindow(win.modelData.address)
+                                            }
+                                            onCanceled: {
+                                                dragging = false
+                                                overview.dragged = null
+                                            }
+                                        }
+
+                                        // Close this window. Above the window's
+                                        // own area, so its click is its own.
+                                        Rectangle {
+                                            anchors.top: parent.top
+                                            anchors.right: parent.right
+                                            anchors.margins: 4
+                                            width: 18
+                                            height: 18
+                                            radius: 9
+                                            color: winClose.containsMouse ? Theme.error : Qt.rgba(0, 0, 0, 0.55)
+                                            visible: win.width > 60 && win.height > 40
+                                            opacity: (winArea.containsMouse || winClose.containsMouse) && !overview.dragged
+                                                     && !card.confirming ? 1 : 0
+
+                                            Behavior on opacity { NumberAnimation { duration: 140 } }
+                                            Behavior on color { ColorAnimation { duration: 120 } }
+
+                                            IconGlyph {
+                                                anchors.centerIn: parent
+                                                text: "\u{F0156}"
+                                                color: "#ffffff"
+                                                size: 9
+                                            }
+
+                                            MouseArea {
+                                                id: winClose
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                enabled: parent.opacity > 0.5
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: overview.closeWindow(win.modelData.address)
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // "Close N windows?" -- the one question asked
+                                // before a workspace goes.
+                                Rectangle {
+                                    anchors.fill: parent
+                                    color: Qt.rgba(0, 0, 0, 0.62)
+                                    opacity: card.confirming ? 1 : 0
+                                    visible: opacity > 0
+
+                                    Behavior on opacity { NumberAnimation { duration: 160 } }
+
+                                    // Takes the clicks on the dim: a click
+                                    // there says no, not "go to this workspace".
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        onClicked: overview.confirmId = -2
+                                    }
+
+                                    Column {
+                                        anchors.centerIn: parent
+                                        spacing: 12
+
+                                        Text {
+                                            anchors.horizontalCenter: parent.horizontalCenter
+                                            text: card.d.windows.length === 1 ? "Close its window?"
+                                                : "Close its " + card.d.windows.length + " windows?"
+                                            color: Theme.textPrimary
+                                            font.pixelSize: 13
+                                            font.bold: true
+                                            font.family: Theme.fontMono
+                                        }
+
+                                        Row {
+                                            anchors.horizontalCenter: parent.horizontalCenter
+                                            spacing: 8
+
+                                            Repeater {
+                                                model: [{ label: "Remove", danger: true }, { label: "Keep", danger: false }]
+
+                                                delegate: Rectangle {
+                                                    id: btn
+                                                    required property var modelData
+                                                    width: btnText.implicitWidth + 26
+                                                    height: 28
+                                                    radius: 14
+                                                    color: btn.modelData.danger
+                                                           ? Theme.alpha(Theme.error, btnArea.containsMouse ? 0.9 : 0.7)
+                                                           : Theme.alpha(Theme.foreground, btnArea.containsMouse ? 0.2 : 0.12)
+
+                                                    Behavior on color { ColorAnimation { duration: 120 } }
+
+                                                    Text {
+                                                        id: btnText
+                                                        anchors.centerIn: parent
+                                                        text: btn.modelData.label
+                                                        color: "#ffffff"
+                                                        font.pixelSize: 11
+                                                        font.bold: true
+                                                        font.family: Theme.fontMono
+                                                    }
+
+                                                    MouseArea {
+                                                        id: btnArea
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        onClicked: {
+                                                            if (btn.modelData.danger) overview.removeWorkspace(card.d, true)
+                                                            else overview.confirmId = -2
+                                                        }
                                                     }
                                                 }
                                             }
@@ -857,99 +948,118 @@ PanelWindow {
                                     }
                                 }
                             }
-                        }
 
-                        // Remove the workspace.
-                        Rectangle {
-                            anchors.top: parent.top
-                            anchors.right: parent.right
-                            anchors.topMargin: -8
-                            anchors.rightMargin: -8
-                            width: 24
-                            height: 24
-                            radius: 12
-                            color: removeHover.hovered ? Theme.error : Theme.glass
-                            border.width: 1
-                            border.color: Theme.outline
-                            visible: overview.canRemove(card.d)
-                            opacity: (card.hovered || card.chosen) && !card.confirming && !overview.dragged ? 1 : 0
-                            scale: opacity > 0.5 ? 1 : 0.6
+                            // Where the keyboard is, and where a dragged
+                            // window would land: a ring on the card itself,
+                            // so it lifts and resizes with it.
+                            Rectangle {
+                                anchors.fill: parent
+                                anchors.margins: -5
+                                radius: overview.cardRadius + 5
+                                color: "transparent"
+                                border.width: 2
+                                border.color: AppState.themeAccent
+                                opacity: card.dropping ? 1 : card.chosen && !overview.dragged ? 0.95 : 0
+                                scale: opacity > 0 ? 1 : 0.97
 
-                            Behavior on opacity { NumberAnimation { duration: 160 } }
-                            Behavior on scale { NumberAnimation { duration: 200; easing.type: Easing.OutBack } }
-                            Behavior on color { ColorAnimation { duration: 120 } }
-
-                            IconGlyph {
-                                anchors.centerIn: parent
-                                text: "\u{F0156}"
-                                color: Theme.textPrimary
-                                size: 11
+                                Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutQuad } }
+                                Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
                             }
 
-                            HoverHandler { id: removeHover; cursorShape: Qt.PointingHandCursor }
-                            TapHandler {
-                                enabled: parent.opacity > 0.5
-                                onTapped: overview.removeWorkspace(card.d, false)
+                            // Remove the workspace. Last, so it is on top of
+                            // everything the card holds and takes its click.
+                            Rectangle {
+                                anchors.top: parent.top
+                                anchors.right: parent.right
+                                anchors.topMargin: -8
+                                anchors.rightMargin: -8
+                                width: 24
+                                height: 24
+                                radius: 12
+                                color: removeArea.containsMouse ? Theme.error : Theme.glass
+                                border.width: 1
+                                border.color: Theme.outline
+                                visible: overview.canRemove(card.d)
+                                opacity: (card.hovered || card.chosen) && !card.confirming && !overview.dragged ? 1 : 0
+                                scale: opacity > 0.5 ? 1 : 0.6
+
+                                Behavior on opacity { NumberAnimation { duration: 160 } }
+                                Behavior on scale { NumberAnimation { duration: 200; easing.type: Easing.OutBack } }
+                                Behavior on color { ColorAnimation { duration: 120 } }
+
+                                IconGlyph {
+                                    anchors.centerIn: parent
+                                    text: "\u{F0156}"
+                                    color: Theme.textPrimary
+                                    size: 11
+                                }
+
+                                MouseArea {
+                                    id: removeArea
+                                    anchors.fill: parent
+                                    anchors.margins: -4
+                                    hoverEnabled: true
+                                    enabled: parent.opacity > 0.5
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: overview.removeWorkspace(card.d, false)
+                                }
+                            }
+
+                            HoverHandler {
+                                id: cardHover
+                                onHoveredChanged: if (hovered && overview.pointerSteers && card.place >= 0)
+                                                      overview.selected = card.place
                             }
                         }
 
-                        HoverHandler {
-                            id: cardHover
-                            onHoveredChanged: if (hovered && overview.pointerSteers) overview.selected = card.index
-                        }
+                        // The number in a chip, a dot for the one you are on.
+                        Row {
+                            anchors.horizontalCenter: face.horizontalCenter
+                            anchors.top: face.bottom
+                            anchors.topMargin: 14
+                            spacing: 8
 
-                        TapHandler {
-                            onTapped: overview.goToWorkspace(card.d.id)
-                        }
-                    }
-
-                    // The number in a chip, a dot for the one you are on.
-                    Row {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.top: face.bottom
-                        anchors.topMargin: 14
-                        spacing: 8
-
-                        Rectangle {
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: Math.max(24, num.implicitWidth + 16)
-                            height: 22
-                            radius: 11
-                            color: card.chosen ? AppState.themeAccent : Theme.alpha(Theme.foreground, 0.1)
-
-                            Behavior on color { ColorAnimation { duration: 180 } }
-
-                            Text {
-                                id: num
-                                anchors.centerIn: parent
-                                text: card.d.isNew ? "+" : card.d.name
-                                color: card.chosen ? Theme.accentText : Theme.textPrimary
-                                font.pixelSize: 12
-                                font.bold: true
-                                font.family: Theme.fontMono
+                            Rectangle {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: Math.max(24, num.implicitWidth + 16)
+                                height: 22
+                                radius: 11
+                                color: card.chosen ? AppState.themeAccent : Theme.alpha(Theme.foreground, 0.1)
 
                                 Behavior on color { ColorAnimation { duration: 180 } }
+
+                                Text {
+                                    id: num
+                                    anchors.centerIn: parent
+                                    text: card.d.isNew ? "+" : card.d.name
+                                    color: card.chosen ? Theme.accentText : Theme.textPrimary
+                                    font.pixelSize: 12
+                                    font.bold: true
+                                    font.family: Theme.fontMono
+
+                                    Behavior on color { ColorAnimation { duration: 180 } }
+                                }
                             }
-                        }
 
-                        Rectangle {
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: 6
-                            height: 6
-                            radius: 3
-                            color: AppState.themeAccent
-                            visible: !!card.d.focused
-                        }
+                            Rectangle {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 6
+                                height: 6
+                                radius: 3
+                                color: AppState.themeAccent
+                                visible: !!card.d.focused
+                            }
 
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            visible: !card.d.isNew
-                            text: card.d.windows.length === 0 ? "empty"
-                                : card.d.windows.length === 1 ? "1 window"
-                                : card.d.windows.length + " windows"
-                            color: Theme.textMuted
-                            font.pixelSize: 11
-                            font.family: Theme.fontMono
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                visible: !card.d.isNew
+                                text: card.d.windows.length === 0 ? "empty"
+                                    : card.d.windows.length === 1 ? "1 window"
+                                    : card.d.windows.length + " windows"
+                                color: Theme.textMuted
+                                font.pixelSize: 11
+                                font.family: Theme.fontMono
+                            }
                         }
                     }
                 }
