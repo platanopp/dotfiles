@@ -1661,6 +1661,7 @@ Singleton {
     property string wallpapersScreen: ""
 
     onWallpapersOpenChanged: {
+        root.syncSubmap()
         if (!root.wallpapersOpen) return
         var monitor = Hyprland.focusedMonitor
         root.wallpapersScreen = monitor ? monitor.name : ""
@@ -1716,13 +1717,13 @@ Singleton {
         function close(): void { root.overviewOpen = false }
     }
 
-    // The launcher and the overview put Hyprland in its "shell-modal"
-    // submap while either is up (hyprland.lua), where Super+drag and the
+    // The launcher, the overview and the wallpaper picker put Hyprland in
+    // its "shell-modal" submap while one is up (hyprland.lua), where Super+drag and the
     // other binds do nothing -- they reached the windows behind the overlay.
     // Set again on every change of either: Super+Tab or Super+Space drop
     // the submap themselves, and one may be opening as the other closes.
     // Reset once as the shell starts, in case one died with it set.
-    readonly property bool modalOpen: root.overviewOpen || root.launcherOpen
+    readonly property bool modalOpen: root.overviewOpen || root.launcherOpen || root.wallpapersOpen
 
     // One call, with where things ended up, a moment after they settle --
     // not one per change: two changes close together (the launcher closing

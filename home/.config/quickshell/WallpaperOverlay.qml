@@ -22,6 +22,45 @@ PanelWindow {
     // One copy per monitor, and only the one it was opened on shows. Focus
     // follows the mouse here, so matching against live focus would drag the
     // picker to whichever screen the pointer wandered onto.
+    // A key, drawn as a key -- the launcher's and the overview's.
+    component KeyCap: Rectangle {
+        id: cap
+        property string key: ""
+        width: Math.max(20, capText.implicitWidth + 12)
+        height: 20
+        radius: 6
+        color: Theme.glass
+        border.width: 1
+        border.color: Theme.outline
+
+        Text {
+            id: capText
+            anchors.centerIn: parent
+            text: cap.key
+            color: Theme.textSecondary
+            font.pixelSize: 10
+            font.family: Theme.fontMono
+        }
+    }
+
+    // A key and what it does.
+    component KeyHint: Row {
+        id: hint
+        property string key: ""
+        property string label: ""
+        spacing: 6
+
+        KeyCap { anchors.verticalCenter: parent.verticalCenter; key: hint.key }
+
+        Text {
+            anchors.verticalCenter: parent.verticalCenter
+            text: hint.label
+            color: Theme.textMuted
+            font.pixelSize: 10
+            font.family: Theme.fontMono
+        }
+    }
+
     readonly property bool onOpeningScreen: {
         if (!bar.monitor) return true
         if (AppState.wallpapersScreen === "") return bar.monitor.focused
@@ -37,15 +76,18 @@ PanelWindow {
     // or not it has anything in it. There were four of these, full-screen, on
     // every monitor.
     //
-    // The timer is what lets it close politely: `open` goes false, the fade
-    // inside starts, and the surface stays mapped long enough for that fade to
-    // play. Without it the window would vanish on the first frame and the
-    // fade-out would never be seen.
+    // `shown` is what lets it close politely: `open` goes false, the fade
+    // inside starts, and the surface stays mapped until that fade has
+    // played. It read `open || unmapDelay.running`, which was false for the
+    // moment between `open` going false and the timer starting -- the picker
+    // unmapped, came back, and only then faded: the two-frame blink the
+    // launcher had too (see AppLauncher).
     //
     // Connections rather than an `onOpenChanged` here, because two of these
     // files already declare one and a second on the same object is a
     // "Property value set multiple times" error.
-    visible: overlay.open || unmapDelay.running
+    property bool shown: false
+    visible: overlay.shown
 
     Timer {
         id: unmapDelay
@@ -62,6 +104,7 @@ PanelWindow {
         // the time this fires the window really is gone, and the carousel can
         // take as long as it likes to travel.
         onTriggered: {
+            overlay.shown = false
             overlay.section = overlay.sectionInUse()
             overlay.centerOnCurrent()
         }
@@ -70,7 +113,12 @@ PanelWindow {
     Connections {
         target: overlay
         function onOpenChanged() {
-            if (!overlay.open) unmapDelay.restart()
+            if (overlay.open) {
+                unmapDelay.stop()
+                overlay.shown = true
+            } else {
+                unmapDelay.restart()
+            }
         }
     }
 
@@ -80,8 +128,11 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Overlay
     exclusionMode: ExclusionMode.Ignore
 
-    WlrLayershell.keyboardFocus: overlay.open ? WlrKeyboardFocus.Exclusive
-                                              : WlrKeyboardFocus.None
+    // Held until the picker is gone, not dropped as it starts to fade:
+    // changing it on a surface that stays up drops that surface for two
+    // frames (see AppLauncher).
+    WlrLayershell.keyboardFocus: overlay.shown ? WlrKeyboardFocus.Exclusive
+                                               : WlrKeyboardFocus.None
 
     anchors {
         top: true
@@ -443,7 +494,7 @@ PanelWindow {
     Item {
         id: keyCatcher
         anchors.fill: parent
-        focus: overlay.open
+        focus: overlay.shown
 
         // Escape steps back one mode rather than always closing: from the
         // framing editor it returns to the row, and only from the row does
@@ -463,6 +514,13 @@ PanelWindow {
             overlay.showSection(overlay.videos ? "images" : "videos")
         Keys.onUpPressed: if (overlay.framing) overlay.nudgeFraming(0, -0.02)
         Keys.onDownPressed: if (overlay.framing) overlay.nudgeFraming(0, 0.02)
+        // F frames the image in the middle, as the Frame button does.
+        Keys.onPressed: event => {
+            if (event.key === Qt.Key_F && !overlay.framing && !overlay.videos) {
+                overlay.startFraming()
+                event.accepted = true
+            }
+        }
     }
 
     // ── Content ──────────────────────────────────────────────────────────
@@ -507,10 +565,14 @@ PanelWindow {
         }
 
         opacity: overlay.open ? 1 : 0
+        scale: overlay.open ? 1 : 0.97
         visible: opacity > 0
 
         Behavior on opacity {
             NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic }
+        }
+        Behavior on scale {
+            NumberAnimation { duration: Theme.durLong; easing.type: Easing.OutCubic }
         }
 
         // Stepping into the framing editor and back.
@@ -552,9 +614,18 @@ PanelWindow {
                 width: sectionRow.implicitWidth + 8
                 height: 40
                 radius: height / 2
-                color: Theme.surfaceContainer
+                color: Theme.glass
                 border.width: 1
                 border.color: Theme.outline
+
+                RectangularShadow {
+                    anchors.fill: parent
+                    z: -1
+                    radius: parent.radius
+                    blur: 20
+                    offset.y: 5
+                    color: Qt.rgba(0, 0, 0, 0.4)
+                }
 
                 // The fill slides between the two rather than blinking from one
                 // to the other, so the switch says which way it went.
@@ -858,7 +929,7 @@ PanelWindow {
                             Rectangle {
                                 id: cardMask
                                 anchors.fill: parent
-                                radius: 12
+                                radius: 16
                                 color: "transparent"
                                 visible: false
                             }
@@ -963,6 +1034,45 @@ PanelWindow {
                                 }
                             }
 
+                            // "In use", on the wallpaper that is up -- the ring
+                            // alone read as one more highlight.
+                            Rectangle {
+                                anchors.top: parent.top
+                                anchors.left: parent.left
+                                anchors.margins: 10
+                                width: inUseRow.implicitWidth + 16
+                                height: 24
+                                radius: 12
+                                color: Theme.accent
+                                opacity: card.isActive ? 1 : 0
+                                scale: card.isActive ? 1 : 0.8
+                                visible: opacity > 0
+
+                                Behavior on opacity { NumberAnimation { duration: Theme.durMedium } }
+                                Behavior on scale { NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutBack } }
+
+                                Row {
+                                    id: inUseRow
+                                    anchors.centerIn: parent
+                                    spacing: 5
+
+                                    IconGlyph {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: "\u{F012C}"
+                                        size: Theme.iconTiny
+                                        color: Theme.accentText
+                                    }
+                                    Text {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: "In use"
+                                        color: Theme.accentText
+                                        font.pixelSize: 10
+                                        font.bold: true
+                                        font.family: Theme.fontMono
+                                    }
+                                }
+                            }
+
                             // Marks a panel as a video, since the still in it looks
                             // exactly like an image. Bottom left, clear of the ring.
                             Rectangle {
@@ -1015,21 +1125,45 @@ PanelWindow {
                 // row rather than to any one panel -- a button per panel would
                 // be six invitations to reframe something the user is not
                 // looking at.
-                IconButton {
+                // A pill that says what it does, with its key, rather than a
+                // bare glyph in a corner with nothing beside it to explain it.
+                Rectangle {
                     anchors.right: parent.right
                     anchors.top: parent.top
-                    size: 34
-                    icon: "󰆞"
-                    // Given a fill of its own. A bare glyph over the dimmed
-                    // desktop reads as a smudge rather than as something to
-                    // press, and this one sits in a corner with nothing
-                    // beside it to borrow context from.
-                    color: Theme.surfaceContainerHigh
-                    iconColor: Theme.textPrimary
-                    interactive: overlay.files.length > 0
+                    width: frameRow.implicitWidth + 24
+                    height: 34
+                    radius: 17
+                    color: Theme.glass
+                    border.width: 1
+                    border.color: Theme.outline
                     // No framing for a video: mpv covers the screen itself.
-                    visible: !overlay.videos
-                    onTapped: overlay.startFraming()
+                    visible: !overlay.videos && overlay.files.length > 0
+
+                    Row {
+                        id: frameRow
+                        anchors.centerIn: parent
+                        spacing: 8
+
+                        IconGlyph {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "󰆞"
+                            size: Theme.iconSmall
+                            color: Theme.textPrimary
+                        }
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "Frame"
+                            color: Theme.textPrimary
+                            font.pixelSize: 12
+                            font.family: Theme.fontMono
+                        }
+                        KeyCap { anchors.verticalCenter: parent.verticalCenter; key: "f" }
+                    }
+
+                    StateLayer {
+                        radius: parent.radius
+                        onTapped: overlay.startFraming()
+                    }
                 }
             }
 
@@ -1038,35 +1172,60 @@ PanelWindow {
             Column {
                 anchors.horizontalCenter: parent.horizontalCenter
                 visible: overlay.files.length > 0
-                spacing: 6
+                spacing: 14
 
-                Text {
+                Row {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    // Sized off the carousel, not off the text. Bound to its
-                    // own implicitWidth, a long file name is free to grow the
-                    // column it sits in and shove everything else around.
-                    width: carousel.width
-                    horizontalAlignment: Text.AlignHCenter
-                    elide: Text.ElideMiddle
-                    text: {
-                        var path = overlay.files[carousel.currentIndex] || ""
-                        return path.split("/").pop()
+                    spacing: 10
+
+                    // Where in the folder, in a chip.
+                    Rectangle {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: countText.implicitWidth + 16
+                        height: 22
+                        radius: 11
+                        color: Theme.alpha(Theme.foreground, 0.1)
+
+                        Text {
+                            id: countText
+                            anchors.centerIn: parent
+                            text: (carousel.currentIndex + 1) + " / " + overlay.files.length
+                            color: Theme.textSecondary
+                            font.pixelSize: 11
+                            font.family: Theme.fontMono
+                        }
                     }
-                    color: Theme.textSecondary
-                    font.pixelSize: 12
-                    font.family: Theme.fontMono
+
+                    // The name as a name: without the extension, and without
+                    // the underscores and dashes that stand in for spaces.
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        // Capped, so a long name cannot grow the column it
+                        // sits in and shove everything else around.
+                        width: Math.min(implicitWidth, carousel.width * 0.7)
+                        elide: Text.ElideMiddle
+                        text: {
+                            var path = overlay.files[carousel.currentIndex] || ""
+                            return path.split("/").pop().replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim()
+                        }
+                        color: Theme.textPrimary
+                        font.pixelSize: 13
+                        font.family: Theme.fontMono
+                    }
                 }
 
-                Text {
+                Row {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: (carousel.currentIndex + 1) + " / " + overlay.files.length
-                        + "   ·   " + (overlay.files[carousel.currentIndex] === overlay.current
-                                       ? "in use" : "Enter to apply")
-                        + "   ·   Tab for " + (overlay.videos ? "images" : "videos")
-                        + "   ·   Esc to close"
-                    color: Theme.textMuted
-                    font.pixelSize: 11
-                    font.family: Theme.fontMono
+                    spacing: 18
+
+                    KeyHint { key: "\u2190\u2192"; label: "Browse" }
+                    KeyHint {
+                        key: "\u21B5"
+                        label: overlay.files[carousel.currentIndex] === overlay.current ? "In use" : "Apply"
+                    }
+                    KeyHint { key: "tab"; label: overlay.videos ? "Images" : "Videos" }
+                    KeyHint { key: "f"; label: "Frame"; visible: !overlay.videos }
+                    KeyHint { key: "esc"; label: "Close" }
                 }
             }
         }
@@ -1125,9 +1284,11 @@ PanelWindow {
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: "Framing"
-                    color: Theme.textPrimary
-                    font.pixelSize: 18
+                    color: Theme.textSecondary
+                    font.pixelSize: 11
                     font.bold: true
+                    font.letterSpacing: 1.6
+                    font.capitalization: Font.AllUppercase
                     font.family: Theme.fontMono
                 }
 
@@ -1204,6 +1365,7 @@ PanelWindow {
                             color: "transparent"
                             border.width: 2
                             border.color: Theme.accent
+                            radius: 4
                             width: framingView.cropWidth
                             height: framingView.cropHeight
                             x: framingView.slackX * overlay.focusX
@@ -1247,16 +1409,24 @@ PanelWindow {
 
                     Text {
                         anchors.horizontalCenter: parent.horizontalCenter
-                        text: {
-                            var how = framingView.slackX > 1 && framingView.slackY > 1 ? "Drag"
-                                : framingView.slackX > 1 ? "Drag sideways"
-                                : framingView.slackY > 1 ? "Drag up and down"
-                                : "This image already matches the screen"
-                            return how + "   ·   Enter to apply   ·   Esc to go back"
-                        }
+                        text: framingView.slackX > 1 && framingView.slackY > 1 ? "Drag the picture to place the crop"
+                            : framingView.slackX > 1 ? "Drag sideways to place the crop"
+                            : framingView.slackY > 1 ? "Drag up and down to place the crop"
+                            : "This image already matches the screen"
                         color: Theme.textMuted
                         font.pixelSize: 11
                         font.family: Theme.fontMono
+                    }
+
+                    Item { width: 1; height: 6 }
+
+                    Row {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        spacing: 18
+
+                        KeyHint { key: "\u2190\u2191\u2192\u2193"; label: "Move" }
+                        KeyHint { key: "\u21B5"; label: "Apply" }
+                        KeyHint { key: "esc"; label: "Back" }
                     }
                 }
             }

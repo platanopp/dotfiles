@@ -220,15 +220,14 @@ hl.bind(mainMod .. " + space", hl.dsp.global("quickshell:launcher"))
 hl.bind(mainMod .. " + Tab", hl.dsp.global("quickshell:overview"))
 hl.bind(mainMod .. " + SHIFT + R", hl.dsp.global("quickshell:record"))
 
--- ── While the shell's launcher or workspace overview is up ────────────
+-- ── While the shell's launcher, overview or wallpaper picker is up ─────
 --
--- Quickshell switches to this submap as either opens and back as it closes
--- (AppState.modalOpen). In it only the two keys that close them do
--- anything: the rest -- above all Super+drag, which moved and resized the
+-- Quickshell switches to this submap as one opens and back as it closes
+-- (AppState.modalOpen). In it only the keys that close them do anything: the rest -- above all Super+drag, which moved and resized the
 -- windows behind the overview -- waits until they are gone. Keys the
 -- overlays handle themselves (Esc, arrows, typing) reach them as usual.
 --
--- Each of the two drops back to the normal binds itself before asking the
+-- Each of them drops back to the normal binds itself before asking the
 -- shell, so the way out never depends on Quickshell answering: a shell
 -- that died with the overview up cannot leave the keyboard stuck here.
 hl.define_submap("shell-modal", function()
@@ -239,6 +238,10 @@ hl.define_submap("shell-modal", function()
     hl.bind(mainMod .. " + space", function()
         hl.dispatch(hl.dsp.submap("reset"))
         hl.dispatch(hl.dsp.global("quickshell:launcher"))
+    end)
+    hl.bind(mainMod .. " + W", function()
+        hl.dispatch(hl.dsp.submap("reset"))
+        hl.dispatch(hl.dsp.global("quickshell:wallpapers"))
     end)
 end)
 hl.bind(mainMod .. " + F", hl.dsp.global("quickshell:keybinds"))
