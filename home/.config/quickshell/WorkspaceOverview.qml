@@ -9,15 +9,16 @@ import QtQuick.Effects
 // small picture of its monitor -- the wallpaper, and its windows where they
 // sit, drawn from a capture of each window.
 //
-//   click a window        go to it (its workspace comes with it)
 //   click a workspace     go there; the last card, +, is a new one
-//   drag a window         move it to the workspace it is dropped on
 //   ×, or Delete          remove a workspace (asks first if it has windows)
-//   × on a window, or     close that window
-//     middle click
 //   arrows / Tab, Enter   choose a workspace, go there
+//   N                     a new workspace
 //   1 - 9                 go straight to that workspace
 //   Esc, or Super+Tab     close
+//
+// Workspaces only: the windows in a card are a picture of what is there,
+// not things to click, close or drag -- a click anywhere on a card goes to
+// that workspace.
 //
 // Same house pattern as the launcher: mapped only while up, exclusive
 // keyboard while up, pinned to the screen it opened on. The keyboard grab is
@@ -29,11 +30,10 @@ import QtQuick.Effects
 // its views destroyed. While up, each window is captured once, when its card
 // is built, not streamed.
 //
-// The clickable things inside a card are MouseAreas, not TapHandlers: a
-// TapHandler's grab is passive, so a click on a card's × (or a window's)
-// was also a click on the card under it, which went to that workspace and
-// closed the overview before the × could do anything. A MouseArea keeps the
-// click it takes.
+// The clickable things on a card are MouseAreas, not TapHandlers: a
+// TapHandler's grab is passive, so a click on a card's × was also a click on
+// the card under it, which went to that workspace and closed the overview
+// before the × could do anything. A MouseArea keeps the click it takes.
 PanelWindow {
     id: overview
 
@@ -83,7 +83,6 @@ PanelWindow {
             if (overview.open) {
                 unmapDelay.stop()
                 overview.leaving = false
-                overview.dragged = null
                 overview.confirmId = -2
                 overview.goingKeys = []
                 overview.pointerSteers = false
@@ -361,18 +360,6 @@ PanelWindow {
         overview.leaveThen(function() { overview.run("hl.dispatch(hl.dsp.focus({ workspace = " + id + " }))") })
     }
 
-    function goToWindow(address) {
-        overview.leaveThen(function() {
-            overview.run("hl.dispatch(hl.dsp.focus({ window = 'address:0x" + address + "' }))")
-        })
-    }
-
-    // Moved without following it: the overview stays, and shows it arrive.
-    function moveWindow(address, id) {
-        overview.run("hl.dispatch(hl.dsp.window.move({ workspace = " + id
-                     + ", window = 'address:0x" + address + "', follow = false }))")
-    }
-
     function closeWindow(address) {
         overview.run("hl.dispatch(hl.dsp.window.close({ window = 'address:0x" + address + "' }))")
     }
@@ -419,24 +406,6 @@ PanelWindow {
             overview.run("hl.get_monitor('" + card.monitor + "'):set_workspace({ workspace = " + other.id + " })")
         }
     }
-
-    // ── Dragging a window ────────────────────────────────────────────────
-    property var dragged: null          // the window's entry, while dragged
-    property point dragPoint: Qt.point(0, 0)
-    property size dragSize: Qt.size(0, 0)
-
-    // The card key under a point, or null.
-    function cardKeyAt(point) {
-        for (var i = 0; i < cardRepeater.count; i++) {
-            var card = cardRepeater.itemAt(i)
-            if (!card || card.going) continue
-            var p = card.mapFromItem(content, point.x, point.y)
-            if (p.x >= 0 && p.y >= 0 && p.x <= card.faceWidth && p.y <= overview.shownHeight) return card.key
-        }
-        return null
-    }
-
-    readonly property var dropKey: overview.dragged ? overview.cardKeyAt(overview.dragPoint) : null
 
     // ── Drawing ──────────────────────────────────────────────────────────
 
@@ -512,6 +481,9 @@ PanelWindow {
                     if (card) overview.goToWorkspace(card.id)
                 } else if (event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace) {
                     overview.removeWorkspace(card, false)
+                } else if (event.key === Qt.Key_N) {
+                    var fresh = overview.cardData[-1]
+                    if (fresh) overview.goToWorkspace(fresh.id)
                 } else if (event.key >= Qt.Key_1 && event.key <= Qt.Key_9) {
                     overview.goToWorkspace(event.key - Qt.Key_0)
                 } else {
@@ -572,8 +544,6 @@ PanelWindow {
                         }
                         readonly property bool chosen: !card.going && overview.selected === card.place
                         readonly property bool hovered: cardHover.hovered
-                        readonly property bool dropping: overview.dropKey === card.key && !!overview.dragged
-                                                         && overview.dragged.workspace !== card.d.id
                         readonly property bool confirming: overview.confirmId === card.d.id && !card.d.isNew
 
                         // Each card carries the gap after it (the last,
@@ -629,13 +599,13 @@ PanelWindow {
 
                         transform: Translate { y: card.rise }
 
-                        // Lifts a little under the pointer or a dragged window.
+                        // Lifts a little under the pointer.
                         Item {
                             id: face
                             width: card.faceWidth
                             height: overview.shownHeight
-                            y: card.hovered || card.dropping ? -4 : 0
-                            scale: card.dropping ? 1.04 : card.hovered ? 1.015 : 1
+                            y: card.hovered ? -4 : 0
+                            scale: card.hovered ? 1.015 : 1
 
                             Behavior on y { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                             Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
@@ -645,8 +615,8 @@ PanelWindow {
                             RectangularShadow {
                                 anchors.fill: parent
                                 radius: overview.cardRadius
-                                blur: card.hovered || card.dropping ? 30 : 20
-                                offset.y: card.hovered || card.dropping ? 10 : 6
+                                blur: card.hovered ? 30 : 20
+                                offset.y: card.hovered ? 10 : 6
                                 color: Qt.rgba(0, 0, 0, 0.45)
 
                                 Behavior on blur { NumberAnimation { duration: 200 } }
@@ -663,6 +633,7 @@ PanelWindow {
                             // button and window above it gets its click first.
                             MouseArea {
                                 anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
                                 onClicked: {
                                     if (card.confirming) overview.confirmId = -2
                                     else overview.goToWorkspace(card.d.id)
@@ -695,7 +666,7 @@ PanelWindow {
                                     anchors.centerIn: parent
                                     visible: card.d.isNew
                                     spacing: 6
-                                    opacity: card.hovered || card.chosen || card.dropping ? 1 : 0.55
+                                    opacity: card.hovered || card.chosen ? 1 : 0.55
 
                                     Behavior on opacity { NumberAnimation { duration: 180 } }
 
@@ -707,7 +678,7 @@ PanelWindow {
                                     }
                                     Text {
                                         anchors.horizontalCenter: parent.horizontalCenter
-                                        text: overview.dragged ? "Drop here" : "New"
+                                        text: "New"
                                         color: Theme.textMuted
                                         font.pixelSize: 11
                                         font.family: Theme.fontMono
@@ -724,8 +695,6 @@ PanelWindow {
                                         readonly property real sx: screenArea.width / card.geom.w
                                         readonly property real sy: screenArea.height / card.geom.h
                                         readonly property bool whole: win.modelData.fullscreen
-                                        readonly property bool held: !!overview.dragged
-                                                                     && overview.dragged.address === win.modelData.address
 
                                         // Clamped to the card: a window partly
                                         // off its monitor stays inside the picture.
@@ -737,11 +706,9 @@ PanelWindow {
                                         height: whole ? parent.height : Math.min(parent.height, Math.max(10, Math.round(win.modelData.h * sy)))
                                         // Fades in when its capture has arrived,
                                         // rather than popping in over a blank.
-                                        opacity: win.held ? 0.25 : shot.hasContent ? 1 : 0
-                                        scale: winArea.containsMouse && !overview.dragged ? 1.03 : 1
+                                        opacity: shot.hasContent ? 1 : 0
 
                                         Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutQuad } }
-                                        Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
 
                                         ClippingRectangle {
                                             anchors.fill: parent
@@ -781,94 +748,10 @@ PanelWindow {
                                             anchors.fill: parent
                                             radius: 7
                                             color: "transparent"
-                                            border.width: winArea.containsMouse ? 2 : 1
-                                            border.color: winArea.containsMouse ? AppState.themeAccent : Qt.rgba(1, 1, 1, 0.1)
-
-                                            Behavior on border.color { ColorAnimation { duration: 140 } }
+                                            border.width: 1
+                                            border.color: Qt.rgba(1, 1, 1, 0.1)
                                         }
 
-                                        // Click to go to it, middle click to
-                                        // close it, drag to move it: one area,
-                                        // so a drag is never also a click.
-                                        MouseArea {
-                                            id: winArea
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            acceptedButtons: Qt.LeftButton | Qt.MiddleButton
-                                            cursorShape: Qt.PointingHandCursor
-                                            enabled: !card.confirming
-
-                                            property point pressAt
-                                            property bool dragging: false
-
-                                            onPressed: mouse => {
-                                                pressAt = Qt.point(mouse.x, mouse.y)
-                                                dragging = false
-                                            }
-                                            onPositionChanged: mouse => {
-                                                if (!pressed || !(pressedButtons & Qt.LeftButton)) return
-                                                if (!dragging && Math.hypot(mouse.x - pressAt.x, mouse.y - pressAt.y) > 6) {
-                                                    dragging = true
-                                                    overview.dragSize = Qt.size(win.width, win.height)
-                                                    overview.dragged = Object.assign({}, win.modelData,
-                                                                                     { workspace: card.d.id })
-                                                }
-                                                if (dragging)
-                                                    overview.dragPoint = win.mapToItem(content, mouse.x, mouse.y)
-                                            }
-                                            onReleased: mouse => {
-                                                if (dragging) {
-                                                    var key = overview.dropKey
-                                                    var w = overview.dragged
-                                                    overview.dragged = null
-                                                    dragging = false
-                                                    var target = key === null ? null : overview.cardData[key]
-                                                    if (target && target.id !== w.workspace)
-                                                        overview.moveWindow(w.address, target.id)
-                                                    return
-                                                }
-                                                if (mouse.button === Qt.MiddleButton) overview.closeWindow(win.modelData.address)
-                                                else overview.goToWindow(win.modelData.address)
-                                            }
-                                            onCanceled: {
-                                                dragging = false
-                                                overview.dragged = null
-                                            }
-                                        }
-
-                                        // Close this window. Above the window's
-                                        // own area, so its click is its own.
-                                        Rectangle {
-                                            anchors.top: parent.top
-                                            anchors.right: parent.right
-                                            anchors.margins: 4
-                                            width: 18
-                                            height: 18
-                                            radius: 9
-                                            color: winClose.containsMouse ? Theme.error : Qt.rgba(0, 0, 0, 0.55)
-                                            visible: win.width > 60 && win.height > 40
-                                            opacity: (winArea.containsMouse || winClose.containsMouse) && !overview.dragged
-                                                     && !card.confirming ? 1 : 0
-
-                                            Behavior on opacity { NumberAnimation { duration: 140 } }
-                                            Behavior on color { ColorAnimation { duration: 120 } }
-
-                                            IconGlyph {
-                                                anchors.centerIn: parent
-                                                text: "\u{F0156}"
-                                                color: "#ffffff"
-                                                size: 9
-                                            }
-
-                                            MouseArea {
-                                                id: winClose
-                                                anchors.fill: parent
-                                                hoverEnabled: true
-                                                enabled: parent.opacity > 0.5
-                                                cursorShape: Qt.PointingHandCursor
-                                                onClicked: overview.closeWindow(win.modelData.address)
-                                            }
-                                        }
                                     }
                                 }
 
@@ -949,9 +832,8 @@ PanelWindow {
                                 }
                             }
 
-                            // Where the keyboard is, and where a dragged
-                            // window would land: a ring on the card itself,
-                            // so it lifts and resizes with it.
+                            // Where the keyboard is: a ring on the card
+                            // itself, so it lifts and resizes with it.
                             Rectangle {
                                 anchors.fill: parent
                                 anchors.margins: -5
@@ -959,7 +841,7 @@ PanelWindow {
                                 color: "transparent"
                                 border.width: 2
                                 border.color: AppState.themeAccent
-                                opacity: card.dropping ? 1 : card.chosen && !overview.dragged ? 0.95 : 0
+                                opacity: card.chosen ? 0.95 : 0
                                 scale: opacity > 0 ? 1 : 0.97
 
                                 Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutQuad } }
@@ -980,7 +862,7 @@ PanelWindow {
                                 border.width: 1
                                 border.color: Theme.outline
                                 visible: overview.canRemove(card.d)
-                                opacity: (card.hovered || card.chosen) && !card.confirming && !overview.dragged ? 1 : 0
+                                opacity: (card.hovered || card.chosen) && !card.confirming ? 1 : 0
                                 scale: opacity > 0.5 ? 1 : 0.6
 
                                 Behavior on opacity { NumberAnimation { duration: 160 } }
@@ -1067,45 +949,10 @@ PanelWindow {
 
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: "click to go  ·  drag a window to move it  ·  del removes  ·  1-9  ·  esc"
+                text: "click to go  ·  × or del closes  ·  n new  ·  1-9  ·  esc"
                 color: Theme.textMuted
                 font.pixelSize: 10
                 font.family: Theme.fontMono
-            }
-        }
-
-        // The window being dragged, under the pointer.
-        Item {
-            id: ghost
-            visible: overview.dragged !== null
-            x: overview.dragPoint.x - width / 2
-            y: overview.dragPoint.y - height / 2
-            width: overview.dragSize.width
-            height: overview.dragSize.height
-            scale: visible ? 1.06 : 0.9
-
-            Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutBack } }
-
-            RectangularShadow {
-                anchors.fill: parent
-                radius: 7
-                blur: 24
-                offset.y: 8
-                color: Qt.rgba(0, 0, 0, 0.5)
-            }
-
-            ClippingRectangle {
-                anchors.fill: parent
-                radius: 7
-                color: Theme.surfaceContainerHigh
-                border.width: 2
-                border.color: AppState.themeAccent
-
-                ScreencopyView {
-                    anchors.fill: parent
-                    captureSource: overview.dragged ? overview.dragged.toplevel.wayland : null
-                    live: false
-                }
             }
         }
     }
