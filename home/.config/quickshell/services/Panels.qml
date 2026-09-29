@@ -140,6 +140,15 @@ Singleton {
         root.keybindsOpen = !root.keybindsOpen
     }
 
+    // qs ipc call keybinds toggle | open | close -- the sheet without the
+    // global shortcut, like the launcher's and the overview's targets.
+    IpcHandler {
+        target: "keybinds"
+        function toggle(): void { root.toggleKeybinds() }
+        function open(): void { root.keybindsOpen = true }
+        function close(): void { root.keybindsOpen = false }
+    }
+
     // The wallpaper picker. Same two reasons as the cheatsheet for living
     // here: the control panel opens it, so does a global shortcut, and it
     // has to stay on the screen it was summoned on rather than follow the

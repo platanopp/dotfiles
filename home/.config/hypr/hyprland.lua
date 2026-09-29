@@ -479,6 +479,9 @@ hl.layer_rule({
     -- bar sitting over a workspace but not for a sheet thrown over the work
     -- itself -- the point is to see that this is on top of something.
     xray = false,
+    -- The sheet fades and drops in by itself, like the launcher; Hyprland's
+    -- layer fade on top only made it arrive later.
+    no_anim = true,
 })
 
 hl.layer_rule({

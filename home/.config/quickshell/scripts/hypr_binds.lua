@@ -229,7 +229,7 @@ end
 
 local DIRECTIONS = {
     left = "left", right = "right",
-    up = "arriba", down = "abajo",
+    up = "up", down = "down",
 }
 
 -- "next"/"previous" name a direction rather than a place, so they read as a
