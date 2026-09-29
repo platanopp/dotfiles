@@ -1,6 +1,7 @@
 pragma Singleton
 import QtQuick
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Io
 
 // Monitors, for Settings -> Displays and Colour: modes, scale, layout, VRR,
@@ -45,6 +46,28 @@ Singleton {
     }
 
     function refreshDisplay()                  { displayCmd(["list"]) }
+
+    // Monitors come and go -- a cable pulled, a screen that drops its link in
+    // standby -- and the list was only read when Settings opened, so an
+    // unplugged screen stayed on the Displays page. Read again whenever
+    // Hyprland says one was added or removed, once the burst of events a
+    // hotplug brings has settled.
+    Connections {
+        target: Hyprland
+        function onRawEvent(event) {
+            switch (event.name) {
+            case "monitoradded": case "monitoraddedv2":
+            case "monitorremoved": case "monitorremovedv2":
+                hotplugSettle.restart()
+            }
+        }
+    }
+
+    Timer {
+        id: hotplugSettle
+        interval: 600
+        onTriggered: root.refreshDisplay()
+    }
 
     // Focus the monitor the pointer is on. Used before spawning anything from
     // the launcher: follow_mouse cannot do it while a layer surface holds the

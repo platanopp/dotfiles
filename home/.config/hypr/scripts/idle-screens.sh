@@ -4,8 +4,9 @@
 #   idle-screens.sh off
 #   idle-screens.sh on
 #
-# The two monitors are powered off in different ways, because they behave
-# differently when they go dark:
+# Monitors are powered off in two different ways, because they behave
+# differently when they go dark (which ones are attached is asked of
+# Hyprland on each run, see POWER_OFF below):
 #
 #   Samsung Odyssey, DP-2 -- DPMS through wlopm. It keeps its DisplayPort
 #   link while asleep (zero disconnects in every test), so Hyprland simply
@@ -34,8 +35,22 @@ export LC_ALL=C
 
 XIAOMI_MODE=ddc-off
 
-POWER_OFF=(DP-2)
-XIAOMI_OUTPUT=HDMI-A-1
+# Which screens there are, asked of Hyprland each time rather than written
+# down: an unplugged monitor is simply not in the list, and any new one is put
+# to sleep like the Samsung. The Xiaomi is recognised by its make, not by the
+# connector it happens to be on, and is left out of POWER_OFF for the
+# treatment below; with no Xiaomi attached, that part is skipped.
+POWER_OFF=()
+XIAOMI_OUTPUT=""
+while IFS=$'\t' read -r name make; do
+    [ -n "$name" ] || continue
+    if [[ "$make" == *Xiaomi* ]]; then XIAOMI_OUTPUT=$name
+    else POWER_OFF+=("$name"); fi
+done < <(hyprctl -j monitors 2>/dev/null | python3 -c '
+import json, sys
+for m in json.load(sys.stdin):
+    print(m["name"] + "\t" + (m.get("make") or ""))
+' 2>/dev/null)
 # By manufacturer, not by i2c bus number, which can change between boots.
 DDC_XIAOMI=(--mfg XMI)
 
@@ -61,10 +76,12 @@ ddc() {
 }
 
 xiaomi_off() {
+    [ -n "$XIAOMI_OUTPUT" ] || return 0
     ddc setvcp D6 05 --noverify >/dev/null 2>&1
 }
 
 xiaomi_on() {
+    [ -n "$XIAOMI_OUTPUT" ] || return 0
     # The first write has always been enough, but the monitor is waking from
     # off and a missed write here means a dark screen until someone finds its
     # button -- so it is checked, and sent again if it did not take.
@@ -77,6 +94,7 @@ xiaomi_on() {
 }
 
 dim() {
+    [ -n "$XIAOMI_OUTPUT" ] || return 0
     local cur
     cur=$(ddc getvcp 10 --terse 2>/dev/null | awk '{print $4}')
     [ -n "$cur" ] && [ "$cur" -gt 0 ] && echo "$cur" >"$brightness_file"
@@ -84,6 +102,7 @@ dim() {
 }
 
 undim() {
+    [ -n "$XIAOMI_OUTPUT" ] || return 0
     local want
     want=$(cat "$brightness_file" 2>/dev/null)
     [ -n "$want" ] && ddc setvcp 10 "$want" --noverify >/dev/null 2>&1
@@ -102,7 +121,7 @@ case "${1:-}:$XIAOMI_MODE" in
         wait
         ;;
     off:cover)
-        qs ipc call screens blank "$XIAOMI_OUTPUT"
+        [ -n "$XIAOMI_OUTPUT" ] && qs ipc call screens blank "$XIAOMI_OUTPUT"
         power off
         dim
         ;;
