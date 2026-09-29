@@ -159,7 +159,7 @@ Column {
             icon: "\u{F024B}"
             title: "Folder"
             description: Recorder.recordingFolder.replace(Quickshell.env("HOME"), "~")
-            // Back to ~/Vídeos/Recordings.
+            // Back to ~/Videos/Recordings.
             resettable: ShellSettings.recordFolder.length > 0
             onReset: ShellSettings.set("recordFolder", "")
 

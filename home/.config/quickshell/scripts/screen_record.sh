@@ -7,7 +7,7 @@
 #                    [--cursor yes|no] [--dir FOLDER]
 #
 # Everything has a default (the monitor in use, 1080p, 60 fps, very high,
-# H.264, the computer's sound, ~/Vídeos/Recordings); Settings -> Recording
+# H.264, the computer's sound, ~/Videos/Recordings); Settings -> Recording
 # picks them (ShellSettings, passed in by Recorder.startRecording).
 #
 # Prints the file it writes to as its first line, then becomes the recorder

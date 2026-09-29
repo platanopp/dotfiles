@@ -43,7 +43,7 @@ Singleton {
     // Where recordings are going, for the Settings page.
     readonly property string recordingFolder: ShellSettings.recordFolder.length > 0
         ? ShellSettings.recordFolder
-        : Quickshell.env("HOME") + "/Vídeos/Recordings"
+        : Quickshell.env("HOME") + "/Videos/Recordings"
 
     // A folder picked in a dialog (zenity); cancelling it changes nothing.
     function chooseRecordingFolder() {

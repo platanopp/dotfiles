@@ -40,7 +40,7 @@ Singleton {
     readonly property int keyboardRgbProfile: adapter.keyboardRgbProfile
 
     // Screen recording (Settings -> Recording, scripts/screen_record.sh).
-    // Where recordings go: "" for ~/Vídeos/Recordings.
+    // Where recordings go: "" for ~/Videos/Recordings.
     readonly property string recordFolder: adapter.recordFolder
     // The height recorded at, the width following the monitor: "native",
     // "2160", "1440", "1080" or "720".

@@ -8,5 +8,12 @@
     "keyboardRgbBrightness": 100,
     "keyboardRgbProfile": 0,
     "lockAtBoot": true,
-    "lockMonitor": "DP-2"
+    "lockMonitor": "DP-2",
+    "recordAudio": "system",
+    "recordCodec": "h264",
+    "recordCursor": true,
+    "recordFolder": "/home/gone/Videos/Recordings",
+    "recordFps": 60,
+    "recordQuality": "very_high",
+    "recordResolution": "1080"
 }
