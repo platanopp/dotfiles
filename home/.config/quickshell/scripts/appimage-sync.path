@@ -1,0 +1,12 @@
+# Puts the AppImages in ~/Applications in the launcher as they arrive and
+# leave (appimage_sync.py). systemd watches the folder, so nothing runs in
+# between: no process of this sits in memory waiting.
+[Unit]
+Description=Watch ~/Applications for AppImages
+
+[Path]
+PathChanged=%h/Applications
+MakeDirectory=yes
+
+[Install]
+WantedBy=default.target

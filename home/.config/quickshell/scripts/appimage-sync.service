@@ -1,0 +1,12 @@
+# Run by appimage-sync.path on every change to ~/Applications, and once at
+# login for anything that changed while logged out.
+[Unit]
+Description=Put the AppImages in ~/Applications in the launcher
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 %h/.config/quickshell/scripts/appimage_sync.py
+Nice=10
+
+[Install]
+WantedBy=default.target
