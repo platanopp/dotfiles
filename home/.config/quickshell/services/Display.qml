@@ -47,16 +47,33 @@ Singleton {
 
     function refreshDisplay()                  { displayCmd(["list"]) }
 
+    // What Settings -> Displays and Colour chose -- mode, position and scale
+    // per monitor, vibrance, the colour filter -- played back: nothing of it
+    // survives on its own (Hyprland re-reads its config, nvibrant resets with
+    // the driver, hyprsunset starts fresh), and the script saves every choice
+    // for exactly this. Once as the shell starts, which is the session
+    // starting, and again whenever a monitor is plugged back in. It answers
+    // with the whole state, like `list`.
+    function restoreDisplay()                  { displayCmd(["restore"]) }
+
+    Component.onCompleted: root.restoreDisplay()
+
     // Monitors come and go -- a cable pulled, a screen that drops its link in
     // standby -- and the list was only read when Settings opened, so an
     // unplugged screen stayed on the Displays page. Read again whenever
     // Hyprland says one was added or removed, once the burst of events a
-    // hotplug brings has settled.
+    // hotplug brings has settled; a monitor that arrived also gets its saved
+    // settings back.
+    property bool hotplugAdded: false
+
     Connections {
         target: Hyprland
         function onRawEvent(event) {
             switch (event.name) {
             case "monitoradded": case "monitoraddedv2":
+                root.hotplugAdded = true
+                hotplugSettle.restart()
+                break
             case "monitorremoved": case "monitorremovedv2":
                 hotplugSettle.restart()
             }
@@ -66,7 +83,11 @@ Singleton {
     Timer {
         id: hotplugSettle
         interval: 600
-        onTriggered: root.refreshDisplay()
+        onTriggered: {
+            if (root.hotplugAdded) root.restoreDisplay()
+            else root.refreshDisplay()
+            root.hotplugAdded = false
+        }
     }
 
     // Focus the monitor the pointer is on. Used before spawning anything from
