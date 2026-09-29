@@ -1,0 +1,222 @@
+/* ── Thunar, in the shell's material ──────────────────────────────────────
+ *
+ * The palette is quickshell's own (config/Theme.qml): background #101014,
+ * text #f2f2f2, and the grey accent #d8d8d8, used as translucent fills
+ * rather than solid colour. Hyprland already draws every window at 0.8
+ * opacity with blur behind it, so a #101014 window comes out as the same
+ * glass as the bar's pills -- nothing here has to be translucent itself.
+ *
+ * Scoped to window.thunar (the class Thunar gives its windows), so no other
+ * GTK app changes. Menus and dialogs are windows of their own and take plain
+ * Adwaita-dark (settings.ini).
+ */
+
+@define-color shell_bg #101014;
+@define-color shell_side #15151a;
+@define-color shell_fg #f2f2f2;
+
+window.thunar {
+    background-color: @shell_bg;
+    color: @shell_fg;
+    font-family: "SF Pro Text";
+    font-size: 10.5pt;
+}
+
+/* ── Toolbar: back, forward, the path, view and search ─────────────────── */
+
+window.thunar toolbar,
+window.thunar .toolbar {
+    background: @shell_bg;
+    border: none;
+    box-shadow: none;
+    padding: 8px 10px 4px 10px;
+}
+
+window.thunar toolbar button,
+window.thunar .toolbar button {
+    background: none;
+    border: none;
+    box-shadow: none;
+    border-radius: 10px;
+    min-height: 28px;
+    min-width: 28px;
+    color: alpha(@shell_fg, 0.66);
+}
+
+window.thunar toolbar button:hover,
+window.thunar .toolbar button:hover {
+    background-color: alpha(@shell_fg, 0.08);
+    color: @shell_fg;
+}
+
+window.thunar toolbar button:active,
+window.thunar toolbar button:checked {
+    background-color: alpha(@shell_fg, 0.12);
+    color: @shell_fg;
+}
+
+/* The path, as a row of pills: the folder you are in filled like the
+   launcher's selected row, the ones above it quiet until pointed at. */
+window.thunar .location-button,
+window.thunar .path-bar-button {
+    background: none;
+    border: none;
+    box-shadow: none;
+    border-radius: 10px;
+    padding: 2px 10px;
+    color: alpha(@shell_fg, 0.66);
+}
+
+window.thunar .location-button:hover {
+    background-color: alpha(@shell_fg, 0.08);
+    color: @shell_fg;
+}
+
+window.thunar .location-button:checked {
+    background-color: alpha(#d8d8d8, 0.22);
+    color: @shell_fg;
+}
+
+window.thunar entry {
+    background-color: alpha(@shell_fg, 0.08);
+    color: @shell_fg;
+    border: none;
+    box-shadow: none;
+    border-radius: 10px;
+    min-height: 28px;
+    padding: 0 10px;
+    caret-color: @shell_fg;
+}
+
+window.thunar entry:focus {
+    background-color: alpha(@shell_fg, 0.12);
+}
+
+window.thunar entry selection {
+    background-color: alpha(#d8d8d8, 0.35);
+    color: @shell_fg;
+}
+
+/* ── Side pane: places, a shade lighter than the files ─────────────────── */
+
+window.thunar .sidebar,
+window.thunar .sidebar .view,
+window.thunar .sidebar treeview,
+window.thunar .sidebar viewport {
+    background-color: @shell_side;
+    border: none;
+    color: alpha(@shell_fg, 0.66);
+}
+
+window.thunar .sidebar .view:hover,
+window.thunar .sidebar treeview:hover {
+    color: @shell_fg;
+}
+
+window.thunar .sidebar .view:selected,
+window.thunar .sidebar treeview:selected {
+    background-color: alpha(#d8d8d8, 0.22);
+    color: @shell_fg;
+    border-radius: 8px;
+}
+
+/* The line between the pane and the files: gone, the shade says it. */
+window.thunar paned > separator {
+    background: @shell_side;
+    border: none;
+    min-width: 1px;
+    background-image: none;
+}
+
+/* ── Files ─────────────────────────────────────────────────────────────── */
+
+window.thunar .standard-view,
+window.thunar .standard-view .view,
+window.thunar .standard-view treeview,
+window.thunar .standard-view iconview,
+window.thunar scrolledwindow,
+window.thunar notebook,
+window.thunar notebook > stack {
+    background-color: @shell_bg;
+    color: @shell_fg;
+    border: none;
+}
+
+window.thunar .view:selected,
+window.thunar iconview:selected,
+window.thunar treeview:selected {
+    background-color: alpha(#d8d8d8, 0.22);
+    color: @shell_fg;
+    border-radius: 10px;
+}
+
+window.thunar .view:hover,
+window.thunar treeview:hover {
+    background-color: alpha(@shell_fg, 0.06);
+}
+
+/* Dragging a box over files. */
+window.thunar .view rubberband,
+window.thunar treeview rubberband,
+window.thunar rubberband {
+    background-color: alpha(#d8d8d8, 0.15);
+    border: 1px solid alpha(#d8d8d8, 0.4);
+    border-radius: 6px;
+}
+
+/* Column headers in the list view. */
+window.thunar treeview header button {
+    background: @shell_bg;
+    border: none;
+    box-shadow: none;
+    color: alpha(@shell_fg, 0.45);
+    font-size: 9pt;
+}
+
+/* Tabs, when there are some. */
+window.thunar notebook > header {
+    background: @shell_bg;
+    border: none;
+    box-shadow: none;
+}
+
+window.thunar notebook > header tab {
+    border: none;
+    border-radius: 10px;
+    padding: 4px 10px;
+    color: alpha(@shell_fg, 0.45);
+}
+
+window.thunar notebook > header tab:checked {
+    background-color: alpha(#d8d8d8, 0.22);
+    color: @shell_fg;
+    box-shadow: none;
+}
+
+/* Thin scrollbars that stay out of the way. */
+window.thunar scrollbar {
+    background: none;
+    border: none;
+}
+
+window.thunar scrollbar slider {
+    background-color: alpha(@shell_fg, 0.18);
+    border: none;
+    border-radius: 99px;
+    min-width: 4px;
+    min-height: 4px;
+}
+
+window.thunar scrollbar slider:hover {
+    background-color: alpha(@shell_fg, 0.3);
+}
+
+/* The status bar and menu bar are off (Ctrl+M brings the menu back); if
+   shown, they match. */
+window.thunar statusbar,
+window.thunar menubar {
+    background: @shell_bg;
+    color: alpha(@shell_fg, 0.45);
+    border: none;
+    box-shadow: none;
+}

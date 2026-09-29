@@ -6,10 +6,11 @@ hl.monitor({
 })
 
 local terminal = "kitty"
--- yazi in its own kitty profile (kitty/yazi.conf): kitty's shortcuts would
--- otherwise take the Dolphin keys yazi is set up with.
+-- Thunar, themed after the shell (~/.config/gtk-3.0/gtk.css). Yazi is still
+-- there for the terminal; its kitty profile (kitty/yazi.conf) keeps kitty's
+-- shortcuts off the Dolphin keys it is set up with, should it be run that way.
 local kittyDir = os.getenv("HOME") .. "/.config/kitty/"
-local fileManager = "kitty --class yazi -c " .. kittyDir .. "kitty.conf -c " .. kittyDir .. "yazi.conf -e yazi"
+local fileManager = "thunar"
 local browser = "zen-browser"
 local mainMod = "SUPER"
 
@@ -298,6 +299,18 @@ local suppressMaximizeRule = hl.window_rule({
     name  = "suppress-maximize-events",
     match = { class = ".*" },
     suppress_event = "maximize",
+})
+
+-- The file manager floats in the middle, as yazi did: it is visited for a
+-- file and left, not worked in beside other windows. No size here: Thunar
+-- sets its own right after mapping and wins, so the size is Thunar's --
+-- 1280x820 to start (xfconf last-window-width/height), then whatever it was
+-- last left at (misc-remember-geometry).
+hl.window_rule({
+    name  = "thunar-floating",
+    match = { class = "^thunar$" },
+    float = true,
+    center = true,
 })
 
 hl.window_rule({

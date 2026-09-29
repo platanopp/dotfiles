@@ -68,3 +68,7 @@
 # ── Application tweaks ───────────────────────────────────────────────────
 .config/spicetify/config-xpui.ini
 .config/Vencord/settings
+.config/gtk-3.0
+.config/xfce4/xfconf/xfce-perchannel-xml/thunar.xml
+.config/Thunar
+.local/share/icons/Papirus-Dark-Grey
