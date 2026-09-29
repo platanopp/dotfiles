@@ -20,6 +20,9 @@ osu!'s with its environment variable -- is left to it: matched by the
 program its Exec runs (through symlinks) or by name. Only files this script
 wrote carry X-AppImage-Sync, and only those are ever changed or removed.
 
+A hand-made .desktop whose AppImage has left ~/Applications is removed as
+well: it would only sit in the launcher opening nothing.
+
 Nothing is renamed. A new version dropped in next to the old one replaces
 it in the launcher (the highest version of a name wins), and deleting the
 old file cleans up after it.
@@ -229,16 +232,25 @@ def main():
     ours = {os.path.basename(p)[len(PREFIX):-len(".desktop")]: (p, e) for p, e, mine in desktops
             if mine and os.path.basename(p).startswith(PREFIX)}
 
+    added, removed, mime = [], [], False
+
     # Covered by a .desktop someone else wrote: by what it runs, or by name.
+    # One whose AppImage in ~/Applications is gone is dead -- it would sit in
+    # the launcher opening nothing -- and goes with it, hand-made or not.
     covered_progs = set()
     covered_names = set()
+    apps_prefix = os.path.realpath(APPS_DIR) + os.sep
     for p, e, mine in desktops:
         if mine:
             continue
-        covered_progs.add(resolve(exec_program(e.get("Exec", ""))))
+        prog = resolve(exec_program(e.get("Exec", "")))
+        if prog.startswith(apps_prefix) and not os.path.exists(prog):
+            os.remove(p)
+            removed.append(e.get("Name", os.path.basename(p)))
+            mime = mime or bool(e.get("MimeType"))
+            continue
+        covered_progs.add(prog)
         covered_names.add(e.get("Name", "").strip().lower())
-
-    added, removed, mime = [], [], False
     listed = []
     try:
         with open(SKIP_FILE, encoding="utf-8") as f:
