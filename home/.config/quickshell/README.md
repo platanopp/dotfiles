@@ -13,8 +13,7 @@ instead of growing out underneath them.
 
 - **Left** — the workspace pill (the active workspace is labelled, the rest are
   dots, dimmer where the workspace is empty), then the media widget.
-- **Centre** — the clock and date, and the quick-capture pill that writes
-  straight into the Obsidian vault.
+- **Centre** — the clock and date.
 - **Right** — the system tray, then the status pill (network, Bluetooth,
   volume, microphone, battery), then the control panel.
 
@@ -62,7 +61,6 @@ service.
 | `Profile` | User name and avatar |
 | `System` | Distribution, About, the dotfiles backup |
 | `Tablet` | OpenTabletDriver on and off |
-| `Notes` | The Obsidian quick-capture note |
 | `Clock` | The time and date |
 | `Notifications` | The notification server, the centre and the toasts |
 | `Spectrum`, `AlbumColors` | The media widget's spectrum ring and its colour |

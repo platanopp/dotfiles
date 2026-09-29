@@ -83,10 +83,6 @@ PanelWindow {
     readonly property int leftMargin: screen ? Math.round((screen.width - implicitWidth) / 2) : 0
     margins.left: leftMargin
 
-    // Where the pill's box ends on screen, mid-move included: the notes pill
-    // parks off it (pillRightOf in shell.qml).
-    readonly property real visualRight: leftMargin + stage.x + stage.width
-
     // Breathing room between the text and the edge of the pill.
     //
     // Named rather than folded into the width below, because the arithmetic is

@@ -23,8 +23,8 @@ Scope {
     // their own -- the IPC targets, the keyboard's colours following the
     // wallpaper -- has to be running before that.
     readonly property var services: [AppImages, Audio, Bluetooth, Clock, Display, Hypr, KeyboardRgb,
-                                     Keybinds, Network, Notes, Panels, Power, Profile, Recorder, System,
-                                     Tablet, Wallpaper]
+                                     Keybinds, Network, Panels, Power, Profile, Recorder, System, Tablet,
+                                     Wallpaper]
 
     Variants {
         model: Quickshell.screens
@@ -110,14 +110,14 @@ Scope {
             readonly property bool barHovered: barHover.hovered || revealZone.hovered
                 || mediaWidget.barHovered || statusWidget.barHovered
                 || controlPanelWidget.barHovered || clockWidget.barHovered
-                || trayWidget.barHovered || notesWidget.barHovered
+                || trayWidget.barHovered
 
             // An open panel also holds it, so the bar cannot vanish from under
             // someone reading it.
             readonly property bool panelsOpen: statusWidget.expandedPanel !== ""
                 || controlPanelWidget.panelOpen || controlPanelWidget.notifOpen
                 || mediaWidget.panelOpen
-                || clockWidget.panelOpen || notesWidget.panelOpen
+                || clockWidget.panelOpen
 
             // Settings -> Shell can keep the bar up over fullscreen windows.
             readonly property bool wantBar: !(fullscreen && ShellSettings.barHideFullscreen)
@@ -166,14 +166,6 @@ Scope {
                 var wide = w.rowWidth !== undefined ? w.rowWidth
                          : w.visualWidth !== undefined ? w.visualWidth : w.width
                 return Math.round(w.rightMargin + wide + pillGap - 24)
-            }
-
-            // Same arithmetic the other way, for a pill that parks off the
-            // right edge of a left-anchored neighbour: visualRight is where
-            // its box ends, in screen coordinates.
-            function pillRightOf(w) {
-                var right = w.visualRight !== undefined ? w.visualRight : w.leftMargin + w.width
-                return Math.round(right + pillGap - 24)
             }
 
             // Which MPRIS player the media widget drives.
@@ -328,13 +320,6 @@ Scope {
                 bar: bar
                 covered: controlPanelWidget.settingsOpen
                 rightMargin: bar.pillLeftOf(statusWidget)
-            }
-
-            NotesWidget {
-                id: notesWidget
-                bar: bar
-                covered: controlPanelWidget.settingsOpen
-                leftMargin: bar.pillRightOf(clockWidget)
             }
 
             RevealZone {

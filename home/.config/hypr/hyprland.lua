@@ -301,18 +301,6 @@ local suppressMaximizeRule = hl.window_rule({
     suppress_event = "maximize",
 })
 
--- The file manager floats in the middle, as yazi did: it is visited for a
--- file and left, not worked in beside other windows. No size here: Thunar
--- sets its own right after mapping and wins, so the size is Thunar's --
--- 1280x820 to start (xfconf last-window-width/height), then whatever it was
--- last left at (misc-remember-geometry).
-hl.window_rule({
-    name  = "thunar-floating",
-    match = { class = "^thunar$" },
-    float = true,
-    center = true,
-})
-
 hl.window_rule({
     name  = "yazi-floating",
     match = { class = "^yazi$" },
