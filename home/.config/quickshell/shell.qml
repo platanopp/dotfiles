@@ -22,9 +22,9 @@ Scope {
     // are only read from a panel or a Settings page, and what they do on
     // their own -- the IPC targets, the keyboard's colours following the
     // wallpaper -- has to be running before that.
-    readonly property var services: [Audio, Bluetooth, Clock, Display, Hypr, KeyboardRgb, Keybinds,
-                                     Network, Notes, Panels, Power, Profile, Recorder, System, Tablet,
-                                     Wallpaper]
+    readonly property var services: [AppImages, Audio, Bluetooth, Clock, Display, Hypr, KeyboardRgb,
+                                     Keybinds, Network, Notes, Panels, Power, Profile, Recorder, System,
+                                     Tablet, Wallpaper]
 
     Variants {
         model: Quickshell.screens

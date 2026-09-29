@@ -2,15 +2,18 @@
 """Puts every AppImage in ~/Applications in the launcher, and takes it out
 again when the file goes.
 
-Run by appimage-sync.path whenever ~/Applications changes, and once at
-login. For each AppImage it reads the .desktop file and icon the image
+Run each time the launcher opens (services/AppImages.qml), the way the
+Steam library is read. A run with nothing new takes about 30ms, in its own
+process, so opening the launcher does not wait on it. For each new AppImage
+it reads the .desktop file and icon the image
 carries inside itself, and writes
 
   ~/.local/share/applications/appimage-<name>.desktop
   ~/.local/share/icons/hicolor/.../appimage-<name>.png
 
-The launcher (Quickshell's DesktopEntries) notices a new .desktop file by
-itself, in a second or two; so does every other menu.
+Quickshell's DesktopEntries notices a new .desktop file by itself, so a
+new app joins the open launcher's list a moment later -- and, being a real
+.desktop file, every other menu and "Open with" sees it too.
 
 An AppImage that already has a .desktop of its own -- written by hand, like
 osu!'s with its environment variable -- is left to it: matched by the
@@ -211,14 +214,6 @@ def remove_icons(slug):
                 os.remove(p)
 
 
-def notify(title, body, icon=""):
-    try:
-        subprocess.Popen(["notify-send", "-a", "Applications", "-i", icon or "application-x-executable",
-                          title, body], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except OSError:
-        pass
-
-
 def write_desktop(path, fields):
     lines = ["[Desktop Entry]"] + [f"{k}={v}" for k, v in fields.items() if v not in (None, "")]
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -332,10 +327,6 @@ def main():
     if (added or removed) and mime and shutil.which("update-desktop-database"):
         subprocess.run(["update-desktop-database", DESKTOP_DIR], stdout=subprocess.DEVNULL,
                        stderr=subprocess.DEVNULL)
-    for name, icon in added:
-        notify(f"{name} is in the launcher", "Super+Space, then type its name", icon)
-    for name in removed:
-        notify(f"{name} was removed", "Its AppImage left ~/Applications")
     return 0
 
 
