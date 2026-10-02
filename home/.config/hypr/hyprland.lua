@@ -698,6 +698,20 @@ hl.monitor({
     cm = "srgb",
 })
 
+-- The layout picked in the shell's Settings (Displays page) -- mode, position
+-- and scale per monitor -- written to monitors.lua by display_control.py.
+-- Run after the rules above, so it wins: at login, and at every config
+-- reload, which used to put the monitors back where this file had them. The
+-- two rules above stay as the defaults for a machine with nothing saved yet.
+do
+    local path = os.getenv("HOME") .. "/.config/hypr/monitors.lua"
+    local f = io.open(path, "r")
+    if f then
+        f:close()
+        dofile(path)
+    end
+end
+
 -- Que workspace cae en cada monitor. Por su cuenta Hyprland le da el 1 al
 -- monitor que enumera primero -- HDMI-A-1, en 0x0 -- y empuja el 2 al DP-2,
 -- que es al reves de lo util: el trabajo va en el DP-2 de 240Hz, y el 2,

@@ -27,6 +27,7 @@ the choice to disk and `restore` plays it all back.
   set-brightness PCT              10-100, 100 is neutral
   focus-cursor-monitor            focus the monitor under the pointer
   restore                         re-apply everything saved
+  write-config                    write the saved layout to ~/.config/hypr/monitors.lua
 """
 
 import json
@@ -90,6 +91,48 @@ def remember(section, key, value):
     else:
         d[section][key] = value
     save(d)
+    if section == "monitors":
+        write_monitor_config(d)
+
+
+# The layout, where Hyprland itself reads it. hyprland.lua runs this file right
+# after its own monitor rules, so what was picked in Settings is what Hyprland
+# starts with, and what it goes back to on every config reload. Kept only in
+# the state file, it was applied by the shell some time after login -- and
+# undone by the next reload, which re-read the rules in hyprland.lua.
+MONITOR_LUA = os.path.join(os.path.expanduser("~/.config/hypr"), "monitors.lua")
+
+
+def write_monitor_config(d=None):
+    d = d if d is not None else load()
+    lines = [
+        "-- Written by the shell's Settings window (Displays page), through",
+        "-- ~/.config/quickshell/scripts/display_control.py. Not meant to be",
+        "-- edited by hand: the next change made there rewrites it. hyprland.lua",
+        "-- runs this after its own monitor rules, so these win.",
+        "",
+    ]
+    for name, spec in sorted(d.get("monitors", {}).items()):
+        if not re.fullmatch(r"[A-Za-z0-9_-]+", name):
+            continue
+        mode, pos, scale = spec.get("mode"), spec.get("position"), spec.get("scale")
+        if not (mode and pos and re.fullmatch(r"\d+x\d+@[\d.]+", mode)
+                and re.fullmatch(r"-?\d+x-?\d+", pos)):
+            continue
+        lines += [
+            "hl.monitor({",
+            f'    output = "{name}",',
+            "    disabled = false,",
+            f'    mode = "{mode}Hz",',
+            f'    position = "{pos}",',
+            f"    scale = {float(scale) if scale is not None else 1:g},",
+            '    cm = "srgb",',
+            "})",
+        ]
+    tmp = MONITOR_LUA + ".tmp"
+    with open(tmp, "w") as f:
+        f.write("\n".join(lines) + "\n")
+    os.replace(tmp, MONITOR_LUA)
 
 
 # ── monitors ─────────────────────────────────────────────────────────────
@@ -395,6 +438,8 @@ def main():
         apply_colour(brightness=int(a[1])); print(json.dumps(snapshot()))
     elif cmd == "focus-cursor-monitor":
         print(focus_cursor_monitor() or "")
+    elif cmd == "write-config":
+        write_monitor_config(); print(MONITOR_LUA)
     elif cmd == "restore":
         restore(); print(json.dumps(snapshot()))
     else:
