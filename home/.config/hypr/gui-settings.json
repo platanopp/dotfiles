@@ -32,5 +32,9 @@
   "inactive_opacity": {
     "value": 0.76,
     "base": 0.7
+  },
+  "accel_profile": {
+    "value": "flat",
+    "base": "adaptive"
   }
 }
