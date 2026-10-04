@@ -34,7 +34,7 @@
     "base": 0.7
   },
   "accel_profile": {
-    "value": "flat",
+    "value": "adaptive",
     "base": "adaptive"
   }
 }

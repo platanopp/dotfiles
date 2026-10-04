@@ -5,7 +5,7 @@
 
 hl.config({
     input = {
-        accel_profile = "flat",
+        accel_profile = "adaptive",
         follow_mouse = 1,
     },
     decoration = {
