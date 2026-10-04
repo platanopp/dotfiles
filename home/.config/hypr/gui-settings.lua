@@ -4,10 +4,6 @@
 -- gui-settings.json. hyprland.lua runs this last, so these values win.
 
 hl.config({
-    input = {
-        accel_profile = "adaptive",
-        follow_mouse = 1,
-    },
     decoration = {
         active_opacity = 0.88,
         inactive_opacity = 0.76,
@@ -16,5 +12,8 @@ hl.config({
         border_size = 0,
         gaps_in = 13,
         gaps_out = { top = 13, bottom = 13, left = 13, right = 13 },
+    },
+    input = {
+        follow_mouse = 1,
     },
 })
