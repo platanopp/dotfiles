@@ -3,10 +3,6 @@
     "value": 0,
     "base": 0
   },
-  "follow_mouse": {
-    "value": 1,
-    "base": 1
-  },
   "gaps_out": {
     "value": {
       "top": 13,
