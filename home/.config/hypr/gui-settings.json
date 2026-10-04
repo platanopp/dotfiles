@@ -34,7 +34,7 @@
     "base": 0.7
   },
   "hide_cursor_typing": {
-    "value": true,
+    "value": false,
     "base": false
   }
 }

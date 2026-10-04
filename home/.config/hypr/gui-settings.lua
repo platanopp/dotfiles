@@ -17,6 +17,6 @@ hl.config({
         follow_mouse = 1,
     },
     cursor = {
-        hide_on_key_press = true,
+        hide_on_key_press = false,
     },
 })
