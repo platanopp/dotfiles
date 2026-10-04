@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=X-GNOME-Metatheme
+Name=Adwaita-dark
+Comment=GTK3's built-in dark Adwaita (see gtk-3.0/gtk.css)
+Encoding=UTF-8
+
+[X-GNOME-Metatheme]
+GtkTheme=Adwaita-dark

@@ -1,4 +1,4 @@
-/* ── Thunar, in the shell's material ──────────────────────────────────────
+/* ── GTK3 apps, in the shell's material ───────────────────────────────────
  *
  * The palette is quickshell's own (config/Theme.qml): background #101014,
  * text #f2f2f2, and the grey accent #d8d8d8, used as translucent fills
@@ -6,34 +6,69 @@
  * opacity with blur behind it, so a #101014 window comes out as the same
  * glass as the bar's pills -- nothing here has to be translucent itself.
  *
- * Scoped to window.thunar (the class Thunar gives its windows), so no other
- * GTK app changes. Menus and dialogs are windows of their own and take plain
- * Adwaita-dark (settings.ini).
+ * On top of dark Adwaita (GTK_THEME=Adwaita-dark, see
+ * ~/.local/share/themes/Adwaita-dark), for every GTK3 window: Thunar,
+ * xarchiver, the folder picker the recorder opens, and the rest. The part
+ * after the Thunar heading only touches Thunar (window.thunar is the class
+ * it gives its windows).
  */
 
 @define-color shell_bg #101014;
 @define-color shell_side #15151a;
 @define-color shell_fg #f2f2f2;
 
-window.thunar {
+/* ── Every window ──────────────────────────────────────────────────────── */
+
+window,
+window.background,
+dialog,
+.background {
     background-color: @shell_bg;
     color: @shell_fg;
+}
+
+window {
     font-family: "SF Pro Text";
     font-size: 10.5pt;
 }
 
-/* ── Toolbar: back, forward, the path, view and search ─────────────────── */
-
-window.thunar toolbar,
-window.thunar .toolbar {
+/* Bars around the content: flat, the window's own colour, no rules. */
+headerbar,
+menubar,
+toolbar,
+.toolbar,
+.primary-toolbar,
+statusbar,
+.inline-toolbar,
+actionbar,
+actionbar > revealer > box {
     background: @shell_bg;
+    background-image: none;
     border: none;
     box-shadow: none;
-    padding: 8px 10px 4px 10px;
+    color: alpha(@shell_fg, 0.66);
 }
 
-window.thunar toolbar button,
-window.thunar .toolbar button {
+toolbar,
+.toolbar {
+    padding: 6px 8px;
+}
+
+menubar > menuitem {
+    color: alpha(@shell_fg, 0.66);
+    border-radius: 8px;
+}
+
+menubar > menuitem:hover {
+    background-color: alpha(@shell_fg, 0.08);
+    color: @shell_fg;
+    box-shadow: none;
+}
+
+/* Buttons: no bevel, a quiet fill on the pointer. */
+toolbar button,
+.toolbar button,
+headerbar button {
     background: none;
     border: none;
     box-shadow: none;
@@ -43,17 +78,232 @@ window.thunar .toolbar button {
     color: alpha(@shell_fg, 0.66);
 }
 
-window.thunar toolbar button:hover,
-window.thunar .toolbar button:hover {
+button {
+    background-image: none;
     background-color: alpha(@shell_fg, 0.08);
+    border: none;
+    box-shadow: none;
+    border-radius: 10px;
     color: @shell_fg;
+    text-shadow: none;
 }
 
-window.thunar toolbar button:active,
-window.thunar toolbar button:checked {
+button:hover,
+toolbar button:hover,
+.toolbar button:hover,
+headerbar button:hover {
     background-color: alpha(@shell_fg, 0.12);
     color: @shell_fg;
 }
+
+button:active,
+button:checked,
+toolbar button:checked {
+    background-color: alpha(#d8d8d8, 0.22);
+    color: @shell_fg;
+}
+
+button:disabled,
+toolbar button:disabled {
+    background-color: transparent;
+    color: alpha(@shell_fg, 0.25);
+}
+
+/* Text fields. */
+entry,
+spinbutton:not(.vertical) {
+    background-color: alpha(@shell_fg, 0.08);
+    color: @shell_fg;
+    border: none;
+    box-shadow: none;
+    border-radius: 10px;
+    min-height: 28px;
+    caret-color: @shell_fg;
+}
+
+entry {
+    padding: 0 10px;
+}
+
+entry:focus {
+    background-color: alpha(@shell_fg, 0.12);
+    box-shadow: none;
+}
+
+entry selection,
+label selection,
+textview text selection {
+    background-color: alpha(#d8d8d8, 0.35);
+    color: @shell_fg;
+}
+
+/* Lists, trees and icon grids. */
+.view,
+treeview.view,
+iconview,
+textview text,
+scrolledwindow,
+viewport,
+notebook,
+notebook > stack,
+list,
+list row {
+    background-color: @shell_bg;
+    color: @shell_fg;
+}
+
+scrolledwindow {
+    border: none;
+}
+
+.view:selected,
+treeview.view:selected,
+iconview:selected,
+list row:selected {
+    background-color: alpha(#d8d8d8, 0.22);
+    color: @shell_fg;
+}
+
+.view:hover,
+treeview.view:hover,
+list row:hover {
+    background-color: alpha(@shell_fg, 0.06);
+}
+
+/* Dragging a box to pick several things. GTK draws it two ways -- a node
+   inside tree views, a style class in older widgets like Thunar's icon
+   grid -- and without both, the grid's box came out solid black. */
+rubberband,
+.rubberband,
+.view rubberband,
+.view.rubberband,
+treeview.view rubberband {
+    background-color: alpha(#d8d8d8, 0.15);
+    border: 1px solid alpha(#d8d8d8, 0.45);
+    border-radius: 6px;
+}
+
+treeview.view header button,
+treeview header button {
+    background: @shell_bg;
+    border: none;
+    border-bottom: 1px solid alpha(@shell_fg, 0.08);
+    box-shadow: none;
+    border-radius: 0;
+    color: alpha(@shell_fg, 0.45);
+    font-size: 9pt;
+}
+
+treeview.view header button:hover {
+    color: @shell_fg;
+    background: alpha(@shell_fg, 0.06);
+}
+
+/* Split panes: the line between them all but gone. */
+paned > separator {
+    background: alpha(@shell_fg, 0.06);
+    background-image: none;
+    border: none;
+    min-width: 1px;
+    min-height: 1px;
+}
+
+separator {
+    background: alpha(@shell_fg, 0.08);
+}
+
+/* Tabs. */
+notebook > header {
+    background: @shell_bg;
+    border: none;
+    box-shadow: none;
+}
+
+notebook > header tab {
+    border: none;
+    border-radius: 10px;
+    padding: 4px 10px;
+    color: alpha(@shell_fg, 0.45);
+    box-shadow: none;
+}
+
+notebook > header tab:checked {
+    background-color: alpha(#d8d8d8, 0.22);
+    color: @shell_fg;
+    box-shadow: none;
+}
+
+/* Menus and popovers: the same dark, rounded rows. */
+menu,
+.menu,
+.context-menu,
+popover,
+popover.background {
+    background-color: @shell_bg;
+    color: @shell_fg;
+    border: 1px solid alpha(@shell_fg, 0.08);
+    box-shadow: none;
+}
+
+menu menuitem,
+.menu menuitem {
+    border-radius: 8px;
+    padding: 6px 10px;
+    color: @shell_fg;
+}
+
+menu menuitem:hover,
+.menu menuitem:hover {
+    background-color: alpha(#d8d8d8, 0.22);
+    color: @shell_fg;
+}
+
+menu menuitem:disabled {
+    color: alpha(@shell_fg, 0.3);
+}
+
+tooltip,
+tooltip.background {
+    background-color: @shell_bg;
+    color: @shell_fg;
+    border: 1px solid alpha(@shell_fg, 0.1);
+    border-radius: 10px;
+}
+
+/* Thin scrollbars that stay out of the way. */
+scrollbar {
+    background: none;
+    border: none;
+}
+
+scrollbar slider {
+    background-color: alpha(@shell_fg, 0.18);
+    border: none;
+    border-radius: 99px;
+    min-width: 4px;
+    min-height: 4px;
+}
+
+scrollbar slider:hover {
+    background-color: alpha(@shell_fg, 0.3);
+}
+
+/* Progress, as in the shell's sliders: a thin grey track. */
+progressbar trough {
+    background-color: alpha(@shell_fg, 0.12);
+    border: none;
+    border-radius: 99px;
+    min-height: 4px;
+}
+
+progressbar progress {
+    background-color: #d8d8d8;
+    border: none;
+    border-radius: 99px;
+    min-height: 4px;
+}
+
+/* ── Thunar ────────────────────────────────────────────────────────────── */
 
 /* The path, as a row of pills: the folder you are in filled like the
    launcher's selected row, the ones above it quiet until pointed at. */
@@ -77,28 +327,11 @@ window.thunar .location-button:checked {
     color: @shell_fg;
 }
 
-window.thunar entry {
-    background-color: alpha(@shell_fg, 0.08);
-    color: @shell_fg;
-    border: none;
-    box-shadow: none;
-    border-radius: 10px;
-    min-height: 28px;
-    padding: 0 10px;
-    caret-color: @shell_fg;
+window.thunar toolbar {
+    padding: 8px 10px 4px 10px;
 }
 
-window.thunar entry:focus {
-    background-color: alpha(@shell_fg, 0.12);
-}
-
-window.thunar entry selection {
-    background-color: alpha(#d8d8d8, 0.35);
-    color: @shell_fg;
-}
-
-/* ── Side pane: places, a shade lighter than the files ─────────────────── */
-
+/* Side pane: places, a shade lighter than the files. */
 window.thunar .sidebar,
 window.thunar .sidebar .view,
 window.thunar .sidebar treeview,
@@ -120,103 +353,11 @@ window.thunar .sidebar treeview:selected {
     border-radius: 8px;
 }
 
-/* The line between the pane and the files: gone, the shade says it. */
 window.thunar paned > separator {
     background: @shell_side;
-    border: none;
-    min-width: 1px;
-    background-image: none;
-}
-
-/* ── Files ─────────────────────────────────────────────────────────────── */
-
-window.thunar .standard-view,
-window.thunar .standard-view .view,
-window.thunar .standard-view treeview,
-window.thunar .standard-view iconview,
-window.thunar scrolledwindow,
-window.thunar notebook,
-window.thunar notebook > stack {
-    background-color: @shell_bg;
-    color: @shell_fg;
-    border: none;
 }
 
 window.thunar .view:selected,
-window.thunar iconview:selected,
-window.thunar treeview:selected {
-    background-color: alpha(#d8d8d8, 0.22);
-    color: @shell_fg;
+window.thunar iconview:selected {
     border-radius: 10px;
-}
-
-window.thunar .view:hover,
-window.thunar treeview:hover {
-    background-color: alpha(@shell_fg, 0.06);
-}
-
-/* Dragging a box over files. */
-window.thunar .view rubberband,
-window.thunar treeview rubberband,
-window.thunar rubberband {
-    background-color: alpha(#d8d8d8, 0.15);
-    border: 1px solid alpha(#d8d8d8, 0.4);
-    border-radius: 6px;
-}
-
-/* Column headers in the list view. */
-window.thunar treeview header button {
-    background: @shell_bg;
-    border: none;
-    box-shadow: none;
-    color: alpha(@shell_fg, 0.45);
-    font-size: 9pt;
-}
-
-/* Tabs, when there are some. */
-window.thunar notebook > header {
-    background: @shell_bg;
-    border: none;
-    box-shadow: none;
-}
-
-window.thunar notebook > header tab {
-    border: none;
-    border-radius: 10px;
-    padding: 4px 10px;
-    color: alpha(@shell_fg, 0.45);
-}
-
-window.thunar notebook > header tab:checked {
-    background-color: alpha(#d8d8d8, 0.22);
-    color: @shell_fg;
-    box-shadow: none;
-}
-
-/* Thin scrollbars that stay out of the way. */
-window.thunar scrollbar {
-    background: none;
-    border: none;
-}
-
-window.thunar scrollbar slider {
-    background-color: alpha(@shell_fg, 0.18);
-    border: none;
-    border-radius: 99px;
-    min-width: 4px;
-    min-height: 4px;
-}
-
-window.thunar scrollbar slider:hover {
-    background-color: alpha(@shell_fg, 0.3);
-}
-
-/* The status bar and menu bar are off (Ctrl+M brings the menu back); if
-   shown, they match. */
-window.thunar statusbar,
-window.thunar menubar {
-    background: @shell_bg;
-    color: alpha(@shell_fg, 0.45);
-    border: none;
-    box-shadow: none;
 }

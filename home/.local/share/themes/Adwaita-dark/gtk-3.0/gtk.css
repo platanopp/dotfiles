@@ -1,0 +1,6 @@
+/* GTK3's own dark Adwaita, under the name hyprland.lua asks for
+ * (GTK_THEME=Adwaita-dark). GTK3 carries the stylesheet inside itself but
+ * only answers to that name when gnome-themes-extra is installed, which it
+ * is not here -- so every GTK3 app quietly fell back to light Adwaita.
+ * This is the same one line that package ships. */
+@import url("resource:///org/gtk/libgtk/theme/Adwaita/gtk-contained-dark.css");

@@ -72,3 +72,4 @@
 .config/xfce4/xfconf/xfce-perchannel-xml/thunar.xml
 .config/Thunar
 .local/share/icons/Papirus-Dark-Grey
+.local/share/themes/Adwaita-dark
