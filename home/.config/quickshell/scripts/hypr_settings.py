@@ -73,7 +73,7 @@ SPEC = {
     "animations":       ("animations:enabled", "bool", None, "Animations"),
     "sensitivity":      ("input:sensitivity", "float", (-1.0, 1.0), "Pointer speed"),
     "accel_profile":    ("input:accel_profile", "enum", ("adaptive", "flat"), "Acceleration"),
-    "follow_mouse":     ("input:follow_mouse", "enum", (1, 0), "Focus follows"),
+    "follow_mouse":     ("input:follow_mouse", "enum", (1, 2, 0), "Focus follows"),
     "repeat_delay":     ("input:repeat_delay", "int", (150, 1000), "Key repeat delay"),
     "repeat_rate":      ("input:repeat_rate", "int", (10, 80), "Key repeat rate"),
     "natural_scroll":   ("input:natural_scroll", "bool", None, "Natural scrolling"),

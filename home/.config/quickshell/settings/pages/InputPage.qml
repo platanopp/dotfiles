@@ -75,13 +75,18 @@ Column {
             resettable: page.opt("follow_mouse").overridden
             onReset: Hypr.resetHypr("follow_mouse")
 
+            // Click is Hyprland's 2, not its 0. With 0 the pointer itself stays
+            // with the focused window: a wheel over another window scrolled
+            // nothing and hover effects stopped until a click. With 2 only the
+            // keyboard waits for the click -- the pointer still reaches what
+            // it is over, the way click-to-focus works everywhere else.
             Segmented {
                 tint: page.tint
                 options: [
                     { value: 1, label: "Hover" },
-                    { value: 0, label: "Click" }
+                    { value: 2, label: "Click" }
                 ]
-                value: page.val("follow_mouse", 1)
+                value: page.val("follow_mouse", 1) === 0 ? 2 : page.val("follow_mouse", 1)
                 onPicked: v => Hypr.setHypr("follow_mouse", v)
             }
         }
