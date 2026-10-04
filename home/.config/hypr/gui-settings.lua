@@ -19,4 +19,7 @@ hl.config({
     cursor = {
         hide_on_key_press = false,
     },
+    misc = {
+        mouse_move_focuses_monitor = false,
+    },
 })

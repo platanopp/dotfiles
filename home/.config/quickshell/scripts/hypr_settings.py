@@ -185,6 +185,16 @@ def render(state):
             node = node.setdefault(part, {})
         node[path[-1]] = entry["value"]
 
+    # Click-to-focus has to hold across monitors too. With follow_mouse at 2
+    # Hyprland keeps the keyboard where it is inside a monitor, but moving the
+    # pointer onto the other monitor still focused that monitor -- and with
+    # it its window, no click -- so Click behaved like Hover the moment the
+    # pointer crossed the gap. Written either way, true for Hover (Hyprland's
+    # default): a change is applied live, without a reload, so a line that
+    # merely went missing would leave the last value in force.
+    fm = state.get("follow_mouse", {}).get("value", 1)
+    tree.setdefault("misc", {})["mouse_move_focuses_monitor"] = str(fm) == "1"
+
     def emit(node, depth):
         pad = "    " * depth
         out = []
