@@ -34,7 +34,7 @@
     "base": false
   },
   "follow_mouse": {
-    "value": 2,
+    "value": 1,
     "base": 1
   }
 }
