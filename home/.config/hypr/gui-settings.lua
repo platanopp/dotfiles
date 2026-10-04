@@ -15,6 +15,7 @@ hl.config({
     },
     input = {
         follow_mouse = 2,
+        float_switch_override_focus = 0,
     },
     cursor = {
         hide_on_key_press = false,

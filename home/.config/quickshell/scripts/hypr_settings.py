@@ -192,8 +192,16 @@ def render(state):
     # pointer crossed the gap. Written either way, true for Hover (Hyprland's
     # default): a change is applied live, without a reload, so a line that
     # merely went missing would leave the last value in force.
+    #
+    # And float_switch_override_focus, which moves the focus whenever the
+    # pointer goes from a tiled window to a floating one or back -- under any
+    # follow_mouse. With a floating terminal over tiled windows that is most
+    # of the time, so Click kept acting like Hover. Off for Click, Hyprland's
+    # 1 for Hover.
     fm = state.get("follow_mouse", {}).get("value", 1)
-    tree.setdefault("misc", {})["mouse_move_focuses_monitor"] = str(fm) == "1"
+    hover = str(fm) == "1"
+    tree.setdefault("misc", {})["mouse_move_focuses_monitor"] = hover
+    tree.setdefault("input", {})["float_switch_override_focus"] = 1 if hover else 0
 
     def emit(node, depth):
         pad = "    " * depth
