@@ -32,5 +32,9 @@
   "hide_cursor_typing": {
     "value": false,
     "base": false
+  },
+  "follow_mouse": {
+    "value": 2,
+    "base": 1
   }
 }

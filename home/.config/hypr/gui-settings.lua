@@ -13,10 +13,13 @@ hl.config({
         gaps_in = 13,
         gaps_out = { top = 13, bottom = 13, left = 13, right = 13 },
     },
+    input = {
+        follow_mouse = 2,
+    },
     cursor = {
         hide_on_key_press = false,
     },
     misc = {
-        mouse_move_focuses_monitor = true,
+        mouse_move_focuses_monitor = false,
     },
 })
