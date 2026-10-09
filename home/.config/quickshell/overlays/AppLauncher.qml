@@ -453,7 +453,9 @@ PanelWindow {
             if (cls.length === 0 || o.mapped === false || o.hidden === true) continue
             var owner = cls.length > 0 ? DesktopEntries.heuristicLookup(cls) : null
             var appName = owner ? owner.name : cls
-            var ws = tops[t].workspace ? tops[t].workspace.name : ""
+            // Numbered within its monitor's block of ten, as the bar does: 13 is 3.
+            var wsObj = tops[t].workspace
+            var ws = !wsObj ? "" : wsObj.id > 0 ? String((wsObj.id - 1) % 10 + 1) : wsObj.name
             var w = { name: title || appName, id: cls, genericName: appName }
             var ws_ = overlay.score(w, q)
             if (ws_ > 0) winHits.push({

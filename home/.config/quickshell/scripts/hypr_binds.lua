@@ -242,18 +242,37 @@ local RELATIVE_WS = {
 local function workspace_label(ws)
     if type(ws) == "number" then return tostring(ws), true end
     local s = tostring(ws)
-    if s == "e+1" then return "next", false end
-    if s == "e-1" then return "previous", false end
+    if s == "e+1" or s == "m+1" then return "next", false end
+    if s == "e-1" or s == "m-1" then return "previous", false end
     local special = s:match("^special:(.+)$")
     if special then return special, false end
     return s, tonumber(s) ~= nil
+end
+
+-- A bind that runs a Lua function says nothing about itself, so it is read
+-- off the `description` the config gives it. "Go to workspace 3 of this
+-- monitor" folds with its nine siblings like a dispatcher bind would, the
+-- tail after the number carried over to the folded row.
+local function describe_function(opts)
+    local text = opts and opts.description
+    if type(text) ~= "string" or text == "" then
+        return { action = "Custom action", category = "Windows" }
+    end
+    for _, f in ipairs({ { "Go to workspace", "ws-focus" }, { "Move to workspace", "ws-move" } }) do
+        local n, rest = text:match("^" .. f[1] .. " (%d+)(.*)$")
+        if n then
+            return { action = text, category = "Workspaces", fold = f[2], workspace = n, suffix = rest }
+        end
+    end
+    return { action = text, category = "Windows" }
 end
 
 -- Returns a table: the action text, the raw command when there is one, the
 -- category the bind belongs under, and -- for the numbered workspace binds --
 -- a fold tag plus the workspace it targets, so the ten of them can collapse
 -- into one row.
-local function describe(action)
+local function describe(action, bind_opts)
+    if type(action) == "function" then return describe_function(bind_opts) end
     if not is_proxy(action) then return { action = "Custom action", category = "Windows" } end
 
     local path = rawget(action, "_path") or ""
@@ -385,7 +404,7 @@ for _, id in ipairs(order) do
     if ev then
         local keys, key_label = pretty_keyspec(ev.keyspec)
         local mods, key = split_keyspec(ev.keyspec)
-        local d = describe(ev.action)
+        local d = describe(ev.action, ev.opts)
         local mod_key = {}
         for _, m in ipairs(mods) do mod_key[#mod_key + 1] = m:upper() end
         table.sort(mod_key)
@@ -397,6 +416,7 @@ for _, id in ipairs(order) do
             command = d.command,
             fold = d.fold,
             workspace = d.workspace,
+            suffix = d.suffix,
             overlay = d.overlay,
             -- A media key is a media key whatever it dispatches, so the
             -- hardware wins over the action for these.
@@ -424,6 +444,7 @@ local function fold_workspaces(list)
                     _first_ws = e.workspace, _last_ws = e.workspace,
                     _base = e.fold == "ws-move" and "Move to workspace"
                             or "Go to workspace",
+                    _suffix = e.suffix or "",
                     -- Everything ahead of the key, "Super + Shift + " included.
                     _mods = e.keys:sub(1, #e.keys - #e.key_label),
                 }
@@ -438,10 +459,10 @@ local function fold_workspaces(list)
     for _, e in ipairs(out) do
         if e._first_key and e._first_key ~= e._last_key then
             e.keys = e._mods .. e._first_key .. " … " .. e._last_key
-            e.action = e._base .. " " .. e._first_ws .. "–" .. e._last_ws
+            e.action = e._base .. " " .. e._first_ws .. "–" .. e._last_ws .. e._suffix
         end
         e._first_key, e._last_key = nil, nil
-        e._first_ws, e._last_ws, e._base, e._mods = nil, nil, nil, nil
+        e._first_ws, e._last_ws, e._base, e._mods, e._suffix = nil, nil, nil, nil, nil
     end
     return out
 end

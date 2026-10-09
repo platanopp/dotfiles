@@ -11,7 +11,6 @@ local terminal = "kitty"
 -- shortcuts off the Dolphin keys it is set up with, should it be run that way.
 local kittyDir = os.getenv("HOME") .. "/.config/kitty/"
 local fileManager = "thunar"
-local browser = "zen-browser"
 local mainMod = "SUPER"
 
 hl.env("QT_QPA_PLATFORMTHEME", "qt6ct")
@@ -45,12 +44,20 @@ hl.on("hyprland.start", function()
     -- thread -- neighbours landed a frame apart and the gaps between the
     -- pills shook by up to 12px mid-animation.
     hl.exec_cmd("quickshell")
-    hl.exec_cmd("kitty")
-    -- Chat and the game client, parked on workspace 2 by the rules further
-    -- down so they come up behind the terminal instead of over it.
+    -- The terminal that's always up, classed so the widget rules below can
+    -- park it on workspace 11, HDMI's first, at the reference layout's position. It already
+    -- shows fastfetch on its own -- that's .zshrc, not this -- so no -e here.
+    hl.exec_cmd("kitty --class widget-sysinfo")
+    -- Chat and the game client.
     hl.exec_cmd("discord")
     hl.exec_cmd("steam")
     hl.exec_cmd("hyprpaper")
+    -- The other two desktop widgets: ordinary floating windows, not shell
+    -- overlays, so they can be dragged, resized or closed like anything
+    -- else. Size and position come from the window rules further down.
+    hl.exec_cmd("kitty --class widget-clock -e tty-clock -c -C 7")
+    hl.exec_cmd("kitty --class widget-cava -e cava")
+    hl.exec_cmd("kitty --class widget-btop -e btop")
     -- Panels off after fifteen idle minutes and a lock at twenty; rules in
     -- hypridle.conf next door. Its output goes to a log rather than nowhere:
     -- when the timeout does not fire, what it says about inhibits is the only
@@ -209,7 +216,7 @@ hl.device({
 
 hl.bind(mainMod .. " + T", hl.dsp.exec_cmd(terminal))
 local closeWindowBind = hl.bind(mainMod .. " + Q", hl.dsp.window.close())
-hl.bind(mainMod .. " + C", hl.dsp.exec_cmd(browser))
+hl.bind(mainMod .. " + C", hl.dsp.exec_cmd(terminal .. " --directory /home/gone claude --continue"))
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager))
 hl.bind(mainMod .. " + V", hl.dsp.window.float({ action = "toggle" }))
 -- Handled inside the shell, which registers the name over Hyprland's
@@ -261,17 +268,45 @@ hl.bind(mainMod .. " + right", hl.dsp.focus({ direction = "right" }))
 hl.bind(mainMod .. " + up",    hl.dsp.focus({ direction = "up" }))
 hl.bind(mainMod .. " + down",  hl.dsp.focus({ direction = "down" }))
 
+-- ── Workspaces: ten per monitor ──────────────────────────────────────────
+--
+-- Each monitor has its own block of ten: DP-2 has 1-10, HDMI-A-1 11-20 (the
+-- rules that pin them are at the end of the file). Super+N and
+-- Super+Shift+N work on the Nth of the focused monitor's block, so each
+-- monitor has a 1 to 10 of its own, and the shell's pill and overview number
+-- them the same way: 13 reads as HDMI's 3.
+--
+-- The block comes from the workspace the monitor is showing, not from its
+-- name, so the shell can work it out the same way, and a monitor with no
+-- rule still gets a block of whatever it landed on.
+local workspaceBlocks = { ["DP-2"] = 0, ["HDMI-A-1"] = 10 }
+
+local function focusedBlock()
+    local m = hl.get_active_monitor()
+    if not m then return 0 end
+    local ws = m.active_workspace
+    if ws and ws.id > 0 then return math.floor((ws.id - 1) / 10) * 10 end
+    return workspaceBlocks[m.name] or 0
+end
+
+-- The description is what `hyprctl binds` and the shell's shortcuts sheet
+-- show: a Lua function, unlike a dispatcher, says nothing about itself.
 for i = 1, 10 do
     local key = i % 10
-    hl.bind(mainMod .. " + " .. key,         hl.dsp.focus({ workspace = i}))
-    hl.bind(mainMod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }))
+    hl.bind(mainMod .. " + " .. key, function()
+        hl.dispatch(hl.dsp.focus({ workspace = focusedBlock() + i }))
+    end, { description = "Go to workspace " .. i .. " of this monitor" })
+    hl.bind(mainMod .. " + SHIFT + " .. key, function()
+        hl.dispatch(hl.dsp.window.move({ workspace = focusedBlock() + i }))
+    end, { description = "Move to workspace " .. i .. " of this monitor" })
 end
 
 hl.bind(mainMod .. " + S",         hl.dsp.workspace.toggle_special("magic"))
 hl.bind(mainMod .. " + SHIFT + S", hl.dsp.window.move({ workspace = "special:magic" }))
 
-hl.bind(mainMod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }))
-hl.bind(mainMod .. " + mouse_up",   hl.dsp.focus({ workspace = "e-1" }))
+-- `m`, not `e`: the open workspaces of this monitor, not of every monitor.
+hl.bind(mainMod .. " + mouse_down", hl.dsp.focus({ workspace = "m+1" }))
+hl.bind(mainMod .. " + mouse_up",   hl.dsp.focus({ workspace = "m-1" }))
 
 hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(),   { mouse = true })
 hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
@@ -337,13 +372,6 @@ hl.window_rule({
     no_focus = true,
 })
 
--- ── Chat and games keep to workspace 2 ─────────────────────────────
---
--- By rule and not by an argument on the exec above: both take long enough to
--- start that the workspace focused at launch is not necessarily the one still
--- focused when their window finally maps, and Steam maps a splash first and
--- its real window second. `silent` places them without dragging focus along,
--- so a login that starts on workspace 1 stays there.
 -- ── World of Warcraft fullscreen ──────────────────────────────────
 --
 -- The gxWindow "0" CVar in Config.wtf is not enough: under XWayland the
@@ -359,23 +387,50 @@ hl.window_rule({
     fullscreen = true,
 })
 
+-- ── Desktop widgets ───────────────────────────────────────────────────
+--
+-- Ordinary floating windows (see the exec_cmd calls above), not pinned or
+-- stuck to the desktop -- `silent` only keeps opening them from dragging
+-- focus to workspace 11 (HDMI's first), the same way Discord and Steam did.
+-- `size`/`move` are pinned here too: with other windows already tiled there, a
+-- freshly floated window otherwise keeps the tile-sized geometry it had
+-- just before `float = true` applied, ignoring kitty's own initial size.
+-- Positions match the reference layout (terminal top-left, clock top-right,
+-- audio bar bottom-right), scaled up from that screenshot to this monitor;
+-- btop fills the free slot under the terminal, same width.
+-- The two at the top are offset by 56px (the quickshell bar's reserved
+-- area, `hyprctl monitors -j`'s reserved[1]) so they don't open under it.
 hl.window_rule({
-    name      = "discord-on-2",
-    match     = { class = "^discord$" },
-    workspace = "2 silent",
+    name      = "widget-sysinfo-float",
+    match     = { class = "^widget-sysinfo$" },
+    float     = true,
+    size      = "1100 626",
+    move      = "68 140",
+    workspace = "11 silent",
 })
 hl.window_rule({
-    name      = "steam-on-2",
-    -- The client's own window and its sign-in, by title, and nothing else
-    -- of class steam. Steam draws its menus, dialogs and toasts as windows
-    -- of their own (contextmenu_N_uid0, PopupWindow_..., notificationtoasts_
-    -- in its webhelper log), and on class alone every one of them was sent
-    -- here -- with Steam moved to the Samsung, a right-click menu opened on
-    -- the Xiaomi. Left alone they open by the window that asked for them.
-    -- (Games are not caught either way: they get classes of their own,
-    -- steam_app_....)
-    match     = { class = "^steam$", title = "^(Steam|Sign in to Steam)$" },
-    workspace = "2 silent",
+    name      = "widget-clock-float",
+    match     = { class = "^widget-clock$" },
+    float     = true,
+    size      = "936 473",
+    move      = "1522 148",
+    workspace = "11 silent",
+})
+hl.window_rule({
+    name      = "widget-cava-float",
+    match     = { class = "^widget-cava$" },
+    float     = true,
+    size      = "808 392",
+    move      = "1646 723",
+    workspace = "11 silent",
+})
+hl.window_rule({
+    name      = "widget-btop-float",
+    match     = { class = "^widget-btop$" },
+    float     = true,
+    size      = "1100 574",
+    move      = "68 806",
+    workspace = "11 silent",
 })
 
 -- ── Steam's notification toasts ─────────────────────────────────────
@@ -712,14 +767,16 @@ do
     end
 end
 
--- Que workspace cae en cada monitor. Por su cuenta Hyprland le da el 1 al
--- monitor que enumera primero -- HDMI-A-1, en 0x0 -- y empuja el 2 al DP-2,
--- que es al reves de lo util: el trabajo va en el DP-2 de 240Hz, y el 2,
--- donde abren Discord y Steam, en el panel HDMI. `default` hace que cada
--- monitor arranque ya en su workspace, en vez de respetar el anclaje solo
--- cuando ese workspace se usa por primera vez.
-hl.workspace_rule({ workspace = "1", monitor = "DP-2",     default = true })
-hl.workspace_rule({ workspace = "2", monitor = "HDMI-A-1", default = true })
+-- Each monitor's block of ten (see `workspaceBlocks` by the binds), pinned
+-- so a workspace opens on its own monitor whichever one asked for it.
+-- `default` has each monitor come up on the first of its block: left alone,
+-- Hyprland hands the 1 to whichever monitor it enumerates first (HDMI-A-1),
+-- and the work screen, DP-2, got the 2.
+for name, base in pairs(workspaceBlocks) do
+    for i = 1, 10 do
+        hl.workspace_rule({ workspace = tostring(base + i), monitor = name, default = i == 1 })
+    end
+end
 
 -- ── Shell fit-up ─────────────────────────────────────────────────────────
 --

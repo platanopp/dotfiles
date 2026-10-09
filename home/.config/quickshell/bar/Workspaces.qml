@@ -4,12 +4,17 @@ import QtQuick
 import qs.components
 import qs.config
 
-// The workspaces, as a row of slots inside the left pill: a filled pill slides
-// to the active one and carries its number; a workspace with windows is a
-// firmer dot than an empty one; one asking for attention is red and pulses.
-// While the special workspace (Super+S) is showing on this monitor it gets a
-// slot of its own at the end. Click a slot to go there; the wheel steps
-// through them.
+// This monitor's workspaces, as a row of slots inside the left pill: a filled
+// pill slides to the active one and carries its number; a workspace with
+// windows is a firmer dot than an empty one; one asking for attention is red
+// and pulses. While the special workspace (Super+S) is showing on this monitor
+// it gets a slot of its own at the end. Click a slot to go there; the wheel
+// steps through them.
+//
+// Each monitor has a block of ten of its own (hyprland.lua: DP-2 has 1-10,
+// HDMI-A-1 11-20), and the slots are numbered within it, the way Super+N
+// counts them: workspace 13 is this monitor's 3. Which block is read off
+// the workspace the monitor shows, as hyprland.lua does.
 //
 // At least five slots, more when a higher workspace is in use, up to ten --
 // Super+6..0 reach them, and a fixed five hid them.
@@ -39,16 +44,27 @@ Item {
     implicitWidth: row.width + (specialSlot.visible ? root.slotGap + 4 + specialSlot.width : 0)
     implicitHeight: root.slotHeight
 
-    readonly property int activeId: monitor && monitor.activeWorkspace ? monitor.activeWorkspace.id : 0
+    readonly property int shownId: monitor && monitor.activeWorkspace ? monitor.activeWorkspace.id : 0
 
-    // id -> { windows, urgent } for the normal workspaces.
+    // The id before this monitor's first workspace (0 or 10). Kept, not
+    // bound, so it holds while the monitor's workspace is briefly unknown.
+    property int base: 0
+    function readBase() { if (root.shownId > 0) root.base = Math.floor((root.shownId - 1) / 10) * 10 }
+    onShownIdChanged: root.readBase()
+    Component.onCompleted: root.readBase()
+
+    // The active slot, 1-10 within the block; 0 while nothing in it shows.
+    readonly property int activeId: root.shownId > root.base && root.shownId <= root.base + 10
+                                    ? root.shownId - root.base : 0
+
+    // Slot -> { windows, urgent } for this block's workspaces.
     readonly property var state: {
         var map = {}
         var list = Hyprland.workspaces.values
         for (var i = 0; i < list.length; i++) {
             var ws = list[i]
-            if (ws.id <= 0) continue
-            map[ws.id] = {
+            if (ws.id <= root.base || ws.id > root.base + 10) continue
+            map[ws.id - root.base] = {
                 windows: ws.toplevels ? ws.toplevels.values.length : 0,
                 urgent: ws.urgent === true
             }
@@ -78,8 +94,9 @@ Item {
         }
     }
 
-    function go(id) {
-        Hyprland.dispatch('hl.dsp.focus({workspace="' + id + '"})')
+    // A slot of this monitor's block.
+    function go(slot) {
+        Hyprland.dispatch('hl.dsp.focus({workspace="' + (root.base + slot) + '"})')
     }
 
     // The wheel: one step per notch, not one per event a touchpad sends.

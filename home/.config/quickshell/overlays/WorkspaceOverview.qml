@@ -10,13 +10,15 @@ import qs.services
 
 // The workspace overview (Super+Tab): every workspace side by side, each a
 // small picture of its monitor -- the wallpaper, and its windows where they
-// sit, drawn from a capture of each window.
+// sit, drawn from a capture of each window. Grouped by monitor, each with its
+// own block of ten numbered 1-10, the way Super+N counts them (hyprland.lua:
+// DP-2 has 1-10, HDMI-A-1 11-20; 13 shows as 3).
 //
-//   click a workspace     go there; the last card, +, is a new one
+//   click a workspace     go there; each monitor's last card, +, is a new one there
 //   ×, or Delete          remove a workspace (asks first if it has windows)
 //   arrows / Tab, Enter   choose a workspace, go there
-//   N                     a new workspace
-//   1 - 9                 go straight to that workspace
+//   N                     a new workspace on this monitor
+//   1 - 9                 go straight to that workspace of this monitor
 //   Esc, or Super+Tab     close
 //
 // Workspaces only: the windows in a card are a picture of what is there,
@@ -177,8 +179,8 @@ PanelWindow {
         Hyprland.refreshMonitors()
     }
 
-    // The cards: one per workspace, in order, and the new one at the end
-    // (key -1). A snapshot, not a binding: rebuilt on opening and when
+    // The cards: one per workspace, in order, and a new one at the end of
+    // each monitor's run (key -100 - its block). A snapshot, not a binding: rebuilt on opening and when
     // Hyprland says something moved -- a binding re-read every window title
     // as it changed, and re-captured every window each time.
     property var cardData: ({})
@@ -202,10 +204,8 @@ PanelWindow {
         })
         var tops = Hyprland.toplevels.values
         var out = []
-        var maxId = 0
         for (var i = 0; i < wss.length; i++) {
             var ws = wss[i]
-            maxId = Math.max(maxId, ws.id)
             var wins = []
             for (var t = 0; t < tops.length; t++) {
                 var top = tops[t]
@@ -229,24 +229,60 @@ PanelWindow {
             var byRecency = wins.slice().sort(function(a, b) { return a.recency - b.recency })
             for (var a = 0; a < byRecency.length; a++)
                 if (apps.indexOf(byRecency[a].cls) === -1) apps.push(byRecency[a].cls)
-            out.push({ key: ws.id, id: ws.id, name: ws.name, geom: overview.geometryOf(mon),
+            out.push({ key: ws.id, id: ws.id, name: String(overview.slotOf(ws.id)), geom: overview.geometryOf(mon),
                        monitor: mon ? mon.name : "", monitorLabel: overview.monitorLabel(mon), apps: apps,
                        focused: ws.id === focusedId,
                        active: !!(mon && mon.activeWorkspace && mon.activeWorkspace.id === ws.id),
                        windows: wins, isNew: false })
         }
-        out.push({ key: -1, id: maxId + 1, name: String(maxId + 1), geom: overview.geometryOf(bar.monitor),
-                   monitor: "", monitorLabel: "", apps: [], focused: false, active: false, windows: [], isNew: true })
-        // Where each monitor's run of cards starts and ends: the first gets
-        // the monitor's name over it, the last a wider gap after it.
-        var monitors = {}
-        for (var j = 0; j < out.length; j++) if (!out[j].isNew) monitors[out[j].monitor] = true
-        var several = Object.keys(monitors).length > 1
-        for (var k = 0; k < out.length; k++) {
-            out[k].groupStart = several && !out[k].isNew && (k === 0 || out[k - 1].monitor !== out[k].monitor)
-            out[k].groupEnd = !out[k].isNew && k + 1 < out.length && out[k + 1].monitor !== out[k].monitor
+        // Each monitor's run ends in a new card of its own: the number after
+        // its highest, or its lowest free one once 10 is taken; none when
+        // all ten are in use.
+        var cards = []
+        for (var j = 0; j < out.length; j++) {
+            cards.push(out[j])
+            if (j + 1 < out.length && out[j + 1].monitor === out[j].monitor) continue
+            var base = Math.floor((out[j].id - 1) / 10) * 10
+            var used = {}
+            for (var u = j; u >= 0 && out[u].monitor === out[j].monitor; u--) used[out[u].id] = true
+            var next = overview.slotOf(out[j].id) < 10 ? out[j].id + 1 : -1
+            for (var s = 1; next < 0 && s <= 10; s++) if (!used[base + s]) next = base + s
+            if (next < 0) continue
+            cards.push({ key: -100 - base / 10, id: next, name: String(overview.slotOf(next)), geom: out[j].geom,
+                         monitor: out[j].monitor, monitorLabel: "", apps: [], focused: false, active: false,
+                         windows: [], isNew: true })
         }
-        return out
+        // Where each monitor's run of cards starts and ends: the first gets
+        // the monitor's name over it, the last a wider gap after it; the
+        // very last none.
+        var monitors = {}
+        for (var m = 0; m < cards.length; m++) monitors[cards[m].monitor] = true
+        var several = Object.keys(monitors).length > 1
+        for (var k = 0; k < cards.length; k++) {
+            cards[k].groupStart = several && !cards[k].isNew && (k === 0 || cards[k - 1].monitor !== cards[k].monitor)
+            cards[k].groupEnd = k + 1 < cards.length && cards[k + 1].monitor !== cards[k].monitor
+            cards[k].last = k + 1 === cards.length
+        }
+        return cards
+    }
+
+    // A workspace's number within its monitor's block of ten: 13 is 3.
+    function slotOf(id) {
+        return (id - 1) % 10 + 1
+    }
+
+    // The id before a monitor's first workspace (0 or 10), off the one it shows.
+    function blockOf(monitor) {
+        var id = monitor && monitor.activeWorkspace ? monitor.activeWorkspace.id : 0
+        return id > 0 ? Math.floor((id - 1) / 10) * 10 : 0
+    }
+
+    // This monitor's new card, if its block has room.
+    function newCardFor(monitor) {
+        var name = monitor ? monitor.name : ""
+        for (var i = 0; i < overview.cardList.length; i++)
+            if (overview.cardList[i].isNew && overview.cardList[i].monitor === name) return overview.cardList[i]
+        return null
     }
 
     // "Samsung Odyssey G40B" for "Samsung Electric Company Odyssey G40B".
@@ -259,7 +295,7 @@ PanelWindow {
     // What a card shows, as a string: two builds that agree on it keep the
     // first card object, so its windows are not rebuilt and re-captured.
     function signature(c) {
-        return JSON.stringify([c.id, c.focused, c.active, c.monitor, c.geom, c.groupStart, c.groupEnd, c.windows.map(function(w) {
+        return JSON.stringify([c.id, c.focused, c.active, c.monitor, c.geom, c.groupStart, c.groupEnd, c.last, c.windows.map(function(w) {
             return [w.address, w.x, w.y, w.w, w.h, w.floating, w.fullscreen]
         })])
     }
@@ -552,10 +588,10 @@ PanelWindow {
                 } else if (event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace) {
                     overview.removeWorkspace(card, false)
                 } else if (event.key === Qt.Key_N) {
-                    var fresh = overview.cardData[-1]
+                    var fresh = overview.newCardFor(bar.monitor)
                     if (fresh) overview.goToWorkspace(fresh.id)
                 } else if (event.key >= Qt.Key_1 && event.key <= Qt.Key_9) {
-                    overview.goToWorkspace(event.key - Qt.Key_0)
+                    overview.goToWorkspace(overview.blockOf(bar.monitor) + event.key - Qt.Key_0)
                 } else {
                     return
                 }
@@ -623,7 +659,7 @@ PanelWindow {
                         // resize, instead of jumping once it is gone.
                         readonly property real faceWidth: Math.round(overview.shownHeight * card.geom.w / card.geom.h)
                         property real grow: 1
-                        width: Math.round((card.faceWidth + (card.key === -1 ? 0
+                        width: Math.round((card.faceWidth + (card.d.last ? 0
                                            : card.d.groupEnd ? overview.groupSpacing : overview.cardSpacing)) * card.grow)
                         height: overview.shownHeight + 52
 
