@@ -1,7 +1,7 @@
 {
     "backupRepo": "~/dotfiles",
     "barHideFullscreen": true,
-    "clock24h": false,
+    "clock24h": true,
     "clockDate": "hover",
     "keyboardRgb": true,
     "keyboardRgbAnimate": true,

@@ -46,10 +46,22 @@ Column {
             }
         }
 
+        SettingsRow {
+            icon: "\u{F0D38}"
+            title: "All outputs"
+            description: "Play through every device at once"
+
+            SettingsSwitch {
+                checked: Audio.allOutputs
+                onToggled: c => Audio.setAllOutputs(c)
+            }
+        }
+
+        // While everything plays everywhere, there is no one device to pick.
         SelectRow {
             icon: "\u{F04C3}"
             title: "Device"
-            visible: Audio.audioSinks.length > 0
+            visible: Audio.audioSinks.length > 0 && !Audio.allOutputs
             options: Audio.audioSinks.map(s => ({ value: s.id, label: s.name }))
             value: page.defaultOf(Audio.audioSinks)
             onPicked: v => Audio.setDefaultSink(v)

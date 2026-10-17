@@ -2,6 +2,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.config
 
 // Sound: the output's volume and mute, the microphone, the devices on either
 // side, and the per-app streams. wpctl and pactl do the work; `pactl
@@ -145,6 +146,36 @@ Singleton {
         onTriggered: audioSinksProc.running = true
     }
 
+    // ── All outputs at once ──────────────────────────────────────────────
+    //
+    // Settings -> Sound: one combined output that plays through every device
+    // (scripts/audio_all_outputs.sh). It is a PipeWire module, gone whenever
+    // PipeWire is, so the choice is kept in ShellSettings and put back at
+    // start and after PipeWire restarts (audioEvents, below).
+    readonly property bool allOutputs: ShellSettings.audioAllOutputs
+
+    function setAllOutputs(on) {
+        ShellSettings.set("audioAllOutputs", on)
+        root.applyAllOutputs(on)
+    }
+
+    function applyAllOutputs(on) {
+        allOutputsProc.command = ["bash", Quickshell.env("HOME") + "/.config/quickshell/scripts/audio_all_outputs.sh",
+                                  on ? "on" : "off"]
+        allOutputsProc.running = true
+    }
+
+    Process {
+        id: allOutputsProc
+        running: false
+        // The device list and the volume then show the combined output (or
+        // the one it went back to) as the default.
+        onExited: {
+            audioSinksProc.running = true
+            if (!volumeGetProc.running) volumeGetProc.running = true
+        }
+    }
+
     // ── Microphone ───────────────────────────────────────────────────────
     //
     // Mute, from the bar, the control panel, Settings and a global shortcut
@@ -195,7 +226,10 @@ Singleton {
 
     // Read once at start; pactl subscribe (audioEvents, below) keeps it
     // current after that.
-    Component.onCompleted: micMutedProc.running = true
+    Component.onCompleted: {
+        micMutedProc.running = true
+        if (root.allOutputs) root.applyAllOutputs(true)
+    }
 
     Process {
         id: micToggleProc
@@ -457,7 +491,11 @@ Singleton {
     Timer {
         id: audioEventsRestart
         interval: 2000
-        onTriggered: audioEvents.running = true
+        onTriggered: {
+            audioEvents.running = true
+            // A new PipeWire has no combined output; put it back.
+            if (root.allOutputs) root.applyAllOutputs(true)
+        }
     }
 
     Timer {

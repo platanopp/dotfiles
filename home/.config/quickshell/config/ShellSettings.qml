@@ -54,6 +54,9 @@ Singleton {
     readonly property string recordAudio: adapter.recordAudio
     readonly property bool recordCursor: adapter.recordCursor
 
+    // Sound out of every output at once (Audio.setAllOutputs).
+    readonly property bool audioAllOutputs: adapter.audioAllOutputs
+
     function set(key, value) {
         adapter[key] = value
     }
@@ -90,6 +93,7 @@ Singleton {
             property string recordCodec: "h264"
             property string recordAudio: "system"
             property bool recordCursor: true
+            property bool audioAllOutputs: false
         }
     }
 }
