@@ -40,6 +40,11 @@ XIAOMI_MODE=ddc-off
 # to sleep like the Samsung. The Xiaomi is recognised by its make, not by the
 # connector it happens to be on, and is left out of POWER_OFF for the
 # treatment below; with no Xiaomi attached, that part is skipped.
+#
+# Switched off over DDC, the Xiaomi drops its link and leaves this list, so
+# "on" cannot find it there -- it went unwoken until 2026-10-18, a dark side
+# screen until someone pressed its button. "off" leaves a mark instead
+# ($xiaomi_off_mark, below), and "on" wakes it by that.
 POWER_OFF=()
 XIAOMI_OUTPUT=""
 while IFS=$'\t' read -r name make; do
@@ -64,6 +69,8 @@ brightness_file="$state-brightness"
 # would otherwise send "on" while "off" is still in flight, and whichever
 # arrives last wins -- a monitor left dark.
 ddc_lock="$state-ddc.lock"
+# Present while the Xiaomi is switched off by "off" (ddc-off mode).
+xiaomi_off_mark="$state-xiaomi-off"
 
 power() {
     local args=()
@@ -75,20 +82,48 @@ ddc() {
     ( flock 9; ddcutil "${DDC_XIAOMI[@]}" "$@" ) 9>"$ddc_lock"
 }
 
+# Power goes over DDC by ddc-power.py, which writes the VESA message to the
+# monitor's I2C bus itself: ddcutil, asked to wake a monitor that is off,
+# spent 4.4 s identifying it before sending anything, and the Xiaomi took
+# 7.3 s to come back; this way, 2.5 s -- the monitor's own start-up and HDMI
+# link. ddcutil stays as the fallback. The bus is looked up while the monitor
+# is still attached and kept in the mark, with the connector whose link "on"
+# waits for.
+ddc_power() {
+    ( flock 9; python3 "$(dirname "$0")/ddc-power.py" "$@" ) 9>"$ddc_lock"
+}
+
 xiaomi_off() {
     [ -n "$XIAOMI_OUTPUT" ] || return 0
+    local bus
+    bus=$(python3 "$(dirname "$0")/ddc-power.py" find 2>/dev/null)
+    echo "${bus:-} $XIAOMI_OUTPUT" >"$xiaomi_off_mark"
+    if [ -n "$bus" ] && ddc_power "$bus" off 2>/dev/null; then
+        return 0
+    fi
     ddc setvcp D6 05 --noverify >/dev/null 2>&1
 }
 
 xiaomi_on() {
-    [ -n "$XIAOMI_OUTPUT" ] || return 0
-    # The first write has always been enough, but the monitor is waking from
-    # off and a missed write here means a dark screen until someone finds its
-    # button -- so it is checked, and sent again if it did not take.
+    # By the mark, not by XIAOMI_OUTPUT: switched off, it is not attached.
+    [ -e "$xiaomi_off_mark" ] || return 0
+    local bus connector
+    read -r bus connector <"$xiaomi_off_mark"
+    # Sent until the link is back (up to 12 s), see ddc-power.py.
+    if [ -n "$bus" ] && ddc_power "$bus" on "$connector" 2>/dev/null; then
+        rm -f "$xiaomi_off_mark"
+        return 0
+    fi
+    # The fallback. A missed write here means a dark screen until someone
+    # finds its button -- so it is checked, and sent again if it did not
+    # take. Should none take, the mark stays and the next wake tries again.
     for _ in 1 2 3 4 5; do
         ddc setvcp D6 01 --noverify >/dev/null 2>&1
         sleep 1.5
-        ddc getvcp D6 --terse 2>/dev/null | grep -q 'x01' && return 0
+        if ddc getvcp D6 --terse 2>/dev/null | grep -q 'x01'; then
+            rm -f "$xiaomi_off_mark"
+            return 0
+        fi
     done
     return 1
 }
