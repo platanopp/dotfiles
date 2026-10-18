@@ -57,6 +57,32 @@ Column {
             }
         }
 
+        // While everything plays everywhere: each device's own level, under
+        // the volume above (which moves them all). The combined output isn't
+        // in the list -- PipeWire files it under filters, not devices.
+        Repeater {
+            model: Audio.allOutputs ? Audio.audioSinks : []
+
+            SettingsRow {
+                id: device
+                required property var modelData
+                stacked: true
+                icon: "\u{F04C3}"
+                title: device.modelData.name
+                value: Math.round(deviceSlider.shown) + "%"
+
+                SettingsSlider {
+                    id: deviceSlider
+                    width: parent.width
+                    from: 0; to: 150; step: 1
+                    neutral: 100
+                    value: device.modelData.volume
+                    format: v => Math.round(v) + "%"
+                    onMoved: v => Audio.setSinkVolume(device.modelData.id, v)
+                }
+            }
+        }
+
         // While everything plays everywhere, there is no one device to pick.
         SelectRow {
             icon: "\u{F04C3}"

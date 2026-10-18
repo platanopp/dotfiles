@@ -115,7 +115,8 @@ Singleton {
         for (var i = 0; i < lines.length; i++) {
             var parts = lines[i].split("|")
             if (parts.length < 3) continue
-            list.push({ id: parts[0], name: parts[1], isDefault: parts[2] === "1" })
+            list.push({ id: parts[0], name: parts[1], isDefault: parts[2] === "1",
+                        volume: parts.length > 3 ? parseInt(parts[3]) : 100 })
         }
         root.audioSinks = list
     }
@@ -138,6 +139,52 @@ Singleton {
     Process {
         id: setSinkProc
         running: false
+    }
+
+    // One device's own level, under the default output's: with All outputs
+    // on, how loud each of them plays (Settings -> Sound). Throttled like
+    // the master slider, for the same reason.
+    function setSinkVolume(id, percent) {
+        sinkVolumeThrottle.pendingId = String(id)
+        sinkVolumeThrottle.pendingValue = Math.max(0, Math.min(150, Math.round(percent)))
+        if (!sinkVolumeThrottle.running) {
+            sinkVolumeThrottle.send()
+            sinkVolumeThrottle.start()
+        }
+    }
+
+    Process {
+        id: sinkVolumeProc
+        running: false
+    }
+
+    Timer {
+        id: sinkVolumeThrottle
+        interval: 45
+        repeat: true
+        property string pendingId: ""
+        property int pendingValue: 0
+        property string sentId: ""
+        property int sentValue: -1
+
+        function send() {
+            if (sinkVolumeProc.running)
+                return
+            sinkVolumeProc.command = ["wpctl", "set-volume", sinkVolumeThrottle.pendingId,
+                                      sinkVolumeThrottle.pendingValue + "%"]
+            sinkVolumeProc.running = true
+            sinkVolumeThrottle.sentId = sinkVolumeThrottle.pendingId
+            sinkVolumeThrottle.sentValue = sinkVolumeThrottle.pendingValue
+        }
+
+        onTriggered: {
+            if (sinkVolumeThrottle.pendingId === sinkVolumeThrottle.sentId
+                    && sinkVolumeThrottle.pendingValue === sinkVolumeThrottle.sentValue) {
+                sinkVolumeThrottle.stop()
+                return
+            }
+            sinkVolumeThrottle.send()
+        }
     }
 
     Timer {
