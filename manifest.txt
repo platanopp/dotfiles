@@ -70,6 +70,8 @@
 .config/Vencord/settings
 .config/gtk-3.0
 .config/xfce4/xfconf/xfce-perchannel-xml/thunar.xml
+.config/xfce4/helpers.rc
+.local/share/xfce4/helpers/kitty.desktop
 .config/Thunar
 .local/share/icons/Papirus-Dark-Grey
 .local/share/themes/Adwaita-dark
