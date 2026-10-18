@@ -18,4 +18,12 @@
   <property name="last-window-height" type="int" value="820"/>
   <property name="last-window-maximized" type="bool" value="true"/>
   <property name="last-separator-position" type="int" value="170"/>
+  <property name="misc-single-click" type="bool" value="false"/>
+  <property name="misc-date-style" type="string" value="THUNAR_DATE_STYLE_SHORT"/>
+  <property name="shortcuts-icon-size" type="string" value="THUNAR_ICON_SIZE_16"/>
+  <property name="misc-image-preview-mode" type="string" value="THUNAR_IMAGE_PREVIEW_MODE_EMBEDDED"/>
+  <property name="misc-symbolic-icons-in-sidepane" type="bool" value="true"/>
+  <property name="last-show-hidden" type="bool" value="true"/>
+  <property name="last-sort-column" type="string" value="THUNAR_COLUMN_DATE_MODIFIED"/>
+  <property name="last-sort-order" type="string" value="GTK_SORT_DESCENDING"/>
 </channel>

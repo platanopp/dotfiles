@@ -1,5 +1,5 @@
 {
-    "audioAllOutputs": true,
+    "audioAllOutputs": false,
     "backupRepo": "~/dotfiles",
     "barHideFullscreen": true,
     "clock24h": true,

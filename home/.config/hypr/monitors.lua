@@ -7,7 +7,7 @@ hl.monitor({
     output = "DP-2",
     disabled = false,
     mode = "1920x1080@239.76Hz",
-    position = "-1920x360",
+    position = "-1828x-333",
     scale = 1,
     cm = "srgb",
 })

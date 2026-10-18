@@ -70,6 +70,9 @@ image/x-xbitmap=org.kde.gwenview.desktop
 image/x-xcf=org.kde.gwenview.desktop
 image/x-xpixmap=org.kde.gwenview.desktop
 x-scheme-handler/discord-424004941485572097=discord-424004941485572097.desktop
+application/x-directory=thunar.desktop
+inode/mount-point=thunar.desktop
+x-directory/normal=thunar.desktop
 
 [Added Associations]
 x-scheme-handler/http=zen.desktop;
