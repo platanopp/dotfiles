@@ -71,6 +71,8 @@ brightness_file="$state-brightness"
 ddc_lock="$state-ddc.lock"
 # Present while the Xiaomi is switched off by "off" (ddc-off mode).
 xiaomi_off_mark="$state-xiaomi-off"
+# Its floating windows' places while it is off (float-keep.py).
+xiaomi_windows="$state-xiaomi-windows"
 
 power() {
     local args=()
@@ -98,6 +100,9 @@ xiaomi_off() {
     local bus
     bus=$(python3 "$(dirname "$0")/ddc-power.py" find 2>/dev/null)
     echo "${bus:-} $XIAOMI_OUTPUT" >"$xiaomi_off_mark"
+    # Hyprland moves its floating windows when it goes, and not back to
+    # where they were when it comes back; see float-keep.py.
+    python3 "$(dirname "$0")/float-keep.py" save "$XIAOMI_OUTPUT" "$xiaomi_windows"
     if [ -n "$bus" ] && ddc_power "$bus" off 2>/dev/null; then
         return 0
     fi
@@ -112,6 +117,7 @@ xiaomi_on() {
     # Sent until the link is back (up to 12 s), see ddc-power.py.
     if [ -n "$bus" ] && ddc_power "$bus" on "$connector" 2>/dev/null; then
         rm -f "$xiaomi_off_mark"
+        python3 "$(dirname "$0")/float-keep.py" restore "$connector" "$xiaomi_windows"
         return 0
     fi
     # The fallback. A missed write here means a dark screen until someone
@@ -122,6 +128,7 @@ xiaomi_on() {
         sleep 1.5
         if ddc getvcp D6 --terse 2>/dev/null | grep -q 'x01'; then
             rm -f "$xiaomi_off_mark"
+            python3 "$(dirname "$0")/float-keep.py" restore "$connector" "$xiaomi_windows"
             return 0
         fi
     done
