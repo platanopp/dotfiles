@@ -455,9 +455,16 @@ hl.window_rule({
 -- corner, over about a third of a second -- and a floating X window gets the
 -- moves it asks for, so a rule's `move` held for 60ms. Steam works that
 -- corner out in X coordinates, where both monitors sit at y=0; here the
--- Samsung is 240px lower and the Xiaomi 242px higher, so the slide ended in
+-- Samsung was 240px lower and the Xiaomi 242px higher, so the slide ended in
 -- the middle of the right edge. Mapped with a rule's `move`, the Xiaomi's
 -- corner came out off-screen as well (monitor_h, without its offset).
+--
+-- Since 2026-10-18 the Xiaomi is at 0,0 and the Samsung at -1920,360 (bottoms
+-- level, as before), so X and Hyprland agree on the Xiaomi at least. Not only
+-- for this: a monitor with a y offset lost it when it came back from being
+-- switched off -- Hyprland put its floating windows back as if it were at
+-- y=0, 120px low every night (see ~/.config/hypr/scripts/float-keep.py).
+-- Keep the Xiaomi, the one that drops its link, at 0,0.
 --
 -- So: into the bottom-right corner of the monitor in use, 13px in like the
 -- windows, and back there every 10ms for as long as the toast is up -- a
@@ -740,7 +747,7 @@ hl.monitor({
     output = "DP-2",
     disabled = false,
     mode = "1920x1080@239.76Hz",
-    position = "-1920x240",
+    position = "-1920x360",
     scale = 1,
     cm = "srgb",
 })
