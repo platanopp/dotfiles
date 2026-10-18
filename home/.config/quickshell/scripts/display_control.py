@@ -187,6 +187,33 @@ def apply_monitor(name, *, mode=None, position=None, scale=None):
     return ok
 
 
+# The layout is kept with the Xiaomi at 0,0, wherever it is dragged to: the
+# others move instead. It is the monitor that drops its link when it is
+# switched off (hypr/scripts/idle-screens.sh), and Hyprland 0.56 brings a
+# monitor back as if it were at y=0 -- its floating windows came back 120px
+# low every night while it sat at 0,-120. XWayland also lines every monitor up
+# at y=0, so X programs (Steam's toasts) and Hyprland only agree on a monitor
+# that is there. The arrangement is the same either way; only the numbers
+# shift. Matched by make, like idle-screens.sh does.
+ANCHOR_MAKE = "Xiaomi"
+
+
+def set_position(name, x, y):
+    mons = monitors()
+    pos = {m["name"]: (m["x"], m["y"]) for m in mons}
+    if name not in pos:
+        return False
+    pos[name] = (x, y)
+    anchor = next((m["name"] for m in mons if ANCHOR_MAKE in m["description"]), None)
+    dx, dy = (-pos[anchor][0], -pos[anchor][1]) if anchor else (0, 0)
+    ok = True
+    for m in mons:
+        nx, ny = pos[m["name"]][0] + dx, pos[m["name"]][1] + dy
+        if (nx, ny) != (m["x"], m["y"]):
+            ok = apply_monitor(m["name"], position=f"{nx}x{ny}") and ok
+    return ok
+
+
 # ── saturation ───────────────────────────────────────────────────────────
 
 def vibrance_map():
@@ -418,7 +445,7 @@ def main():
     elif cmd == "set-mode" and len(a) >= 3:
         apply_monitor(a[1], mode=a[2]); print(json.dumps(snapshot()))
     elif cmd == "set-position" and len(a) >= 4:
-        apply_monitor(a[1], position=f"{a[2]}x{a[3]}"); print(json.dumps(snapshot()))
+        set_position(a[1], int(a[2]), int(a[3])); print(json.dumps(snapshot()))
     elif cmd == "set-scale" and len(a) >= 3:
         apply_monitor(a[1], scale=float(a[2])); print(json.dumps(snapshot()))
     elif cmd == "set-vrr" and len(a) >= 2:
