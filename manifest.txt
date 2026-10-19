@@ -75,3 +75,4 @@
 .config/Thunar
 .local/share/icons/Papirus-Dark-Grey
 .local/share/themes/Adwaita-dark
+.local/share/applications/vlc.desktop
