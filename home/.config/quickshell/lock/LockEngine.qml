@@ -132,13 +132,46 @@ Singleton {
 
     // ── session control ────────────────────────────────────────────────────
     function lock() {
-        if (root.locked)
+        root.beginLock(true);
+    }
+
+    // `photograph` is false only for the boot lock: there is no desktop yet
+    // worth starting from, and that lock wants to be up as early as it can.
+    function beginLock(photograph) {
+        if (root.locked || root.raising)
             return ;
 
         root.reset();
         root.leaving = false;
         root.focused = false;
         root.secured = false;
+        root.raising = true;
+        root.focusSettled = false;
+        root.shotStamp = "";
+        root.takingStamp = "";
+        root.shotSettled = true;
+        // Armed before anything that could go wrong below: whatever happens
+        // to the pictures, the lock goes up.
+        lockAfterFocus.restart();
+        raiseCap.restart();
+        // A capture still hanging from an earlier lock (an output that never
+        // delivered a frame) is not waited on, and not used: its pictures
+        // would be of some other moment.
+        if (photograph && root.shotDir !== "" && !shotProc.running) {
+            try {
+                var names = [];
+                for (const m of Hyprland.monitors.values)
+                    names.push(m.name);
+
+                root.takingStamp = String(Date.now());
+                root.shotSettled = false;
+                shotProc.command = ["sh", "-c", root.shotScript, "sh", root.shotDir, root.takingStamp].concat(names);
+                shotProc.running = true;
+            } catch (e) {
+                root.takingStamp = "";
+                root.shotSettled = true;
+            }
+        }
         // Move the focus before the lock, not after. Hyprland hands the
         // keyboard to the lock surface of whichever monitor has focus, so
         // without this the field can be drawn on one screen and typed into on
@@ -152,7 +185,26 @@ Singleton {
         if (root.fieldMonitor !== "")
             Quickshell.execDetached(["hyprctl", "eval", "hl.dispatch(hl.dsp.focus({ monitor = \"" + root.fieldMonitor + "\" }))"]);
 
-        lockAfterFocus.restart();
+    }
+
+    // Between the ask and the lock being up: the focus is moving and the
+    // screens are being photographed.
+    property bool raising: false
+    property bool focusSettled: false
+    property bool shotSettled: true
+
+    function tryRaise() {
+        if (root.raising && root.focusSettled && root.shotSettled)
+            root.raise();
+
+    }
+
+    function raise() {
+        raiseCap.stop();
+        root.raising = false;
+        root.arriving = true;
+        arrivalWindow.restart();
+        root.locked = true;
     }
 
     // A beat for that dispatch to land -- short enough not to be felt. The
@@ -162,7 +214,97 @@ Singleton {
         id: lockAfterFocus
 
         interval: 120
-        onTriggered: root.locked = true
+        onTriggered: {
+            root.focusSettled = true;
+            root.tryRaise();
+        }
+    }
+
+    // Nothing may hold the lock down for long -- not a capture that is slow,
+    // not one that hangs. Past this it goes up without the pictures.
+    Timer {
+        id: raiseCap
+
+        interval: 400
+        onTriggered: {
+            if (root.raising)
+                root.raise();
+
+        }
+    }
+
+    // ── The desktop, as it was ─────────────────────────────────────────────
+    //
+    // Each screen is photographed just before the lock goes up -- grim, raw
+    // PPM into the runtime tmpfs, both screens at once: 36 ms here on
+    // 2026-10-23, inside the beat the focus already waits. The surface starts
+    // on that picture, so the desktop itself seems to step back into the blur
+    // rather than being cut away; on the way out it comes forward again, so
+    // the lock's last frame is the desktop the session is about to show.
+    //
+    // Only the surfaces raised with the lock open on it. One that arrives
+    // later -- the Xiaomi re-plugging itself when the screens wake -- must not
+    // open on a sharp picture of the session, so it comes up out of black.
+    readonly property string shotDir: {
+        var r = Quickshell.env("XDG_RUNTIME_DIR");
+        return r ? r + "/quickshell" : "";
+    }
+    // Set while this lock's pictures exist; part of every file name, so a
+    // later lock can never be handed an earlier one's.
+    property string shotStamp: ""
+    property string takingStamp: ""
+    property bool arriving: false
+    // `timeout`: grim waits for the output's next frame, and an output that
+    // is powered down never draws one.
+    readonly property string shotScript: "d=$1; s=$2; shift 2; mkdir -p \"$d\" || exit 1; " + "rm -f \"$d\"/lockshot-*.ppm; " + "for n; do timeout 1 grim -o \"$n\" -t ppm \"$d/lockshot-$s-$n.ppm\" & done; wait; " + "ls \"$d\"/lockshot-\"$s\"-*.ppm >/dev/null 2>&1"
+
+    function shotFor(name) {
+        if (root.shotStamp === "" || !name)
+            return "";
+
+        return "file://" + root.shotDir + "/lockshot-" + root.shotStamp + "-" + name + ".ppm";
+    }
+
+    Process {
+        id: shotProc
+
+        running: false
+        onExited: (code) => {
+            // Only for the lock that asked, and only while it still waits:
+            // once the cap has raised it without them, they stay unused.
+            if (!root.raising || root.takingStamp === "")
+                return ;
+
+            if (code === 0)
+                root.shotStamp = root.takingStamp;
+
+            root.shotSettled = true;
+            root.tryRaise();
+        }
+    }
+
+    // Long enough for every surface the lock raises to have been made.
+    Timer {
+        id: arrivalWindow
+
+        interval: 1500
+        onTriggered: root.arriving = false
+    }
+
+    // The pictures go once the surfaces that showed them have; until then
+    // the last frame of the way out is still drawing from them.
+    property string staleStamp: ""
+
+    Timer {
+        id: shotCleanup
+
+        interval: 1000
+        onTriggered: {
+            Quickshell.execDetached(["sh", "-c", "rm -f \"$1\"/lockshot-\"$2\"-*.ppm", "sh", root.shotDir, root.staleStamp]);
+            if (root.shotStamp === root.staleStamp && !root.locked && !root.raising)
+                root.shotStamp = "";
+
+        }
     }
 
     // ── Which screen the field belongs on ──────────────────────────────────
@@ -211,7 +353,12 @@ Singleton {
         root.leaving = false;
         root.focused = false;
         root.secured = false;
+        root.arriving = false;
         root.reset();
+        if (root.shotStamp !== "") {
+            root.staleStamp = root.shotStamp;
+            shotCleanup.restart();
+        }
     }
 
     // every unlock asked for from outside: the ipc, logind. asking twice, or
@@ -286,10 +433,12 @@ Singleton {
         graceOut.restart();
     }
 
+    // Long enough for the field's own "opened" beat (two durMedium steps in
+    // LockScreen) to finish before the cards lift off.
     Timer {
         id: graceOut
 
-        interval: 520
+        interval: Theme.durLong + Theme.durShort
         onTriggered: root.leaving = true
     }
 
@@ -706,7 +855,13 @@ Singleton {
     }
 
     onLockedChanged: root.pushLockedHint()
-    Component.onCompleted: root.pushLockedHint()
+    Component.onCompleted: {
+        root.pushLockedHint();
+        // A shell that died while locked leaves its pictures behind.
+        if (root.shotDir !== "")
+            Quickshell.execDetached(["sh", "-c", "rm -f \"$1\"/lockshot-*.ppm", "sh", root.shotDir]);
+
+    }
 
     // ── Confirmed by the compositor ────────────────────────────────────────
     // `locked` is only this shell's side of the ask. This one is true once the
@@ -749,7 +904,7 @@ Singleton {
             // The claim is taken either way, so switching the setting on
             // later in the session does not lock the screen there and then.
             if (code === 0 && ShellSettings.lockAtBoot)
-                root.lock();
+                root.beginLock(false);
 
         }
     }
@@ -773,6 +928,7 @@ Singleton {
             return JSON.stringify({
                 "locked": root.locked,
                 "secured": root.secured,
+                "photographed": root.shotStamp !== "",
                 "fieldMonitor": root.fieldMonitor,
                 "phase": root.phase,
                 "focused": root.focused,

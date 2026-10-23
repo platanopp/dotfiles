@@ -71,72 +71,287 @@ Scope {
             readonly property bool primary: LockEngine.fieldMonitor === ""
                 || !pane.screen || pane.screen.name === LockEngine.fieldMonitor
 
-            // ── Backdrop ─────────────────────────────────────────────────
-            //
-            // The lock draws its own copy of the wallpaper. A lock surface
-            // covers the output completely, so there is nothing behind it to
-            // let through -- what is not painted here is the black above.
             Item {
                 id: stage
                 anchors.fill: parent
 
-                // Faded in on arrival and out on the way home, and then the
-                // engine is told it may drop the lock. Its deadman is 2s, so
-                // this has to stay comfortably shorter or the release would
-                // race it.
+                // ── Motion ───────────────────────────────────────────────
                 //
-                // `shown` exists because a Behavior does not animate the value
-                // an item is born with: without it the surface would appear at
-                // full opacity and only the exit would be soft.
-                property bool shown: false
+                // Two clocks drive everything that moves on the way in and
+                // out. `reveal` is the backdrop's: 0 is the desktop exactly as
+                // it was when the lock was asked for, 1 is the lock at rest.
+                // `ui` is the cards': each takes its own slot of it, so they
+                // arrive one after another and leave in the reverse order.
+                property real reveal: 0
+                property real ui: 0
+                // Only for a surface with no picture of the desktop to start
+                // from (the boot lock, a screen plugged in while locked): it
+                // comes up out of black, the way the lock always used to.
+                property real fadeIn: 0
 
-                Component.onCompleted: stage.shown = true
+                // This screen's picture from the moment the lock was asked
+                // for, if it has one. Decided once, as the surface is made --
+                // LockEngine.arriving says why a later surface goes without.
+                property string shotSource: ""
+                readonly property bool fromShot: shotImage.status === Image.Ready
 
-                opacity: (LockEngine.leaving || !stage.shown) ? 0 : 1
+                // Typing deepens the blur and the scrim, so while a password
+                // is on screen the field is the only thing still in focus.
+                property real focusDepth: LockEngine.focused ? 1 : 0
 
-                Behavior on opacity {
+                Behavior on focusDepth {
+                    NumberAnimation { duration: Theme.durExtraLong; easing.type: Easing.OutCubic }
+                }
+
+                // The cards step back while the field is in use. A number of
+                // its own, multiplied into each card's opacity, so that the
+                // entrance can own the opacity without a Behavior on it
+                // restarting every frame.
+                property real dim: LockEngine.focused ? 0.45 : 1
+
+                Behavior on dim {
+                    NumberAnimation { duration: Theme.durExtraLong }
+                }
+
+                // The wallpaper decodes in the background, so it is let in
+                // with a fade rather than popping in under the scrim.
+                property real wallIn: 0
+
+                NumberAnimation {
+                    id: wallFade
+                    target: stage
+                    property: "wallIn"
+                    to: 1
+                    duration: Theme.durLong
+                }
+
+                // One card's share of `ui`: where it starts (a) and how far it
+                // has got, eased out. A slot is a little over half the clock,
+                // so neighbours overlap rather than queue.
+                function slot(a) {
+                    var t = Math.max(0, Math.min(1, (stage.ui - a) / 0.55))
+                    return 1 - Math.pow(1 - t, 3)
+                }
+
+                // In from below (dir 1) or above (dir -1), and up and away on
+                // the way out. The sign only flips while everything is at
+                // rest, so nothing jumps when it does.
+                function rise(a, dir) {
+                    return (1 - stage.slot(a)) * (LockEngine.leaving ? -16 : 22 * (dir || 1))
+                }
+
+                opacity: stage.fromShot ? 1 : stage.fadeIn
+
+                // The surface is made before it is told which screen it is
+                // on (pane.screen is still null in Component.onCompleted, seen
+                // 2026-10-23), and the picture is per screen -- so the start
+                // waits for the screen, and only falls back to coming up
+                // without a picture if none is named in time.
+                property bool started: false
+
+                function begin() {
+                    if (stage.started)
+                        return
+                    stage.started = true
+                    stage.shotSource = LockEngine.arriving && pane.screen
+                        ? LockEngine.shotFor(pane.screen.name) : ""
+                    if (LockEngine.leaving)
+                        departure.start()
+                    else
+                        arrival.start()
+                }
+
+                Component.onCompleted: if (pane.screen) stage.begin()
+
+                Connections {
+                    target: pane
+                    function onScreenChanged() {
+                        if (pane.screen)
+                            stage.begin()
+                    }
+                }
+
+                Timer {
+                    running: !stage.started
+                    interval: Theme.durMedium
+                    onTriggered: stage.begin()
+                }
+
+                ParallelAnimation {
+                    id: arrival
                     NumberAnimation {
-                        duration: 300
-                        easing.type: Easing.OutCubic
-                        onRunningChanged: {
-                            if (!running && LockEngine.leaving)
-                                LockEngine.release()
+                        target: stage; property: "fadeIn"; from: 0; to: 1
+                        duration: Theme.durLong; easing.type: Easing.OutCubic
+                    }
+                    NumberAnimation {
+                        target: stage; property: "reveal"; from: 0; to: 1
+                        duration: Theme.durExtraLong + Theme.durLong; easing.type: Easing.InOutCubic
+                    }
+                    SequentialAnimation {
+                        PauseAnimation { duration: Theme.durMedium }
+                        NumberAnimation {
+                            target: stage; property: "ui"; from: 0; to: 1
+                            duration: Theme.durExtraLong + Theme.durLong
                         }
                     }
                 }
 
-                Image {
-                    id: shot
-                    anchors.fill: parent
-                    source: LockEngine.wallpaper.length > 0 ? "file://" + LockEngine.wallpaper : ""
-                    fillMode: Image.PreserveAspectCrop
-                    asynchronous: true
-                    cache: false
-                    visible: false
+                // On the way home the cards lift off first, then the desktop
+                // comes forward and sharpens -- and since it is the picture of
+                // the desktop the session is about to show, the lock's last
+                // frame and the desktop's first are the same one. The engine's
+                // deadman is 2s, so this has to stay well short of it or the
+                // release would race it.
+                SequentialAnimation {
+                    id: departure
+                    ParallelAnimation {
+                        NumberAnimation {
+                            target: stage; property: "ui"; to: 0
+                            duration: Theme.durExtraLong
+                        }
+                        SequentialAnimation {
+                            PauseAnimation { duration: Theme.durShort }
+                            NumberAnimation {
+                                target: stage; property: "reveal"; to: 0
+                                duration: Theme.durExtraLong; easing.type: Easing.InOutCubic
+                            }
+                        }
+                    }
+                    ScriptAction { script: LockEngine.release() }
                 }
 
-                MultiEffect {
-                    anchors.fill: parent
-                    source: shot
-                    blurEnabled: shot.status === Image.Ready
-                    blurMax: 64
-                    // Deepens once typing starts, so while a password is on
-                    // screen the card is the only thing still in focus.
-                    blur: LockEngine.focused ? 1.0 : 0.6
-
-                    Behavior on blur {
-                        NumberAnimation { duration: Theme.durExtraLong; easing.type: Easing.OutCubic }
+                Connections {
+                    target: LockEngine
+                    function onLeavingChanged() {
+                        if (!LockEngine.leaving)
+                            return
+                        arrival.stop()
+                        departure.start()
                     }
                 }
 
-                // Nothing loaded yet, or no wallpaper set: the scrim alone is
-                // the backdrop, and it must not be see-through.
+                // ── Backdrop ─────────────────────────────────────────────
+                //
+                // The lock paints its own backdrop: a lock surface covers the
+                // output completely, so there is nothing behind it to let
+                // through -- what is not painted here is the black above.
+                //
+                // At rest that is the wallpaper, blurred, as it always was.
+                // While the lock comes and goes, the picture of the desktop
+                // lies over it: on the way in it steps back into a rounded
+                // card, blurs and dissolves into the wallpaper; on the way out
+                // it comes forward until it fills the screen again.
+                Item {
+                    id: wall
+                    anchors.fill: parent
+                    // A little larger than the screen, so the blur's soft rim
+                    // falls outside it.
+                    scale: 1 + 0.05 * (stage.fromShot ? 1 : stage.reveal)
+                    opacity: stage.wallIn
+
+                    Image {
+                        id: wallImage
+                        anchors.fill: parent
+                        source: LockEngine.wallpaper.length > 0 ? "file://" + LockEngine.wallpaper : ""
+                        fillMode: Image.PreserveAspectCrop
+                        asynchronous: true
+                        cache: false
+                        visible: false
+                        // Qualified: an unqualified `status` here is the
+                        // status line's id further down, not this image's.
+                        onStatusChanged: if (wallImage.status === Image.Ready) wallFade.start()
+                    }
+
+                    MultiEffect {
+                        anchors.fill: parent
+                        source: wallImage
+                        // Off until the picture is in, as it always was here.
+                        blurEnabled: wallImage.status === Image.Ready
+                        blurMax: 64
+                        // Under a picture of the desktop it can be fully
+                        // blurred from the first frame: the picture hides it
+                        // until it has dissolved. Alone, it blurs as the lock
+                        // comes up.
+                        blur: (0.6 + 0.4 * stage.focusDepth) * (stage.fromShot ? 1 : stage.reveal)
+                    }
+                }
+
+                RectangularShadow {
+                    anchors.fill: card
+                    scale: card.scale
+                    visible: card.visible
+                    radius: card.radius
+                    blur: 48
+                    offset.y: 10
+                    // Strongest while the card is opaque and stepping back,
+                    // and gone well before the card is see-through enough to
+                    // show it underneath.
+                    color: Qt.rgba(0, 0, 0, 0.45 * stage.reveal * Math.pow(card.opacity, 3))
+                }
+
+                Item {
+                    id: card
+                    anchors.fill: parent
+                    readonly property real radius: 32 * stage.reveal
+                    // Dissolves over the last part of the way in, once it has
+                    // stepped back far enough to read as a card -- and only
+                    // into a wallpaper that is there: with none, the blurred
+                    // desktop stays as the backdrop.
+                    readonly property real dissolve: Math.max(0, Math.min(1, (stage.reveal - 0.35) / 0.65))
+
+                    visible: stage.fromShot && card.opacity > 0.001
+                    scale: 1 - 0.1 * stage.reveal
+                    opacity: 1 - card.dissolve * stage.wallIn
+
+                    // Rounded corners. OpacityMask rather than a clip: on the
+                    // lock surface a ClippingRectangle drew nothing at all.
+                    layer.enabled: card.visible
+                    layer.effect: OpacityMask {
+                        maskSource: cardMask
+                    }
+
+                    Image {
+                        id: shotImage
+                        anchors.fill: parent
+                        source: stage.shotSource
+                        // Decoded before the first frame, which has to be the
+                        // desktop and nothing else: raw PPM from tmpfs, so it
+                        // costs a few milliseconds.
+                        asynchronous: false
+                        cache: false
+                        visible: false
+                    }
+
+                    MultiEffect {
+                        anchors.fill: parent
+                        source: shotImage
+                        autoPaddingEnabled: false
+                        blurEnabled: true
+                        blurMax: 48
+                        blur: 0.7 * stage.reveal
+                    }
+                }
+
+                Item {
+                    id: cardMask
+                    anchors.fill: parent
+                    visible: false
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: card.radius
+                    }
+                }
+
+                // Nothing to show yet, or no wallpaper set at all: the scrim
+                // is the backdrop then, and it must not be see-through.
                 Rectangle {
                     anchors.fill: parent
-                    color: Theme.alpha(Theme.background,
-                        shot.status !== Image.Ready ? 1.0 : (LockEngine.focused ? 0.62 : 0.4))
-
-                    Behavior on color { ColorAnimation { duration: Theme.durExtraLong } }
+                    color: {
+                        var settled = (0.4 + 0.22 * stage.focusDepth) * stage.reveal
+                        var ready = stage.fromShot ? 1 : stage.wallIn
+                        return Theme.alpha(Theme.background, settled * ready + (1 - ready))
+                    }
                 }
 
                 // ── The column ───────────────────────────────────────────
@@ -149,9 +364,25 @@ Scope {
                     // Clock. One line rather than stacked: at this size the
                     // hour and minute read as a single number, and stacking
                     // them spends the vertical room the field wants.
+                    //
+                    // Every card below takes its slot of stage.ui: an
+                    // opacity, and a Translate rather than y or x -- they are
+                    // layout children, so their position belongs to the
+                    // ColumnLayout, the same reason the field's shake uses one.
                     RowLayout {
+                        id: clockRow
                         Layout.alignment: Qt.AlignHCenter
                         spacing: 8
+                        opacity: stage.slot(0)
+                        transform: [
+                            Translate { y: stage.rise(0) },
+                            Scale {
+                                origin.x: clockRow.width / 2
+                                origin.y: clockRow.height / 2
+                                xScale: 0.94 + 0.06 * stage.slot(0)
+                                yScale: 0.94 + 0.06 * stage.slot(0)
+                            }
+                        ]
 
                         Text {
                             text: LockEngine.hourText + ":" + LockEngine.minuteText
@@ -175,6 +406,8 @@ Scope {
                     Text {
                         Layout.alignment: Qt.AlignHCenter
                         Layout.topMargin: -4
+                        opacity: stage.slot(0.05)
+                        transform: Translate { y: stage.rise(0.05) }
                         text: LockEngine.dateText
                         color: Theme.textSecondary
                         font.family: Theme.fontMono
@@ -184,6 +417,8 @@ Scope {
                     Text {
                         Layout.alignment: Qt.AlignHCenter
                         Layout.topMargin: 4
+                        opacity: stage.slot(0.09)
+                        transform: Translate { y: stage.rise(0.09) }
                         // The greeting stands in for the field on the screens
                         // that do not have it, so it stays either way.
                         text: LockEngine.greeting + (pane.primary ? "" : ", " + LockEngine.displayName)
@@ -211,9 +446,8 @@ Scope {
                         Layout.preferredHeight: 94
                         radius: 24
                         color: Theme.glass
-                        opacity: LockEngine.focused ? 0.45 : 1
-
-                        Behavior on opacity { NumberAnimation { duration: Theme.durExtraLong } }
+                        opacity: stage.dim * stage.slot(0.15)
+                        transform: Translate { y: stage.rise(0.15) }
 
                         RectangularShadow {
                             anchors.fill: parent
@@ -431,8 +665,10 @@ Scope {
                         Layout.preferredHeight: 52
                         radius: 26
                         color: Theme.glass
+                        opacity: stage.slot(0.21)
                         border.width: 1
-                        border.color: LockEngine.lockedOut ? Theme.alpha(Theme.error, 0.7)
+                        border.color: LockEngine.granted ? Theme.alpha(Theme.success, 0.6)
+                                    : LockEngine.lockedOut ? Theme.alpha(Theme.error, 0.7)
                                     : field.activeFocus ? Theme.alpha(Theme.foreground, 0.28)
                                     : "transparent"
 
@@ -457,6 +693,7 @@ Scope {
                         // coordinate the step before it had already moved.
                         transform: Translate {
                             id: nudge
+                            y: stage.rise(0.21)
                         }
 
                         SequentialAnimation {
@@ -467,11 +704,31 @@ Scope {
                             NumberAnimation { target: nudge; property: "x"; to: 0; duration: 55 }
                         }
 
+                        // The right password gets the opposite of the shake:
+                        // the pill swells once and settles, the lock opens and
+                        // the button turns to a tick -- all inside the engine's
+                        // grace before the cards lift off.
+                        SequentialAnimation {
+                            id: welcome
+                            NumberAnimation {
+                                target: fieldPill; property: "scale"; to: 1.04
+                                duration: Theme.durMedium; easing.type: Easing.OutCubic
+                            }
+                            NumberAnimation {
+                                target: fieldPill; property: "scale"; to: 1
+                                duration: Theme.durMedium; easing.type: Easing.InOutCubic
+                            }
+                        }
+
                         Connections {
                             target: LockEngine
                             function onFailed() {
                                 field.text = ""
                                 shake.restart()
+                            }
+                            function onGrantedChanged() {
+                                if (LockEngine.granted)
+                                    welcome.restart()
                             }
                         }
 
@@ -482,9 +739,13 @@ Scope {
                             spacing: 10
 
                             IconGlyph {
-                                text: LockEngine.lockedOut ? "\u{F0026}" : "\u{F033E}"
-                                color: LockEngine.lockedOut ? Theme.error : Theme.textMuted
+                                text: LockEngine.granted ? "\u{F033F}"
+                                    : LockEngine.lockedOut ? "\u{F0026}" : "\u{F033E}"
+                                color: LockEngine.granted ? Theme.success
+                                     : LockEngine.lockedOut ? Theme.error : Theme.textMuted
                                 size: Theme.iconMedium
+
+                                Behavior on color { ColorAnimation { duration: Theme.durMedium } }
                             }
 
                             TextInput {
@@ -538,15 +799,17 @@ Scope {
                                 Layout.preferredWidth: 38
                                 Layout.preferredHeight: 38
                                 radius: 19
-                                color: submitBtn.ready ? Theme.accent : "transparent"
+                                color: LockEngine.granted ? Theme.success
+                                     : submitBtn.ready ? Theme.accent : "transparent"
 
                                 Behavior on color { ColorAnimation { duration: Theme.durMedium } }
 
                                 IconGlyph {
                                     anchors.centerIn: parent
                                     visible: !LockEngine.busy
-                                    text: "\u{F0054}"
-                                    color: submitBtn.ready ? Theme.accentText : Theme.textMuted
+                                    text: LockEngine.granted ? "\u{F012C}" : "\u{F0054}"
+                                    color: LockEngine.granted ? Theme.background
+                                         : submitBtn.ready ? Theme.accentText : Theme.textMuted
                                     size: Theme.iconMedium
                                 }
 
@@ -605,6 +868,8 @@ Scope {
                     // column does not jump every time a message appears.
                     Item {
                         visible: pane.primary
+                        opacity: stage.slot(0.27)
+                        transform: Translate { y: stage.rise(0.27) }
                         Layout.alignment: Qt.AlignHCenter
                         Layout.topMargin: 14
                         Layout.preferredWidth: 400
@@ -632,6 +897,8 @@ Scope {
                     // quietest way for a correct password to keep failing.
                     RowLayout {
                         visible: pane.primary && (LockEngine.capsLock || LockEngine.layoutShort.length > 0)
+                        opacity: stage.slot(0.3)
+                        transform: Translate { y: stage.rise(0.3) }
                         Layout.alignment: Qt.AlignHCenter
                         Layout.topMargin: 6
                         spacing: 8
@@ -697,13 +964,12 @@ Scope {
                     anchors.left: parent.left
                     anchors.margins: 28
                     visible: pane.primary && LockEngine.displayName.length > 0
-                    opacity: LockEngine.focused ? 0.45 : 1
+                    opacity: stage.dim * stage.slot(0.33)
+                    transform: Translate { y: stage.rise(0.33, -1) }
                     width: whoRow.implicitWidth + 12 + 18
                     height: 44
                     radius: 22
                     color: Theme.glass
-
-                    Behavior on opacity { NumberAnimation { duration: Theme.durExtraLong } }
 
                     RectangularShadow {
                         anchors.fill: parent
@@ -796,9 +1062,8 @@ Scope {
                     height: 44
                     radius: 22
                     color: Theme.glass
-                    opacity: LockEngine.focused ? 0.45 : 1
-
-                    Behavior on opacity { NumberAnimation { duration: Theme.durExtraLong } }
+                    opacity: stage.dim * stage.slot(0.37)
+                    transform: Translate { y: stage.rise(0.37, -1) }
 
                     RectangularShadow {
                         anchors.fill: parent
@@ -879,11 +1144,10 @@ Scope {
                     anchors.bottomMargin: 36
                     spacing: 8
                     visible: pane.primary
-                    opacity: LockEngine.focused ? 0.45 : 1
+                    opacity: stage.dim * stage.slot(0.45)
+                    transform: Translate { y: stage.rise(0.45) }
 
                     property string armed: ""
-
-                    Behavior on opacity { NumberAnimation { duration: Theme.durExtraLong } }
 
                     Timer {
                         id: disarm
