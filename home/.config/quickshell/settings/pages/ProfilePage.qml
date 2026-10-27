@@ -167,7 +167,12 @@ Column {
         id: editor
         visible: page.editing.length > 0
         width: parent.width
-        height: 300
+        // Side by side when the page has room for the 260px viewport and the
+        // controls; stacked otherwise. Settings is half the screen wide, so on
+        // a 1920px monitor the page is about 470px and the controls, laid out
+        // beside the viewport, ran off the card's right edge.
+        readonly property bool wide: width >= 600
+        height: editor.wide ? 300 : editorGrid.implicitHeight + 40
         radius: Theme.radiusXLarge
         color: Theme.surfaceContainer
 
@@ -192,15 +197,19 @@ Column {
         }
         onReadyChanged: editor.settle()
 
-        RowLayout {
+        GridLayout {
+            id: editorGrid
             anchors.fill: parent
             anchors.margins: 20
-            spacing: 24
+            columns: editor.wide ? 2 : 1
+            columnSpacing: 24
+            rowSpacing: 20
 
             ClippingRectangle {
                 id: viewport
                 Layout.preferredWidth: 260
                 Layout.preferredHeight: 260
+                Layout.alignment: Qt.AlignHCenter
                 radius: Theme.radiusLarge
                 color: Theme.background
 
