@@ -40,9 +40,5 @@
   "blur": {
     "value": true,
     "base": true
-  },
-  "blur_size": {
-    "value": 6,
-    "base": 5
   }
 }
