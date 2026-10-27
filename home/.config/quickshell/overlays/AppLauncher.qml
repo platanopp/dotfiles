@@ -795,9 +795,11 @@ PanelWindow {
                 anchors.rightMargin: 20
                 spacing: 14
 
+                // In the accent while there is a search running: the field is
+                // what is active here. Muted while it is empty.
                 IconGlyph {
                     text: "\u{F0349}"
-                    color: searchInput.text.length > 0 ? Theme.textSecondary : Theme.textMuted
+                    color: searchInput.text.length > 0 ? Theme.accent : Theme.textMuted
                     size: 20
 
                     Behavior on color {
@@ -815,6 +817,7 @@ PanelWindow {
                     selectByMouse: true
                     selectionColor: Theme.alpha(Theme.accent, 0.35)
                     selectedTextColor: Theme.textPrimary
+                    cursorDelegate: Component { AccentCaret {} }
                     clip: true
                     focus: overlay.open
 
