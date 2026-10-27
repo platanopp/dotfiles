@@ -31,8 +31,8 @@ PanelWindow {
         property string key: ""
         width: Math.max(20, capText.implicitWidth + 12)
         height: 20
-        radius: 6
-        color: Theme.glass
+        radius: Theme.radiusSmall
+        color: Theme.surface
         border.width: 1
         border.color: Theme.outline
 
@@ -60,7 +60,7 @@ PanelWindow {
             text: hint.label
             color: Theme.textMuted
             font.pixelSize: 10
-            font.family: Theme.fontMono
+            font.family: Theme.fontText
         }
     }
 
@@ -472,12 +472,13 @@ PanelWindow {
 
     // ── Backdrop ─────────────────────────────────────────────────────────
     //
-    // Heavier than the cheatsheet's 0.38. That one sits over text the reader
+    // Heavier than the other overlays' scrim. Those sit over text the reader
     // may want to keep reading; this one sits over a wallpaper, and the
-    // whole job is judging images against a neutral ground.
+    // whole job is judging images against a neutral ground -- which, with no
+    // blur behind it now, means hiding the windows almost entirely.
     Rectangle {
         anchors.fill: parent
-        color: Theme.alpha(Theme.background, 0.72)
+        color: Theme.alpha(Theme.background, 0.88)
         opacity: overlay.open ? 1 : 0
         visible: opacity > 0
 
@@ -635,7 +636,7 @@ PanelWindow {
                 width: sectionRow.implicitWidth + 8
                 height: 40
                 radius: height / 2
-                color: Theme.glass
+                color: Theme.surface
                 border.width: 1
                 border.color: Theme.outline
 
@@ -645,7 +646,7 @@ PanelWindow {
                     radius: parent.radius
                     blur: 20
                     offset.y: 5
-                    color: Qt.rgba(0, 0, 0, 0.4)
+                    color: Theme.alpha(Theme.shadow, 0.4)
                 }
 
                 // The fill slides between the two rather than blinking from one
@@ -711,7 +712,7 @@ PanelWindow {
                                     text: tab.modelData.label
                                     font.pixelSize: 13
                                     font.bold: tab.selected
-                                    font.family: Theme.fontMono
+                                    font.family: Theme.fontText
                                     color: tab.selected ? Theme.accentText : Theme.textSecondary
                                     Behavior on color { ColorAnimation { duration: Theme.durMedium } }
                                 }
@@ -720,7 +721,8 @@ PanelWindow {
                                     anchors.verticalCenter: parent.verticalCenter
                                     text: tab.modelData.count
                                     font.pixelSize: 11
-                                    font.family: Theme.fontMono
+                                    font.family: Theme.fontText
+                                    font.features: Theme.tabular
                                     color: tab.selected ? Theme.alpha(Theme.accentText, 0.6) : Theme.textMuted
                                     Behavior on color { ColorAnimation { duration: Theme.durMedium } }
                                 }
@@ -746,11 +748,11 @@ PanelWindow {
                 anchors.horizontalCenter: parent.horizontalCenter
                 visible: overlay.files.length === 0
                 text: overlay.videos
-                    ? "No videos in ~/Pictures/Wallpapers  (.mp4 .webm .mkv .mov)"
-                    : "No images in ~/Pictures/Wallpapers"
+                    ? "No videos yet. Put .mp4, .webm, .mkv or .mov files in ~/Pictures/Wallpapers"
+                    : "No images yet. Put pictures in ~/Pictures/Wallpapers to pick one here"
                 color: Theme.textMuted
                 font.pixelSize: 13
-                font.family: Theme.fontMono
+                font.family: Theme.fontText
             }
 
             // ── The carousel ─────────────────────────────────────────────
@@ -950,7 +952,7 @@ PanelWindow {
                             Rectangle {
                                 id: cardMask
                                 anchors.fill: parent
-                                radius: 16
+                                radius: Theme.radiusLarge
                                 color: "transparent"
                                 visible: false
                             }
@@ -980,7 +982,7 @@ PanelWindow {
                                 radius: cardMask.radius
                                 offset.y: 10
                                 blur: 28
-                                color: "#000000"
+                                color: Theme.shadow
                                 opacity: card.isCurrent ? 0.55 : 0
 
                                 Behavior on opacity {
@@ -1063,7 +1065,7 @@ PanelWindow {
                                 anchors.margins: 10
                                 width: inUseRow.implicitWidth + 16
                                 height: 24
-                                radius: 12
+                                radius: height / 2
                                 color: Theme.accent
                                 opacity: card.isActive ? 1 : 0
                                 scale: card.isActive ? 1 : 0.8
@@ -1089,7 +1091,7 @@ PanelWindow {
                                         color: Theme.accentText
                                         font.pixelSize: 10
                                         font.bold: true
-                                        font.family: Theme.fontMono
+                                        font.family: Theme.fontText
                                     }
                                 }
                             }
@@ -1103,7 +1105,7 @@ PanelWindow {
                                 anchors.margins: 10
                                 width: 28
                                 height: 28
-                                radius: 14
+                                radius: height / 2
                                 color: Theme.alpha(Theme.background, 0.7)
 
                                 IconGlyph {
@@ -1153,8 +1155,8 @@ PanelWindow {
                     anchors.top: parent.top
                     width: frameRow.implicitWidth + 24
                     height: 34
-                    radius: 17
-                    color: Theme.glass
+                    radius: height / 2
+                    color: Theme.surface
                     border.width: 1
                     border.color: Theme.outline
                     // No framing for a video: mpv covers the screen itself.
@@ -1176,7 +1178,7 @@ PanelWindow {
                             text: "Frame"
                             color: Theme.textPrimary
                             font.pixelSize: 12
-                            font.family: Theme.fontMono
+                            font.family: Theme.fontText
                         }
                         KeyCap { anchors.verticalCenter: parent.verticalCenter; key: "f" }
                     }
@@ -1204,7 +1206,7 @@ PanelWindow {
                         anchors.verticalCenter: parent.verticalCenter
                         width: countText.implicitWidth + 16
                         height: 22
-                        radius: 11
+                        radius: height / 2
                         color: Theme.alpha(Theme.foreground, 0.1)
 
                         Text {
@@ -1213,7 +1215,8 @@ PanelWindow {
                             text: (carousel.currentIndex + 1) + " / " + overlay.files.length
                             color: Theme.textSecondary
                             font.pixelSize: 11
-                            font.family: Theme.fontMono
+                            font.family: Theme.fontText
+                            font.features: Theme.tabular
                         }
                     }
 
@@ -1231,7 +1234,7 @@ PanelWindow {
                         }
                         color: Theme.textPrimary
                         font.pixelSize: 13
-                        font.family: Theme.fontMono
+                        font.family: Theme.fontText
                     }
                 }
 
@@ -1307,10 +1310,8 @@ PanelWindow {
                     text: "Framing"
                     color: Theme.textSecondary
                     font.pixelSize: 11
-                    font.bold: true
-                    font.letterSpacing: 1.6
-                    font.capitalization: Font.AllUppercase
-                    font.family: Theme.fontMono
+                    font.weight: Font.DemiBold
+                    font.family: Theme.fontText
                 }
 
                 // Fixed-size stage. The picture inside it changes size from
@@ -1327,7 +1328,7 @@ PanelWindow {
                         text: "Measuring the image…"
                         color: Theme.textMuted
                         font.pixelSize: 12
-                        font.family: Theme.fontMono
+                        font.family: Theme.fontText
                         opacity: framingView.info === null ? 1 : 0
 
                         Behavior on opacity {
@@ -1425,7 +1426,7 @@ PanelWindow {
                         text: overlay.framingPath.split("/").pop()
                         color: Theme.textSecondary
                         font.pixelSize: 12
-                        font.family: Theme.fontMono
+                        font.family: Theme.fontText
                     }
 
                     Text {
@@ -1436,7 +1437,7 @@ PanelWindow {
                             : "This image already matches the screen"
                         color: Theme.textMuted
                         font.pixelSize: 11
-                        font.family: Theme.fontMono
+                        font.family: Theme.fontText
                     }
 
                     Item { width: 1; height: 6 }

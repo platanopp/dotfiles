@@ -101,7 +101,7 @@ PanelWindow {
         Rectangle {
             id: trayGlass
             anchors.fill: parent
-            radius: 20
+            radius: height / 2
             color: Theme.glass
             visible: false
             layer.enabled: true
@@ -111,7 +111,7 @@ PanelWindow {
             source: trayGlass
             anchors.fill: trayGlass
             shadowEnabled: true
-            shadowColor: "#000000"
+            shadowColor: Theme.shadow
             shadowOpacity: 0.5
             shadowBlur: 0.7
             shadowVerticalOffset: 4

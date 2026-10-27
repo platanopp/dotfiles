@@ -46,7 +46,7 @@ Rectangle {
             text: root.text
             font.pixelSize: 11
             font.bold: root.emphasis
-            font.family: Theme.fontMono
+            font.family: Theme.fontText
             color: root.ink
         }
     }

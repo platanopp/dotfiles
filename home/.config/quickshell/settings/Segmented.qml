@@ -17,7 +17,7 @@ Rectangle {
     property var value
     // The page's colour for the chosen segment; the accent when none is given.
     property color tint: Theme.accent
-    readonly property color onTint: Theme.luminance(root.tint) > 0.5 ? Theme.background : "#ffffff"
+    readonly property color onTint: Theme.inkOn(root.tint)
     signal picked(var value)
 
     implicitHeight: 36
@@ -87,7 +87,7 @@ Rectangle {
                         text: seg.modelData.label
                         font.pixelSize: 11
                         font.bold: seg.chosen
-                        font.family: Theme.fontMono
+                        font.family: Theme.fontText
                         color: seg.chosen ? root.onTint : Theme.textSecondary
                         Behavior on color { ColorAnimation { duration: Theme.durMedium } }
                     }

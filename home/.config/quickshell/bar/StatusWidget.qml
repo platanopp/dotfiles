@@ -99,7 +99,7 @@ PanelWindow {
                 color: Theme.textPrimary
                 font.pixelSize: 14
                 font.bold: true
-                font.family: Theme.fontMono
+                font.family: Theme.fontText
             }
 
             Text {
@@ -108,7 +108,7 @@ PanelWindow {
                 text: header.subtitle
                 color: Theme.textMuted
                 font.pixelSize: 11
-                font.family: Theme.fontMono
+                font.family: Theme.fontText
                 elide: Text.ElideRight
             }
         }
@@ -142,12 +142,10 @@ PanelWindow {
 
     // A small heading inside a panel.
     component PanelLabel: Text {
-        color: Theme.textMuted
-        font.pixelSize: 10
-        font.bold: true
-        font.letterSpacing: 1.2
-        font.capitalization: Font.AllUppercase
-        font.family: Theme.fontMono
+        color: Theme.textSecondary
+        font.pixelSize: 11
+        font.weight: Font.DemiBold
+        font.family: Theme.fontText
     }
 
     // A button in the closed pill: its icon (and number), on a disc -- a
@@ -196,7 +194,7 @@ PanelWindow {
         width: parent ? parent.width : 0
         color: Theme.textMuted
         font.pixelSize: 12
-        font.family: Theme.fontMono
+        font.family: Theme.fontText
         horizontalAlignment: Text.AlignHCenter
         topPadding: 10
         bottomPadding: 10
@@ -306,7 +304,7 @@ PanelWindow {
         source: statusGlass
         anchors.fill: statusGlass
         shadowEnabled: true
-        shadowColor: "#000000"
+        shadowColor: Theme.shadow
         shadowOpacity: 0.5
         shadowBlur: 0.7
         shadowVerticalOffset: 4
@@ -364,7 +362,8 @@ PanelWindow {
                     color: Theme.textPrimary
                     font.pixelSize: 12
                     font.bold: true
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontText
+                    font.features: Theme.tabular
                 }
             }
 
@@ -382,7 +381,8 @@ PanelWindow {
                     text: Math.round(Audio.volumePercent) + "%"
                     color: Audio.volumeMuted ? Theme.textMuted : Theme.textPrimary
                     font.pixelSize: 12
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontText
+                    font.features: Theme.tabular
                 }
 
                 WheelHandler {
@@ -420,7 +420,8 @@ PanelWindow {
                     text: Math.round(Power.batteryPercent) + "%"
                     color: Theme.textPrimary
                     font.pixelSize: 12
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontText
+                    font.features: Theme.tabular
                 }
             }
         }
@@ -511,7 +512,7 @@ PanelWindow {
 
                 EmptyNote {
                     visible: Network.wifiRadioEnabled && Network.wifiNetworks.length === 0
-                    text: Network.wifiScanning ? "Looking for networks…" : "No networks found"
+                    text: Network.wifiScanning ? "Looking for networks…" : "No networks in range. Refresh to look again"
                 }
 
                 Column {
@@ -532,7 +533,7 @@ PanelWindow {
                             Rectangle {
                                 width: parent.width
                                 height: 46
-                                radius: 14
+                                radius: Theme.radiusMedium
                                 color: networkRow.modelData.inUse ? Theme.accent : Theme.surfaceContainer
 
                                 Behavior on color { ColorAnimation { duration: Theme.durShort } }
@@ -558,7 +559,7 @@ PanelWindow {
                                             color: networkRow.modelData.inUse ? Theme.accentText : Theme.textPrimary
                                             font.pixelSize: 13
                                             font.bold: networkRow.modelData.inUse
-                                            font.family: Theme.fontMono
+                                            font.family: Theme.fontText
                                             elide: Text.ElideRight
                                             width: parent.width
                                         }
@@ -571,7 +572,7 @@ PanelWindow {
                                             color: networkRow.modelData.inUse ? Theme.accentText : Theme.textMuted
                                             opacity: networkRow.modelData.inUse ? 0.75 : 1
                                             font.pixelSize: 10
-                                            font.family: Theme.fontMono
+                                            font.family: Theme.fontText
                                         }
                                     }
 
@@ -623,7 +624,7 @@ PanelWindow {
                                 Rectangle {
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 36
-                                    radius: 18
+                                    radius: height / 2
                                     color: Theme.surfaceContainer
                                     border.width: wifiPasswordInput.activeFocus ? 1 : 0
                                     border.color: Theme.alpha(Theme.foreground, 0.4)
@@ -636,7 +637,7 @@ PanelWindow {
                                         verticalAlignment: TextInput.AlignVCenter
                                         color: Theme.textPrimary
                                         font.pixelSize: 12
-                                        font.family: Theme.fontMono
+                                        font.family: Theme.fontText
                                         echoMode: reveal.shown ? TextInput.Normal : TextInput.Password
                                         clip: true
                                         activeFocusOnTab: true
@@ -679,7 +680,7 @@ PanelWindow {
                     text: Network.wifiStatusMessage
                     color: /Wrong|Could not|out of range/.test(Network.wifiStatusMessage) ? Theme.error : Theme.textSecondary
                     font.pixelSize: 11
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontText
                     width: parent.width
                     horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.WordWrap
@@ -731,7 +732,7 @@ PanelWindow {
 
                 EmptyNote {
                     visible: Bluetooth.btEnabled && Bluetooth.bluetoothDevices.length === 0
-                    text: Bluetooth.btScanning ? "Looking for devices…" : "No devices found"
+                    text: Bluetooth.btScanning ? "Looking for devices…" : "No devices found. Put yours in pairing mode, then refresh"
                 }
 
                 Repeater {
@@ -757,7 +758,7 @@ PanelWindow {
                                 required property var modelData
                                 width: parent.width
                                 height: 46
-                                radius: 14
+                                radius: Theme.radiusMedium
                                 color: btDeviceRow.modelData.connected ? Theme.accent : Theme.surfaceContainer
 
                                 Behavior on color { ColorAnimation { duration: Theme.durShort } }
@@ -788,7 +789,7 @@ PanelWindow {
                                             color: btDeviceRow.ink
                                             font.pixelSize: 13
                                             font.bold: btDeviceRow.modelData.connected
-                                            font.family: Theme.fontMono
+                                            font.family: Theme.fontText
                                             elide: Text.ElideRight
                                             width: parent.width
                                         }
@@ -799,7 +800,7 @@ PanelWindow {
                                             color: btDeviceRow.modelData.connected ? Theme.accentText : Theme.textMuted
                                             opacity: btDeviceRow.modelData.connected ? 0.75 : 1
                                             font.pixelSize: 10
-                                            font.family: Theme.fontMono
+                                            font.family: Theme.fontText
                                         }
                                     }
 
@@ -844,7 +845,7 @@ PanelWindow {
                     text: Bluetooth.btStatusMessage
                     color: Bluetooth.btStatusMessage.indexOf("Could not") === 0 ? Theme.error : Theme.textSecondary
                     font.pixelSize: 11
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontText
                     width: parent.width
                     horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.WordWrap
@@ -920,7 +921,8 @@ PanelWindow {
                             text: Math.round(levelSlider.shown) + "%"
                             color: level.muted ? Theme.textMuted : Theme.textSecondary
                             font.pixelSize: 11
-                            font.family: Theme.fontMono
+                            font.family: Theme.fontText
+                            font.features: Theme.tabular
                         }
                     }
                 }
@@ -941,7 +943,7 @@ PanelWindow {
                             required property var modelData
                             width: parent.width
                             height: 36
-                            radius: 12
+                            radius: Theme.radiusMedium
                             color: sinkRow.modelData.isDefault ? Theme.surfaceContainer : "transparent"
 
                             Behavior on color { ColorAnimation { duration: Theme.durShort } }
@@ -963,7 +965,7 @@ PanelWindow {
                                     color: sinkRow.modelData.isDefault ? Theme.textPrimary : Theme.textSecondary
                                     font.pixelSize: 12
                                     font.bold: sinkRow.modelData.isDefault
-                                    font.family: Theme.fontMono
+                                    font.family: Theme.fontText
                                     elide: Text.ElideRight
                                     Layout.fillWidth: true
                                 }
@@ -1020,7 +1022,7 @@ PanelWindow {
                                     text: Audio.streamName(streamRow.modelData.name)
                                     color: Theme.textPrimary
                                     font.pixelSize: 12
-                                    font.family: Theme.fontMono
+                                    font.family: Theme.fontText
                                     elide: Text.ElideRight
                                     Layout.fillWidth: true
                                 }
@@ -1029,7 +1031,8 @@ PanelWindow {
                                     text: Math.round(streamSlider.shown) + "%"
                                     color: Theme.textSecondary
                                     font.pixelSize: 11
-                                    font.family: Theme.fontMono
+                                    font.family: Theme.fontText
+                                    font.features: Theme.tabular
                                 }
                             }
 

@@ -159,14 +159,13 @@ PanelWindow {
     // left and slide back as it shrank.
     readonly property real rowWidth: Math.min(stage.width, 372)
 
-    // Small uppercase heading over a group of controls, in place of the rules
+    // Small heading over a group of controls, in place of the rules
     // and full-size titles that used to split the panel into strips.
     component SectionLabel: Text {
-        color: Theme.textMuted
-        font.pixelSize: 10
-        font.letterSpacing: 1.2
-        font.capitalization: Font.AllUppercase
-        font.family: Theme.fontMono
+        color: Theme.textSecondary
+        font.pixelSize: 11
+        font.weight: Font.DemiBold
+        font.family: Theme.fontText
     }
 
     function runPowerAction(action) {
@@ -248,7 +247,7 @@ PanelWindow {
         source: panelGlass
         anchors.fill: panelGlass
         shadowEnabled: true
-        shadowColor: "#000000"
+        shadowColor: Theme.shadow
         shadowOpacity: 0.5
         shadowBlur: 0.7
         shadowVerticalOffset: 4
@@ -295,7 +294,9 @@ PanelWindow {
                 anchors.centerIn: parent
                 spacing: 6
 
-                // Hollow while counting, filled and breathing once it records.
+                // Hollow while counting, filled once it records. Steady, not
+                // breathing: the timer beside it already moves every second,
+                // and a pulse on top of that only competed with it.
                 Rectangle {
                     anchors.verticalCenter: parent.verticalCenter
                     width: 8
@@ -304,14 +305,6 @@ PanelWindow {
                     color: recIndicator.counting ? "transparent" : Theme.error
                     border.width: recIndicator.counting ? 1.5 : 0
                     border.color: Theme.error
-
-                    // A slow breath rather than a blink.
-                    SequentialAnimation on opacity {
-                        running: Recorder.recording
-                        loops: Animation.Infinite
-                        NumberAnimation { to: 0.35; duration: 900; easing.type: Easing.InOutSine }
-                        NumberAnimation { to: 1; duration: 900; easing.type: Easing.InOutSine }
-                    }
                 }
 
                 Text {
@@ -322,7 +315,8 @@ PanelWindow {
                     color: Theme.textPrimary
                     font.pixelSize: 12
                     font.bold: recIndicator.counting
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontText
+                    font.features: Theme.tabular
 
                     // Each number of the count drops in.
                     onTextChanged: if (recIndicator.counting) countDrop.restart()
@@ -581,7 +575,7 @@ PanelWindow {
                             color: Theme.textPrimary
                             font.pixelSize: 18
                             font.bold: true
-                            font.family: Theme.fontMono
+                            font.family: Theme.fontText
                         }
                     }
                 }
@@ -598,7 +592,7 @@ PanelWindow {
                         color: Theme.textPrimary
                         font.pixelSize: 14
                         font.bold: true
-                        font.family: Theme.fontMono
+                        font.family: Theme.fontText
                         elide: Text.ElideRight
                     }
 
@@ -613,7 +607,7 @@ PanelWindow {
                         }
                         color: powerRow.armed !== "" ? Theme.error : Theme.textMuted
                         font.pixelSize: 10
-                        font.family: Theme.fontMono
+                        font.family: Theme.fontText
                         elide: Text.ElideRight
                     }
 
@@ -624,7 +618,7 @@ PanelWindow {
                         color: Theme.textMuted
                         opacity: 0.7
                         font.pixelSize: 10
-                        font.family: Theme.fontMono
+                        font.family: Theme.fontText
                         elide: Text.ElideRight
                     }
                 }
@@ -724,7 +718,7 @@ PanelWindow {
                 id: wallpaperCard
                 width: parent.width
                 height: 96
-                radius: 16
+                radius: Theme.radiusLarge
                 color: Theme.surfaceContainer
 
                 readonly property bool isVideo: Wallpaper.activeVideoWallpaper !== ""
@@ -767,11 +761,11 @@ PanelWindow {
                     spacing: 2
 
                     Text {
-                        text: wallpaperCard.isVideo ? "WALLPAPER · VIDEO" : "WALLPAPER"
+                        text: wallpaperCard.isVideo ? "Wallpaper · video" : "Wallpaper"
                         color: Theme.textSecondary
-                        font.pixelSize: 9
-                        font.letterSpacing: 1.2
-                        font.family: Theme.fontMono
+                        font.weight: Font.DemiBold
+                        font.pixelSize: 11
+                        font.family: Theme.fontText
                     }
 
                     Text {
@@ -780,7 +774,7 @@ PanelWindow {
                         color: Theme.textPrimary
                         font.pixelSize: 12
                         font.bold: true
-                        font.family: Theme.fontMono
+                        font.family: Theme.fontText
                         elide: Text.ElideRight
                     }
                 }
@@ -791,7 +785,7 @@ PanelWindow {
                     anchors.margins: 10
                     width: changeRow.implicitWidth + 20
                     height: 26
-                    radius: 13
+                    radius: height / 2
                     color: Theme.alpha(Theme.background, 0.7)
 
                     Row {
@@ -804,7 +798,7 @@ PanelWindow {
                             text: "Change"
                             color: Theme.textPrimary
                             font.pixelSize: 10
-                            font.family: Theme.fontMono
+                            font.family: Theme.fontText
                         }
 
                         IconGlyph {
@@ -896,7 +890,7 @@ PanelWindow {
                                         text: mode.modelData.label
                                         font.pixelSize: 11
                                         font.bold: mode.modelData.active
-                                        font.family: Theme.fontMono
+                                        font.family: Theme.fontText
                                         color: mode.modelData.active ? Theme.accentText : Theme.textSecondary
                                         Behavior on color { ColorAnimation { duration: Theme.durMedium } }
                                     }
@@ -935,7 +929,7 @@ PanelWindow {
                         required property var modelData
                         Layout.fillWidth: true
                         Layout.preferredHeight: 52
-                        radius: 16
+                        radius: Theme.radiusLarge
                         color: Theme.surfaceContainer
 
                         RowLayout {
@@ -960,7 +954,7 @@ PanelWindow {
                                     color: Theme.textPrimary
                                     font.pixelSize: 12
                                     font.bold: true
-                                    font.family: Theme.fontMono
+                                    font.family: Theme.fontText
                                     elide: Text.ElideRight
                                 }
 
@@ -970,7 +964,7 @@ PanelWindow {
                                     color: link.modelData.key === "binds" && Keybinds.hyprBindsError.length > 0
                                          ? Theme.error : Theme.textMuted
                                     font.pixelSize: 10
-                                    font.family: Theme.fontMono
+                                    font.family: Theme.fontText
                                     elide: Text.ElideRight
                                 }
                             }
@@ -1017,7 +1011,7 @@ PanelWindow {
 
                         Layout.fillWidth: true
                         Layout.preferredHeight: 46
-                        radius: 16
+                        radius: Theme.radiusLarge
                         color: powerButton.isArmed ? Theme.error
                              : modelData.danger
                                  ? Theme.alpha(Theme.error, powerState.hovered ? 0.22 : 0.1)

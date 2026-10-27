@@ -89,7 +89,7 @@ Column {
         width: parent.width
         visible: Display.displayRevert !== null
         height: 64
-        radius: 22
+        radius: Theme.radiusXLarge
         color: Theme.alpha(Theme.warning, 0.14)
         border.width: 1
         border.color: Theme.alpha(Theme.warning, 0.35)
@@ -129,7 +129,8 @@ Column {
                     color: Theme.warning
                     font.pixelSize: 12
                     font.bold: true
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontText
+                    font.features: Theme.tabular
                 }
             }
 
@@ -139,7 +140,7 @@ Column {
                 color: Theme.textPrimary
                 font.pixelSize: 13
                 font.bold: true
-                font.family: Theme.fontMono
+                font.family: Theme.fontText
             }
 
             PillButton { text: "Revert"; onClicked: Display.revertDisplayChanges() }

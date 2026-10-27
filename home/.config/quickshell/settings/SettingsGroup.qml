@@ -40,22 +40,12 @@ Column {
             visible: group.title.length > 0
             spacing: 8
 
-            Rectangle {
-                anchors.verticalCenter: parent.verticalCenter
-                width: 6
-                height: 6
-                radius: 3
-                color: group.tint
-            }
-
             Text {
                 text: group.title
                 color: Theme.textSecondary
                 font.pixelSize: 11
-                font.bold: true
-                font.letterSpacing: 1.4
-                font.capitalization: Font.AllUppercase
-                font.family: Theme.fontMono
+                font.weight: Font.DemiBold
+                font.family: Theme.fontText
             }
         }
 
@@ -65,7 +55,7 @@ Column {
             text: group.subtitle
             color: Theme.textMuted
             font.pixelSize: 11
-            font.family: Theme.fontMono
+            font.family: Theme.fontText
             wrapMode: Text.WordWrap
         }
     }

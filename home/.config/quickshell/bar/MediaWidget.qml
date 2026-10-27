@@ -235,7 +235,7 @@ PanelWindow {
             source: mediaGlass
             anchors.fill: mediaGlass
             shadowEnabled: true
-            shadowColor: "#000000"
+            shadowColor: Theme.shadow
             shadowOpacity: 0.5
             shadowBlur: 0.7
             shadowVerticalOffset: 4
@@ -338,8 +338,8 @@ PanelWindow {
                 anchors.verticalCenter: parent.verticalCenter
                 width: 22
                 height: 22
-                radius: 11
-                color: Qt.rgba(0, 0, 0, 0.5)
+                radius: height / 2
+                color: Theme.alpha(Theme.shadow, 0.5)
                 opacity: bar.isPlaying || !compactArt.hasArt ? 0 : 1
                 visible: opacity > 0
 
@@ -348,7 +348,7 @@ PanelWindow {
                 IconGlyph {
                     anchors.centerIn: parent
                     text: "\u{F03E4}"
-                    color: "#ffffff"
+                    color: Theme.knob
                     size: Theme.iconTiny
                 }
             }
@@ -386,7 +386,7 @@ PanelWindow {
                         color: Theme.textPrimary
                         font.pixelSize: 12
                         font.bold: true
-                        font.family: Theme.fontMono
+                        font.family: Theme.fontText
 
                         // An animation on a property leaves that property
                         // wherever it stopped, and this one stops whenever a
@@ -452,7 +452,7 @@ PanelWindow {
                     text: bar.trackArtist
                     color: Theme.textSecondary
                     font.pixelSize: 10
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontText
                     elide: Text.ElideRight
                     width: Math.min(implicitWidth, 180)
                 }
@@ -515,7 +515,7 @@ PanelWindow {
                 Rectangle {
                     id: heroMask
                     anchors.fill: parent
-                    radius: 26
+                    radius: Theme.radiusXLarge
                     visible: false
                     gradient: Gradient {
                         // Gone by 0.85 -- 195px down, just above the title.
@@ -646,7 +646,7 @@ PanelWindow {
                         color: Theme.textPrimary
                         font.pixelSize: 17
                         font.bold: true
-                        font.family: Theme.fontMono
+                        font.family: Theme.fontText
                         wrapMode: Text.WordWrap
                         maximumLineCount: 2
                         elide: Text.ElideRight
@@ -657,7 +657,7 @@ PanelWindow {
                         text: bar.trackArtist
                         color: Theme.textSecondary
                         font.pixelSize: 12
-                        font.family: Theme.fontMono
+                        font.family: Theme.fontText
                         elide: Text.ElideRight
                         Layout.fillWidth: true
                     }
@@ -667,7 +667,7 @@ PanelWindow {
                         text: mediaWidgetItem.player ? (mediaWidgetItem.player.trackAlbum || "") : ""
                         color: Theme.textMuted
                         font.pixelSize: 11
-                        font.family: Theme.fontMono
+                        font.family: Theme.fontText
                         elide: Text.ElideRight
                         Layout.fillWidth: true
                     }
@@ -729,7 +729,8 @@ PanelWindow {
                             text: mediaWidgetItem.formatTime(mediaWidgetItem.currentPosition)
                             color: Theme.textMuted
                             font.pixelSize: 11
-                            font.family: Theme.fontMono
+                            font.family: Theme.fontText
+                            font.features: Theme.tabular
                             Layout.fillWidth: true
                         }
 
@@ -737,7 +738,8 @@ PanelWindow {
                             text: mediaWidgetItem.formatTime(mediaWidgetItem.trackLength)
                             color: Theme.textMuted
                             font.pixelSize: 11
-                            font.family: Theme.fontMono
+                            font.family: Theme.fontText
+                            font.features: Theme.tabular
                         }
                     }
                 }
@@ -771,7 +773,7 @@ PanelWindow {
                     Rectangle {
                         Layout.preferredWidth: 48
                         Layout.preferredHeight: 48
-                        radius: 24
+                        radius: height / 2
                         color: Theme.accent
                         scale: playState.pressed ? 0.94 : 1.0
 
@@ -864,7 +866,8 @@ PanelWindow {
                             + (mediaWidgetItem.onAppVolume ? "" : " · system")
                         color: Theme.textMuted
                         font.pixelSize: 10
-                        font.family: Theme.fontMono
+                        font.family: Theme.fontText
+                        font.features: Theme.tabular
                     }
                 }
 
@@ -878,7 +881,7 @@ PanelWindow {
                 Rectangle {
                     width: parent.width
                     height: 34
-                    radius: 12
+                    radius: Theme.radiusMedium
                     color: Theme.surfaceContainer
 
                     RowLayout {
@@ -906,7 +909,7 @@ PanelWindow {
                             text: mediaWidgetItem.player ? (mediaWidgetItem.player.identity || "Player") : ""
                             color: Theme.textSecondary
                             font.pixelSize: 11
-                            font.family: Theme.fontMono
+                            font.family: Theme.fontText
                             elide: Text.ElideRight
                             Layout.fillWidth: true
                         }
@@ -916,7 +919,8 @@ PanelWindow {
                             text: (bar.activePlayerIndex + 1) + "/" + mediaWidgetItem.playerCount
                             color: Theme.textMuted
                             font.pixelSize: 10
-                            font.family: Theme.fontMono
+                            font.family: Theme.fontText
+                            font.features: Theme.tabular
                         }
 
                         IconGlyph {

@@ -82,7 +82,7 @@ Item {
                 Rectangle {
                     Layout.preferredWidth: 32
                     Layout.preferredHeight: 32
-                    radius: 16
+                    radius: height / 2
                     color: backState.hovered ? Theme.surfaceContainerHigh : "transparent"
 
                     IconGlyph {
@@ -101,14 +101,14 @@ Item {
                 Rectangle {
                     Layout.preferredWidth: 34
                     Layout.preferredHeight: 34
-                    radius: 17
-                    color: Theme.accent
+                    radius: height / 2
+                    color: Theme.surfaceContainerHigh
 
                     IconGlyph {
                         anchors.centerIn: parent
                         text: "\u{F385}"
                         size: Theme.iconMedium
-                        color: Theme.accentText
+                        color: Theme.textPrimary
                     }
                 }
 
@@ -121,7 +121,7 @@ Item {
                         color: Theme.textPrimary
                         font.pixelSize: 14
                         font.bold: true
-                        font.family: Theme.fontMono
+                        font.family: Theme.fontText
                     }
 
                     Text {
@@ -130,7 +130,7 @@ Item {
                         visible: text.length > 0
                         color: Theme.textMuted
                         font.pixelSize: 10
-                        font.family: Theme.fontMono
+                        font.family: Theme.fontText
                         elide: Text.ElideRight
                     }
                 }
@@ -151,12 +151,10 @@ Item {
                         Layout.topMargin: navGroup.index > 0 ? 14 : 0
                         Layout.bottomMargin: 3
                         text: navGroup.modelData.group
-                        color: Theme.textMuted
-                        font.pixelSize: 9
-                        font.bold: true
-                        font.letterSpacing: 1.4
-                        font.capitalization: Font.AllUppercase
-                        font.family: Theme.fontMono
+                        color: Theme.textSecondary
+                        font.pixelSize: 11
+                        font.weight: Font.DemiBold
+                        font.family: Theme.fontText
                     }
 
                     Repeater {
@@ -169,7 +167,7 @@ Item {
 
                             Layout.fillWidth: true
                             Layout.preferredHeight: 44
-                            radius: 14
+                            radius: Theme.radiusMedium
                             color: navItem.chosen ? Theme.alpha(Theme.accent, 0.14)
                                  : navState.hovered ? Theme.surfaceContainer : "transparent"
 
@@ -181,9 +179,11 @@ Item {
                                 anchors.rightMargin: 10
                                 spacing: 11
 
+                                // Only the page you are on takes the accent;
+                                // the rest of the list stays neutral.
                                 TintBadge {
                                     icon: navItem.modelData.icon
-                                    tint: Theme.accent
+                                    tint: navItem.chosen ? Theme.accent : Theme.textSecondary
                                     box: 30
                                 }
 
@@ -193,16 +193,8 @@ Item {
                                     color: navItem.chosen ? Theme.textPrimary : Theme.textSecondary
                                     font.pixelSize: 12
                                     font.bold: navItem.chosen
-                                    font.family: Theme.fontMono
+                                    font.family: Theme.fontText
                                     elide: Text.ElideRight
-                                }
-
-                                Rectangle {
-                                    visible: navItem.chosen
-                                    Layout.preferredWidth: 6
-                                    Layout.preferredHeight: 6
-                                    radius: 3
-                                    color: Theme.accent
                                 }
                             }
 
@@ -228,7 +220,7 @@ Item {
             Layout.topMargin: 10
             Layout.bottomMargin: 10
             Layout.rightMargin: 10
-            radius: 24
+            radius: Theme.radiusXLarge
             color: Theme.alpha(Theme.foreground, 0.035)
 
             // The page's title stays put; only what is under it scrolls.
@@ -244,7 +236,7 @@ Item {
 
                 TintBadge {
                     icon: view.current.icon
-                    tint: Theme.accent
+                    tint: Theme.textPrimary
                     box: 46
                 }
 
@@ -254,7 +246,7 @@ Item {
                     color: Theme.textPrimary
                     font.pixelSize: 22
                     font.bold: true
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontDisplay
                 }
             }
 
@@ -314,7 +306,7 @@ Item {
                 anchors.margins: 18
                 width: 34
                 height: 34
-                radius: 17
+                radius: height / 2
                 color: closeState.hovered ? Theme.surfaceContainerHigh : Theme.surfaceContainer
 
                 IconGlyph {
@@ -341,7 +333,7 @@ Item {
                 anchors.bottomMargin: toast.shown ? 18 : -height - 4
                 width: Math.min(parent.width - 40, toastRow.implicitWidth + 28)
                 height: 40
-                radius: 20
+                radius: height / 2
                 color: Theme.alpha(Theme.background, 0.94)
                 border.width: 1
                 border.color: Theme.alpha(toast.good ? Theme.success : Theme.error, 0.5)
@@ -387,7 +379,7 @@ Item {
                         }
                         color: Theme.textPrimary
                         font.pixelSize: 11
-                        font.family: Theme.fontMono
+                        font.family: Theme.fontText
                     }
                 }
             }

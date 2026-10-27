@@ -13,9 +13,9 @@ import qs.services
 // "quickshell:launcher" (Super+Space). Replaces `rofi -show drun`.
 //
 // Shaped after macOS Spotlight by request, which is why the names are in SF
-// Pro rather than the mono face the bar uses, and why it does not dim the
-// desktop behind it. The rest is the shell's: the pill glass and its shadow,
-// the panels' small uppercase section labels, the mono hints.
+// Pro, and why it does not dim the desktop behind it. The rest is the
+// shell's: the overlays' solid card and its shadow, the panels' section
+// labels, the keycap hints.
 //
 // It finds more than applications, each kind under its own label:
 //   Frequent      on an empty field, what you open most (LauncherHistory)
@@ -115,12 +115,10 @@ PanelWindow {
     // A section's name over its rows: the panels' label (StatusWidget's
     // PanelLabel), so the launcher reads as part of the same shell.
     component SectionLabel: Text {
-        color: Theme.textMuted
-        font.pixelSize: 10
-        font.bold: true
-        font.letterSpacing: 1.2
-        font.capitalization: Font.AllUppercase
-        font.family: Theme.fontMono
+        color: Theme.textSecondary
+        font.pixelSize: 11
+        font.weight: Font.DemiBold
+        font.family: Theme.fontText
     }
 
     // A key and what it does, for the footer.
@@ -154,7 +152,7 @@ PanelWindow {
             text: hint.label
             color: Theme.textMuted
             font.pixelSize: 10
-            font.family: Theme.fontMono
+            font.family: Theme.fontText
         }
     }
 
@@ -163,8 +161,8 @@ PanelWindow {
     // Spotlight is a proportional-set panel and reads wrong in a monospace --
     // the names are the content here, not tabular data. Display is the
     // optical size cut for the large field, Text for the rows.
-    readonly property string fontDisplay: "SF Pro Display"
-    readonly property string fontText: "SF Pro Text"
+    readonly property string fontDisplay: Theme.fontDisplay
+    readonly property string fontText: Theme.fontText
 
     // ── Geometry ─────────────────────────────────────────────────────────
     readonly property int cardWidth: 680
@@ -737,12 +735,14 @@ PanelWindow {
             NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic }
         }
 
-        // The pills' glass and shadow.
+        // The overlays' solid card and its shadow. Solid rather than the
+        // pills' glass: the glass belongs to the bar, and an opaque card reads
+        // the same over any window it opens on.
         Rectangle {
             id: card
             anchors.fill: parent
-            radius: 26
-            color: Theme.glass
+            radius: Theme.radiusXLarge
+            color: Theme.surface
             // No outline: none of the shell's glass has one, and this one's
             // bottom edge read as a light rim over the shadow.
             visible: false
@@ -753,7 +753,7 @@ PanelWindow {
             source: card
             anchors.fill: card
             shadowEnabled: true
-            shadowColor: "#000000"
+            shadowColor: Theme.shadow
             shadowOpacity: 0.55
             shadowBlur: 1.0
             shadowVerticalOffset: 10
@@ -857,7 +857,7 @@ PanelWindow {
 
                     Rectangle {
                         anchors.fill: parent
-                        radius: 13
+                        radius: Theme.radiusMedium
                         color: Theme.surfaceContainer
 
                         IconGlyph {
@@ -932,7 +932,7 @@ PanelWindow {
                     x: 8
                     width: parent.width - 16
                     height: overlay.rowHeight
-                    radius: 12
+                    radius: Theme.radiusMedium
                     color: row.current ? Theme.surfaceContainerHigh : "transparent"
 
                     Behavior on color {
@@ -964,7 +964,7 @@ PanelWindow {
                             Rectangle {
                                 anchors.fill: parent
                                 visible: row.glyphIcon
-                                radius: 9
+                                radius: Theme.radiusMedium
                                 color: row.current ? Theme.alpha(Theme.accent, 0.22) : Theme.surfaceContainer
 
                                 Behavior on color {
@@ -1012,12 +1012,12 @@ PanelWindow {
                             text: overlay.verb(row.modelData) + "  ↵"
                             color: Theme.textMuted
                             font.pixelSize: 10
-                            font.family: Theme.fontMono
+                            font.family: Theme.fontText
                         }
                     }
 
                     StateLayer {
-                        radius: 12
+                        radius: Theme.radiusMedium
                         // No hover tint of its own: the pointer moves the
                         // selection instead (the HoverHandler on the panel).
                         tint: "transparent"
@@ -1068,7 +1068,7 @@ PanelWindow {
                     text: overlay.results.length + (overlay.results.length === 1 ? " result" : " results")
                     color: Theme.textMuted
                     font.pixelSize: 10
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontText
                 }
 
                 KeyHint { key: "esc"; label: "Close" }

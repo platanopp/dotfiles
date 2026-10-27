@@ -249,7 +249,7 @@ PanelWindow {
             source: panelGlass
             anchors.fill: panelGlass
             shadowEnabled: true
-            shadowColor: "#000000"
+            shadowColor: Theme.shadow
             shadowOpacity: 0.5
             shadowBlur: 0.7
             shadowVerticalOffset: 4
@@ -276,7 +276,8 @@ PanelWindow {
                 color: Theme.textPrimary
                 font.pixelSize: 14
                 font.bold: true
-                font.family: Theme.fontMono
+                font.family: Theme.fontText
+                font.features: Theme.tabular
             }
 
             // The date, folded to nothing at rest. Its width is what opens,
@@ -297,14 +298,15 @@ PanelWindow {
                         text: "\u00b7"
                         color: Theme.textMuted
                         font.pixelSize: 14
-                        font.family: Theme.fontMono
+                        font.family: Theme.fontText
                     }
 
                     Text {
                         text: Clock.currentDate
                         color: Theme.textSecondary
                         font.pixelSize: 13
-                        font.family: Theme.fontMono
+                        font.family: Theme.fontText
+                        font.features: Theme.tabular
                     }
                 }
             }
@@ -344,7 +346,8 @@ PanelWindow {
                     color: Theme.textPrimary
                     font.pixelSize: 30
                     font.bold: true
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontDisplay
+                    font.features: Theme.tabular
                 }
 
                 Text {
@@ -354,7 +357,8 @@ PanelWindow {
                     text: Clock.currentDate
                     color: Theme.textMuted
                     font.pixelSize: 12
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontText
+                    font.features: Theme.tabular
                     elide: Text.ElideRight
                 }
             }
@@ -387,14 +391,14 @@ PanelWindow {
                             font.pixelSize: 13
                             font.bold: true
                             font.capitalization: Font.Capitalize
-                            font.family: Theme.fontMono
+                            font.family: Theme.fontText
                             Layout.fillWidth: true
                         }
 
                         IconButton {
                             icon: "󰋚"
                             visible: !clockItem.viewingCurrentMonth
-                            iconColor: Theme.accent
+                            iconColor: Theme.textPrimary
                             onTapped: clockItem.resetToToday()
                         }
 
@@ -429,7 +433,7 @@ PanelWindow {
                                     color: Theme.textMuted
                                     font.pixelSize: 10
                                     font.bold: true
-                                    font.family: Theme.fontMono
+                                    font.family: Theme.fontText
                                 }
                             }
                         }
@@ -508,7 +512,7 @@ PanelWindow {
                                     anchors.centerIn: parent
                                     width: 30
                                     height: 30
-                                    radius: 15
+                                    radius: height / 2
                                     visible: dayCell.isToday
                                     color: Theme.accent
                                 }
@@ -521,7 +525,7 @@ PanelWindow {
                                          : dayCell.weekend ? Theme.textSecondary : Theme.textPrimary
                                     font.pixelSize: 12
                                     font.bold: dayCell.isToday
-                                    font.family: Theme.fontMono
+                                    font.family: Theme.fontText
                                 }
                             }
                         }
@@ -543,14 +547,14 @@ PanelWindow {
                             color: Theme.textPrimary
                             font.pixelSize: 13
                             font.bold: true
-                            font.family: Theme.fontMono
+                            font.family: Theme.fontText
                         }
 
                         Text {
                             text: Weather.city
                             color: Theme.textMuted
                             font.pixelSize: 10
-                            font.family: Theme.fontMono
+                            font.family: Theme.fontText
                             elide: Text.ElideRight
                             Layout.fillWidth: true
                         }
@@ -566,10 +570,10 @@ PanelWindow {
                         visible: !Weather.ready
                         Layout.fillWidth: true
                         text: Weather.loading ? "Fetching the forecast..."
-                            : (Weather.error.length > 0 ? "No forecast: " + Weather.error : "No data")
+                            : (Weather.error.length > 0 ? "No forecast: " + Weather.error : "No forecast yet")
                         color: Theme.textMuted
                         font.pixelSize: 11
-                        font.family: Theme.fontMono
+                        font.family: Theme.fontText
                         wrapMode: Text.WordWrap
                     }
 
@@ -577,7 +581,7 @@ PanelWindow {
                         visible: Weather.ready
                         Layout.fillWidth: true
                         Layout.preferredHeight: 70
-                        radius: 18
+                        radius: Theme.radiusLarge
                         color: Theme.surfaceContainer
 
                         RowLayout {
@@ -588,7 +592,7 @@ PanelWindow {
 
                             Text {
                                 text: Weather.icon(Weather.code, Weather.isDay)
-                                color: Theme.accent
+                                color: Theme.textPrimary
                                 font.pixelSize: 30
                                 font.family: Theme.fontMono
                             }
@@ -602,14 +606,15 @@ PanelWindow {
                                     color: Theme.textPrimary
                                     font.pixelSize: 22
                                     font.bold: true
-                                    font.family: Theme.fontMono
+                                    font.family: Theme.fontDisplay
+                                    font.features: Theme.tabular
                                 }
 
                                 Text {
                                     text: Weather.describe(Weather.code)
                                     color: Theme.textSecondary
                                     font.pixelSize: 10
-                                    font.family: Theme.fontMono
+                                    font.family: Theme.fontText
                                     elide: Text.ElideRight
                                     Layout.fillWidth: true
                                 }
@@ -631,7 +636,8 @@ PanelWindow {
                                         text: Weather.humidity + "%"
                                         color: Theme.textMuted
                                         font.pixelSize: 11
-                                        font.family: Theme.fontMono
+                                        font.family: Theme.fontText
+                                        font.features: Theme.tabular
                                     }
                                 }
 
@@ -648,7 +654,7 @@ PanelWindow {
                                         text: Math.round(Weather.wind) + " km/h"
                                         color: Theme.textMuted
                                         font.pixelSize: 11
-                                        font.family: Theme.fontMono
+                                        font.family: Theme.fontText
                                     }
                                 }
                             }
@@ -670,7 +676,7 @@ PanelWindow {
 
                             width: parent.width
                             height: 26
-                            radius: 8
+                            radius: Theme.radiusSmall
                             color: index === 0 ? Theme.alpha(Theme.accent, 0.14) : "transparent"
 
                             RowLayout {
@@ -685,7 +691,7 @@ PanelWindow {
                                     color: dayRow.index === 0 ? Theme.accent : Theme.textSecondary
                                     font.pixelSize: 10
                                     font.bold: dayRow.index === 0
-                                    font.family: Theme.fontMono
+                                    font.family: Theme.fontText
                                 }
 
                                 Text {
@@ -702,7 +708,8 @@ PanelWindow {
                                     color: Theme.textPrimary
                                     font.pixelSize: 11
                                     font.bold: true
-                                    font.family: Theme.fontMono
+                                    font.family: Theme.fontText
+                                    font.features: Theme.tabular
                                 }
 
                                 Text {
@@ -711,7 +718,8 @@ PanelWindow {
                                     text: Math.round(dayRow.modelData.min) + "°"
                                     color: Theme.textMuted
                                     font.pixelSize: 11
-                                    font.family: Theme.fontMono
+                                    font.family: Theme.fontText
+                                    font.features: Theme.tabular
                                 }
                             }
                         }

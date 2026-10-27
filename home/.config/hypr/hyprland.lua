@@ -528,10 +528,14 @@ hl.layer_rule({
     no_anim = true,
 })
 
+-- The full-screen overlays draw an opaque card over a scrim (Theme.surface,
+-- Theme.scrim), so they ask for no blur: the compositor's blur is kept for
+-- the bar's glass, and a blurred full-screen layer was the costliest frame
+-- the shell could ask for.
 hl.layer_rule({
     name  = "quickshell-keybinds-blur",
     match = { namespace = "^quickshell:keybinds$" },
-    blur  = true,
+    blur  = false,
     -- The cheatsheet's own dim is what gets blurred through, so the
     -- threshold sits below it: at the bar's 0.3 the blur would snap in
     -- partway through the fade instead of coming up with it. Closed, the
@@ -550,7 +554,7 @@ hl.layer_rule({
 hl.layer_rule({
     name  = "quickshell-wallpapers-blur",
     match = { namespace = "^quickshell:wallpapers$" },
-    blur  = true,
+    blur  = false,
     -- Same reasoning as the cheatsheet above: the picker's own dim is what
     -- gets blurred through, so the threshold sits under it rather than at
     -- the bar's 0.3.
@@ -571,7 +575,7 @@ hl.layer_rule({
 hl.layer_rule({
     name         = "quickshell-overview",
     match        = { namespace = "^quickshell:overview$" },
-    blur         = true,
+    blur  = false,
     ignore_alpha = 0.02,
     xray         = false,
     no_anim      = true,
@@ -586,7 +590,7 @@ hl.layer_rule({
 hl.layer_rule({
     name  = "quickshell-launcher-blur",
     match = { namespace = "^quickshell:launcher$" },
-    blur  = true,
+    blur  = false,
     -- The bar's threshold, not the cheatsheet's, because the launcher does
     -- not dim the screen: everything outside the panel is fully transparent
     -- and must stay unblurred, so only the panel itself clears this. At the

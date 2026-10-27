@@ -207,7 +207,8 @@ Item {
                     color: Theme.accentText
                     font.pixelSize: 11
                     font.bold: true
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontText
+                    font.features: Theme.tabular
 
                     Behavior on opacity { NumberAnimation { duration: Theme.durMedium } }
                 }

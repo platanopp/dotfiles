@@ -66,7 +66,7 @@ Column {
         visible: page.editing.length === 0
         width: parent.width
         height: 132
-        radius: 22
+        radius: Theme.radiusXLarge
         color: Theme.surfaceContainer
 
         RowLayout {
@@ -110,7 +110,7 @@ Column {
                         color: Theme.textPrimary
                         font.pixelSize: 36
                         font.bold: true
-                        font.family: Theme.fontMono
+                        font.family: Theme.fontDisplay
                     }
                 }
             }
@@ -124,7 +124,7 @@ Column {
                     color: Theme.textPrimary
                     font.pixelSize: 20
                     font.bold: true
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontDisplay
                 }
 
                 Text {
@@ -134,7 +134,7 @@ Column {
                         : "Pick an image below to frame it"
                     color: Profile.avatarError.length > 0 ? Theme.error : Theme.textMuted
                     font.pixelSize: 11
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontText
                     elide: Text.ElideRight
                 }
 
@@ -168,7 +168,7 @@ Column {
         visible: page.editing.length > 0
         width: parent.width
         height: 300
-        radius: 22
+        radius: Theme.radiusXLarge
         color: Theme.surfaceContainer
 
         // The picture's size as loaded; the framing is in fractions of it,
@@ -201,7 +201,7 @@ Column {
                 id: viewport
                 Layout.preferredWidth: 260
                 Layout.preferredHeight: 260
-                radius: 18
+                radius: Theme.radiusLarge
                 color: Theme.background
 
                 Image {
@@ -227,7 +227,7 @@ Column {
                     onPaint: {
                         var c = getContext("2d")
                         c.reset()
-                        c.fillStyle = Qt.rgba(0, 0, 0, 0.55)
+                        c.fillStyle = Theme.alpha(Theme.shadow, 0.55)
                         c.fillRect(0, 0, width, height)
                         c.globalCompositeOperation = "destination-out"
                         c.beginPath()
@@ -242,7 +242,7 @@ Column {
                     radius: width / 2
                     color: "transparent"
                     border.width: 2
-                    border.color: Theme.alpha("#ffffff", 0.8)
+                    border.color: Theme.alpha(Theme.knob, 0.8)
                 }
 
                 Text {
@@ -251,7 +251,7 @@ Column {
                     text: shown.status === Image.Error ? "Cannot open this image" : "Loading…"
                     color: Theme.textMuted
                     font.pixelSize: 11
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontText
                 }
 
                 MouseArea {
@@ -293,7 +293,7 @@ Column {
                     color: Theme.textPrimary
                     font.pixelSize: 16
                     font.bold: true
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontText
                 }
 
                 Text {
@@ -301,7 +301,7 @@ Column {
                     text: "Drag to move · scroll to zoom"
                     color: Theme.textMuted
                     font.pixelSize: 11
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontText
                     wrapMode: Text.WordWrap
                 }
 
@@ -421,7 +421,7 @@ Column {
                     id: thumb
                     width: grid.cell
                     height: grid.cell
-                    radius: 16
+                    radius: Theme.radiusLarge
                     color: Theme.surfaceContainer
                     scale: tap.pressed ? 0.96 : hover.hovered ? 1.03 : 1
 
@@ -486,7 +486,7 @@ Column {
                     text: entry.fileName
                     color: entry.fileIsDir ? Theme.textPrimary : Theme.textMuted
                     font.pixelSize: 10
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontText
                     elide: Text.ElideMiddle
                     horizontalAlignment: Text.AlignHCenter
                 }
@@ -500,7 +500,7 @@ Column {
         text: "No folders or images here"
         color: Theme.textMuted
         font.pixelSize: 11
-        font.family: Theme.fontMono
+        font.family: Theme.fontText
         horizontalAlignment: Text.AlignHCenter
     }
 

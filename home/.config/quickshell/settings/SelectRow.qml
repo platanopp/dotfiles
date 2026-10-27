@@ -27,7 +27,7 @@ Rectangle {
     readonly property string currentLabel: {
         for (var i = 0; i < row.options.length; i++)
             if (row.options[i].value === row.value) return row.options[i].label
-        return "—"
+        return "Not set"
     }
 
     readonly property real outer: 22
@@ -75,14 +75,14 @@ Rectangle {
                 color: Theme.textPrimary
                 font.pixelSize: 13
                 font.bold: true
-                font.family: Theme.fontMono
+                font.family: Theme.fontText
                 elide: Text.ElideRight
             }
 
             Rectangle {
                 Layout.preferredHeight: 32
                 Layout.preferredWidth: pillRow.implicitWidth + 26
-                radius: 16
+                radius: height / 2
                 color: Theme.alpha(Theme.background, 0.45)
 
                 Row {
@@ -96,7 +96,7 @@ Rectangle {
                         color: Theme.textPrimary
                         font.pixelSize: 11
                         font.bold: true
-                        font.family: Theme.fontMono
+                        font.family: Theme.fontText
                     }
 
                     IconGlyph {
@@ -142,7 +142,7 @@ Rectangle {
 
                 width: (choices.width - choices.spacing * (choices.columns - 1)) / choices.columns
                 height: 34
-                radius: 17
+                radius: height / 2
                 color: choice.chosen ? Theme.accent
                      : choiceState.hovered ? Theme.surfaceContainerHigh
                      : Theme.alpha(Theme.background, 0.35)
@@ -166,7 +166,7 @@ Rectangle {
                         text: choice.modelData.label
                         font.pixelSize: 11
                         font.bold: choice.chosen
-                        font.family: Theme.fontMono
+                        font.family: Theme.fontText
                         color: choice.chosen ? Theme.accentText : Theme.textSecondary
                     }
                 }

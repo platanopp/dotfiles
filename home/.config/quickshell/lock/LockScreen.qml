@@ -286,7 +286,7 @@ Scope {
                     // Strongest while the card is opaque and stepping back,
                     // and gone well before the card is see-through enough to
                     // show it underneath.
-                    color: Qt.rgba(0, 0, 0, 0.45 * stage.reveal * Math.pow(card.opacity, 3))
+                    color: Theme.alpha(Theme.shadow, 0.45 * stage.reveal * Math.pow(card.opacity, 3))
                 }
 
                 Item {
@@ -387,7 +387,8 @@ Scope {
                         Text {
                             text: LockEngine.hourText + ":" + LockEngine.minuteText
                             color: Theme.textPrimary
-                            font.family: Theme.fontMono
+                            font.family: Theme.fontDisplay
+                            font.features: Theme.tabular
                             font.pixelSize: 104
                             font.weight: Font.Light
                         }
@@ -396,7 +397,7 @@ Scope {
                             visible: LockEngine.meridiem.length > 0
                             text: LockEngine.meridiem
                             color: Theme.textMuted
-                            font.family: Theme.fontMono
+                            font.family: Theme.fontText
                             font.pixelSize: 18
                             Layout.alignment: Qt.AlignBottom
                             Layout.bottomMargin: 20
@@ -410,7 +411,7 @@ Scope {
                         transform: Translate { y: stage.rise(0.05) }
                         text: LockEngine.dateText
                         color: Theme.textSecondary
-                        font.family: Theme.fontMono
+                        font.family: Theme.fontText
                         font.pixelSize: 14
                     }
 
@@ -423,7 +424,7 @@ Scope {
                         // that do not have it, so it stays either way.
                         text: LockEngine.greeting + (pane.primary ? "" : ", " + LockEngine.displayName)
                         color: Theme.textMuted
-                        font.family: Theme.fontMono
+                        font.family: Theme.fontText
                         font.pixelSize: 12
                     }
 
@@ -444,7 +445,7 @@ Scope {
                         Layout.topMargin: 30
                         Layout.preferredWidth: 400
                         Layout.preferredHeight: 94
-                        radius: 24
+                        radius: Theme.radiusXLarge
                         color: Theme.glass
                         opacity: stage.dim * stage.slot(0.15)
                         transform: Translate { y: stage.rise(0.15) }
@@ -455,7 +456,7 @@ Scope {
                             radius: parent.radius
                             blur: 18
                             offset.y: 4
-                            color: Qt.rgba(0, 0, 0, 0.35)
+                            color: Theme.alpha(Theme.shadow, 0.35)
                         }
 
                         Item {
@@ -540,7 +541,7 @@ Scope {
                                     Layout.fillWidth: true
                                     text: nowPlaying.p ? nowPlaying.p.trackTitle : ""
                                     color: Theme.textPrimary
-                                    font.family: Theme.fontMono
+                                    font.family: Theme.fontText
                                     font.pixelSize: 14
                                     font.bold: true
                                     elide: Text.ElideRight
@@ -550,7 +551,7 @@ Scope {
                                     Layout.fillWidth: true
                                     text: nowPlaying.p ? (nowPlaying.p.trackArtist || nowPlaying.p.identity || "") : ""
                                     color: Theme.textSecondary
-                                    font.family: Theme.fontMono
+                                    font.family: Theme.fontText
                                     font.pixelSize: 11
                                     elide: Text.ElideRight
                                 }
@@ -568,7 +569,7 @@ Scope {
                             Rectangle {
                                 Layout.preferredWidth: 40
                                 Layout.preferredHeight: 40
-                                radius: 20
+                                radius: height / 2
                                 color: Theme.accent
                                 scale: playTap.pressed ? 0.94 : 1
 
@@ -663,7 +664,7 @@ Scope {
                         Layout.topMargin: nowPlaying.visible ? 22 : 36
                         Layout.preferredWidth: 340
                         Layout.preferredHeight: 52
-                        radius: 26
+                        radius: height / 2
                         color: Theme.glass
                         opacity: stage.slot(0.21)
                         border.width: 1
@@ -678,7 +679,7 @@ Scope {
                             radius: parent.radius
                             blur: 18
                             offset.y: 4
-                            color: Qt.rgba(0, 0, 0, 0.35)
+                            color: Theme.alpha(Theme.shadow, 0.35)
                         }
 
                         Behavior on border.color { ColorAnimation { duration: Theme.durMedium } }
@@ -757,7 +758,7 @@ Scope {
                                 echoMode: LockEngine.secret ? TextInput.Password : TextInput.Normal
                                 passwordCharacter: "•"
                                 color: Theme.textPrimary
-                                font.family: Theme.fontMono
+                                font.family: Theme.fontText
                                 font.pixelSize: 15
                                 verticalAlignment: TextInput.AlignVCenter
                                 focus: true
@@ -798,7 +799,7 @@ Scope {
                                 readonly property bool ready: field.text.length > 0 && LockEngine.acceptsInput
                                 Layout.preferredWidth: 38
                                 Layout.preferredHeight: 38
-                                radius: 19
+                                radius: height / 2
                                 color: LockEngine.granted ? Theme.success
                                      : submitBtn.ready ? Theme.accent : "transparent"
 
@@ -885,7 +886,7 @@ Scope {
                             color: LockEngine.statusKind === "error" ? Theme.error
                                  : LockEngine.statusKind === "good" ? Theme.success
                                  : Theme.textSecondary
-                            font.family: Theme.fontMono
+                            font.family: Theme.fontText
                             font.pixelSize: 12
 
                             Behavior on opacity { NumberAnimation { duration: Theme.durMedium } }
@@ -907,7 +908,7 @@ Scope {
                             visible: LockEngine.capsLock
                             Layout.preferredWidth: capsLabel.implicitWidth + 22
                             Layout.preferredHeight: 24
-                            radius: 12
+                            radius: height / 2
                             color: Theme.alpha(Theme.warning, 0.16)
                             border.width: 1
                             border.color: Theme.alpha(Theme.warning, 0.4)
@@ -915,9 +916,9 @@ Scope {
                             Text {
                                 id: capsLabel
                                 anchors.centerIn: parent
-                                text: "CAPS"
+                                text: "Caps Lock"
                                 color: Theme.warning
-                                font.family: Theme.fontMono
+                                font.family: Theme.fontText
                                 font.pixelSize: 10
                                 font.bold: true
                             }
@@ -927,7 +928,7 @@ Scope {
                             visible: LockEngine.layoutShort.length > 0
                             Layout.preferredWidth: layoutRow.implicitWidth + 20
                             Layout.preferredHeight: 24
-                            radius: 12
+                            radius: height / 2
                             color: LockEngine.card
                             border.width: 1
                             border.color: LockEngine.hairline
@@ -946,7 +947,7 @@ Scope {
                                 Text {
                                     text: LockEngine.layoutShort
                                     color: Theme.textSecondary
-                                    font.family: Theme.fontMono
+                                    font.family: Theme.fontText
                                     font.pixelSize: 10
                                 }
                             }
@@ -968,7 +969,7 @@ Scope {
                     transform: Translate { y: stage.rise(0.33, -1) }
                     width: whoRow.implicitWidth + 12 + 18
                     height: 44
-                    radius: 22
+                    radius: height / 2
                     color: Theme.glass
 
                     RectangularShadow {
@@ -977,7 +978,7 @@ Scope {
                         radius: parent.radius
                         blur: 16
                         offset.y: 4
-                        color: Qt.rgba(0, 0, 0, 0.3)
+                        color: Theme.alpha(Theme.shadow, 0.3)
                     }
 
                     RowLayout {
@@ -1012,7 +1013,7 @@ Scope {
                                     anchors.centerIn: parent
                                     text: LockEngine.initials
                                     color: Theme.textPrimary
-                                    font.family: Theme.fontMono
+                                    font.family: Theme.fontText
                                     font.pixelSize: 13
                                     font.bold: true
                                 }
@@ -1040,7 +1041,7 @@ Scope {
                         Text {
                             text: LockEngine.displayName
                             color: Theme.textPrimary
-                            font.family: Theme.fontMono
+                            font.family: Theme.fontText
                             font.pixelSize: 12
                             font.bold: true
                         }
@@ -1060,7 +1061,7 @@ Scope {
                     visible: glanceRow.visibleChildren.length > 0
                     width: glanceRow.implicitWidth + 36
                     height: 44
-                    radius: 22
+                    radius: height / 2
                     color: Theme.glass
                     opacity: stage.dim * stage.slot(0.37)
                     transform: Translate { y: stage.rise(0.37, -1) }
@@ -1071,7 +1072,7 @@ Scope {
                         radius: parent.radius
                         blur: 16
                         offset.y: 4
-                        color: Qt.rgba(0, 0, 0, 0.3)
+                        color: Theme.alpha(Theme.shadow, 0.3)
                     }
 
                     // One pill, like the bar's status pill: the pieces side by
@@ -1120,7 +1121,7 @@ Scope {
                                 Text {
                                     text: chip.modelData.label
                                     color: chip.modelData.alert ? Theme.error : Theme.textSecondary
-                                    font.family: Theme.fontMono
+                                    font.family: Theme.fontText
                                     font.pixelSize: 11
                                     elide: Text.ElideRight
                                     Layout.maximumWidth: 150
@@ -1166,7 +1167,7 @@ Scope {
 
                             Layout.preferredWidth: powerBtn.isArmed ? confirmLabel.implicitWidth + 32 : 44
                             Layout.preferredHeight: 44
-                            radius: 22
+                            radius: height / 2
                             color: powerBtn.isArmed ? Theme.alpha(Theme.error, 0.9) : Theme.glass
 
                             RectangularShadow {
@@ -1175,7 +1176,7 @@ Scope {
                                 radius: parent.radius
                                 blur: 14
                                 offset.y: 3
-                                color: Qt.rgba(0, 0, 0, 0.3)
+                                color: Theme.alpha(Theme.shadow, 0.3)
                             }
 
                             Behavior on Layout.preferredWidth {
@@ -1205,7 +1206,7 @@ Scope {
                                 visible: powerBtn.isArmed
                                 text: powerBtn.modelData.label + "?"
                                 color: Theme.foreground
-                                font.family: Theme.fontMono
+                                font.family: Theme.fontText
                                 font.pixelSize: 12
                                 font.bold: true
                             }

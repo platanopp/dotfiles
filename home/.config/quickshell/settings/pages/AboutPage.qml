@@ -22,7 +22,7 @@ Column {
     Rectangle {
         width: parent.width
         height: 118
-        radius: 22
+        radius: Theme.radiusXLarge
         color: Theme.surfaceContainer
 
         RowLayout {
@@ -33,14 +33,14 @@ Column {
             Rectangle {
                 Layout.preferredWidth: 78
                 Layout.preferredHeight: 78
-                radius: 24
-                color: Theme.accent
+                radius: Theme.radiusXLarge
+                color: Theme.surfaceContainerHigh
 
                 IconGlyph {
                     anchors.centerIn: parent
                     text: "\u{F385}"
                     size: Theme.iconHero + 10
-                    color: Theme.accentText
+                    color: Theme.textPrimary
                 }
             }
 
@@ -53,7 +53,7 @@ Column {
                     color: Theme.textPrimary
                     font.pixelSize: 20
                     font.bold: true
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontDisplay
                 }
 
                 Text {
@@ -61,7 +61,7 @@ Column {
                     text: (page.info.os || "") + (page.info.kernel ? "  ·  " + page.info.kernel : "")
                     color: Theme.textSecondary
                     font.pixelSize: 11
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontText
                     elide: Text.ElideRight
                 }
 
@@ -70,7 +70,8 @@ Column {
                     text: page.info.uptime ? "up " + page.info.uptime : ""
                     color: Theme.textMuted
                     font.pixelSize: 11
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontText
+                    font.features: Theme.tabular
                 }
             }
         }
@@ -97,7 +98,7 @@ Column {
                     text: page.info[hw.modelData.key] || "…"
                     color: Theme.textSecondary
                     font.pixelSize: 11
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontText
                 }
             }
         }
@@ -123,7 +124,7 @@ Column {
                     text: (page.info[sw.modelData.key] || "…").split(" ")[0]
                     color: Theme.textSecondary
                     font.pixelSize: 11
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontText
                 }
             }
         }
@@ -165,7 +166,7 @@ Column {
                 text: page.backup.display || ""
                 color: Theme.textSecondary
                 font.pixelSize: 11
-                font.family: Theme.fontMono
+                font.family: Theme.fontText
             }
         }
 
@@ -276,7 +277,7 @@ Column {
         }
         color: System.backupLast && !System.backupLast.ok ? Theme.error : Theme.textMuted
         font.pixelSize: 11
-        font.family: Theme.fontMono
+        font.family: Theme.fontText
         wrapMode: Text.WordWrap
         horizontalAlignment: Text.AlignHCenter
     }

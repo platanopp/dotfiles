@@ -38,7 +38,7 @@ Column {
     Rectangle {
         width: parent.width
         height: board.height + 64
-        radius: 22
+        radius: Theme.radiusXLarge
         color: Theme.surfaceContainer
 
         Column {
@@ -69,7 +69,7 @@ Column {
                             required property int index
                             width: board.unit * key.modelData[0] + 4 * (key.modelData[0] - 1)
                             height: board.unit
-                            radius: 7
+                            radius: Theme.radiusSmall
                             color: page.keyColour(keyRow.index, key.modelData[1])
 
                             Behavior on color { ColorAnimation { duration: Theme.durLong } }

@@ -65,14 +65,14 @@ Item {
                 color: Theme.textPrimary
                 font.pixelSize: 15
                 font.bold: true
-                font.family: Theme.fontMono
+                font.family: Theme.fontText
             }
 
             Rectangle {
                 visible: Notifications.count > 0
                 implicitWidth: countText.implicitWidth + 14
                 implicitHeight: 20
-                radius: 10
+                radius: height / 2
                 color: Theme.surfaceContainerHigh
 
                 Text {
@@ -82,7 +82,8 @@ Item {
                     color: Theme.textSecondary
                     font.pixelSize: 10
                     font.bold: true
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontText
+                    font.features: Theme.tabular
                 }
             }
 
@@ -132,7 +133,7 @@ Item {
                 text: Notifications.dnd ? "Do not disturb is on" : "All caught up"
                 color: Theme.textMuted
                 font.pixelSize: 12
-                font.family: Theme.fontMono
+                font.family: Theme.fontText
             }
         }
 
@@ -173,7 +174,7 @@ Item {
 
                 width: ListView.view.width
                 implicitHeight: body.implicitHeight + 24
-                radius: 16
+                radius: Theme.radiusLarge
                 color: cardHover.hovered && card.defaultAction ? Theme.surfaceContainerHigh : Theme.surfaceContainer
 
                 Behavior on color { ColorAnimation { duration: Theme.durShort } }
@@ -215,7 +216,7 @@ Item {
                         Layout.alignment: Qt.AlignTop
                         Layout.preferredWidth: 32
                         Layout.preferredHeight: 32
-                        radius: 9
+                        radius: Theme.radiusMedium
                         color: Theme.surfaceContainerHigh
 
                         IconImage {
@@ -248,7 +249,8 @@ Item {
                                 text: (card.n.appName || "Notification") + "  ·  " + centre.ago(card.n.time)
                                 color: Theme.textMuted
                                 font.pixelSize: 10
-                                font.family: Theme.fontMono
+                                font.family: Theme.fontText
+                                font.features: Theme.tabular
                                 elide: Text.ElideRight
                             }
 
@@ -271,7 +273,7 @@ Item {
                             color: Theme.textPrimary
                             font.pixelSize: 13
                             font.bold: true
-                            font.family: Theme.fontMono
+                            font.family: Theme.fontText
                             wrapMode: Text.WordWrap
                             maximumLineCount: 2
                             elide: Text.ElideRight
@@ -283,7 +285,7 @@ Item {
                             text: card.n.body
                             color: Theme.textSecondary
                             font.pixelSize: 12
-                            font.family: Theme.fontMono
+                            font.family: Theme.fontText
                             textFormat: Text.PlainText
                             wrapMode: Text.WordWrap
                             maximumLineCount: 3

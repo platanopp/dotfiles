@@ -228,8 +228,8 @@ PanelWindow {
                     id: glass
                     width: parent.width
                     height: content.implicitHeight + 30
-                    radius: 22
-                    color: Theme.glass
+                    radius: Theme.radiusXLarge
+                    color: Theme.surface
                     visible: false
                     layer.enabled: true
                 }
@@ -238,7 +238,7 @@ PanelWindow {
                     source: glass
                     anchors.fill: glass
                     shadowEnabled: true
-                    shadowColor: "#000000"
+                    shadowColor: Theme.shadow
                     shadowOpacity: 0.5
                     shadowBlur: 0.7
                     shadowVerticalOffset: 4
@@ -273,7 +273,7 @@ PanelWindow {
                             Layout.alignment: Qt.AlignTop
                             Layout.preferredWidth: 36
                             Layout.preferredHeight: 36
-                            radius: 11
+                            radius: Theme.radiusMedium
                             color: Theme.surfaceContainerHigh
 
                             IconImage {
@@ -320,7 +320,7 @@ PanelWindow {
                                     text: (card.n.appName || "Notification") + "  ·  now"
                                     color: Theme.textMuted
                                     font.pixelSize: 10
-                                    font.family: Theme.fontMono
+                                    font.family: Theme.fontText
                                     elide: Text.ElideRight
                                 }
 
@@ -343,7 +343,7 @@ PanelWindow {
                                 color: Theme.textPrimary
                                 font.pixelSize: 13
                                 font.bold: true
-                                font.family: Theme.fontMono
+                                font.family: Theme.fontText
                                 wrapMode: Text.WordWrap
                                 maximumLineCount: 2
                                 elide: Text.ElideRight
@@ -355,7 +355,7 @@ PanelWindow {
                                 text: card.n.body
                                 color: Theme.textSecondary
                                 font.pixelSize: 12
-                                font.family: Theme.fontMono
+                                font.family: Theme.fontText
                                 textFormat: Text.PlainText
                                 wrapMode: Text.WordWrap
                                 maximumLineCount: 3

@@ -94,7 +94,7 @@ Singleton {
             return "Welcome back";
 
         if (root.lockedOut)
-            return "Too many attempts — try again in " + root.humanSecs(root.lockoutLeft);
+            return "Too many attempts. Try again in " + root.humanSecs(root.lockoutLeft);
 
         if (root.phase === "checking")
             return "Checking…";
@@ -107,10 +107,10 @@ Singleton {
                 return root.pamText;
 
             if (root.triesLeft === 1)
-                return "Incorrect password — one try left";
+                return "Incorrect password, one try left";
 
             if (root.triesLeft > 1)
-                return "Incorrect password — " + root.triesLeft + " tries left";
+                return "Incorrect password, " + root.triesLeft + " tries left";
 
             return "Incorrect password";
         }
@@ -473,7 +473,7 @@ Singleton {
             if (result === PamResult.Success)
                 root.grant();
             else if (result === PamResult.MaxTries)
-                root.fail("Too many attempts — the account is locked");
+                root.fail("Too many attempts. The account is locked");
             else if (result === PamResult.Error)
                 root.error("PAM could not complete the check");
             else

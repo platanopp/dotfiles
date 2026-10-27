@@ -56,8 +56,8 @@ PanelWindow {
             anchors.verticalCenter: parent.verticalCenter
             width: Math.max(20, keyText.implicitWidth + 12)
             height: 20
-            radius: 6
-            color: Theme.glass
+            radius: Theme.radiusSmall
+            color: Theme.surface
             border.width: 1
             border.color: Theme.outline
 
@@ -76,7 +76,7 @@ PanelWindow {
             text: hint.label
             color: Theme.textMuted
             font.pixelSize: 10
-            font.family: Theme.fontMono
+            font.family: Theme.fontText
         }
     }
 
@@ -515,10 +515,13 @@ PanelWindow {
 
     // ── Drawing ──────────────────────────────────────────────────────────
 
-    // The desktop behind, dimmed (and blurred by Hyprland's layer rule).
+    // The desktop behind, almost hidden. Not blurred -- the compositor blur
+    // stays on the bar's glass -- and with no card of its own under the
+    // labels and key hints, the other overlays' 0.6 scrim let a terminal's
+    // text show through and cross them. The wallpaper picker's 0.88 does not.
     Rectangle {
         anchors.fill: parent
-        color: Qt.rgba(0, 0, 0, 0.42)
+        color: Theme.alpha(Theme.background, 0.88)
         opacity: overview.open && !overview.leaving ? 1 : 0
 
         Behavior on opacity {
@@ -610,10 +613,8 @@ PanelWindow {
                 text: "Workspaces"
                 color: Theme.textSecondary
                 font.pixelSize: 11
-                font.bold: true
-                font.letterSpacing: 1.6
-                font.capitalization: Font.AllUppercase
-                font.family: Theme.fontMono
+                font.weight: Font.DemiBold
+                font.family: Theme.fontText
             }
 
             // A plain row: it always knows where its cards are. (A ListView
@@ -723,11 +724,9 @@ PanelWindow {
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: card.d.monitorLabel || ""
                                 color: Theme.textMuted
-                                font.pixelSize: 10
-                                font.bold: true
-                                font.letterSpacing: 1.2
-                                font.capitalization: Font.AllUppercase
-                                font.family: Theme.fontMono
+                                font.pixelSize: 11
+                                font.weight: Font.DemiBold
+                                font.family: Theme.fontText
                             }
                         }
 
@@ -762,7 +761,7 @@ PanelWindow {
                                 radius: overview.cardRadius
                                 blur: card.hovered ? 30 : 20
                                 offset.y: card.hovered ? 10 : 6
-                                color: Qt.rgba(0, 0, 0, 0.45)
+                                color: Theme.alpha(Theme.shadow, 0.45)
 
                                 Behavior on blur { NumberAnimation { duration: 200 } }
                             }
@@ -770,7 +769,7 @@ PanelWindow {
                             Rectangle {
                                 anchors.fill: parent
                                 radius: overview.cardRadius
-                                color: card.d.isNew ? Theme.alpha(Theme.background, card.hovered ? 0.5 : 0.3) : Theme.glass
+                                color: card.d.isNew ? Theme.alpha(Theme.background, card.hovered ? 0.5 : 0.3) : Theme.surface
 
                                 Behavior on color { ColorAnimation { duration: 180 } }
                             }
@@ -843,9 +842,9 @@ PanelWindow {
                                     text: "Empty"
                                     color: Theme.textSecondary
                                     font.pixelSize: 12
-                                    font.family: Theme.fontMono
+                                    font.family: Theme.fontText
                                     style: Text.Raised
-                                    styleColor: Qt.rgba(0, 0, 0, 0.4)
+                                    styleColor: Theme.alpha(Theme.shadow, 0.4)
                                 }
 
                                 // A new workspace: a plus where the windows would be.
@@ -868,7 +867,7 @@ PanelWindow {
                                         text: "New"
                                         color: Theme.textMuted
                                         font.pixelSize: 11
-                                        font.family: Theme.fontMono
+                                        font.family: Theme.fontText
                                     }
                                 }
 
@@ -899,7 +898,7 @@ PanelWindow {
 
                                         ClippingRectangle {
                                             anchors.fill: parent
-                                            radius: 7
+                                            radius: Theme.radiusSmall
                                             color: Theme.surfaceContainerHigh
 
                                             ScreencopyView {
@@ -915,8 +914,8 @@ PanelWindow {
                                             anchors.centerIn: parent
                                             width: 30
                                             height: 30
-                                            radius: 15
-                                            color: Qt.rgba(0, 0, 0, 0.45)
+                                            radius: height / 2
+                                            color: Theme.alpha(Theme.shadow, 0.45)
                                             visible: win.width > 48 && win.height > 40
 
                                             IconImage {
@@ -933,10 +932,10 @@ PanelWindow {
 
                                         Rectangle {
                                             anchors.fill: parent
-                                            radius: 7
+                                            radius: Theme.radiusSmall
                                             color: "transparent"
                                             border.width: 1
-                                            border.color: Qt.rgba(1, 1, 1, 0.1)
+                                            border.color: Theme.alpha(Theme.knob, 0.1)
                                         }
 
                                     }
@@ -946,7 +945,7 @@ PanelWindow {
                                 // before a workspace goes.
                                 Rectangle {
                                     anchors.fill: parent
-                                    color: Qt.rgba(0, 0, 0, 0.62)
+                                    color: Theme.alpha(Theme.shadow, 0.62)
                                     opacity: card.confirming ? 1 : 0
                                     visible: opacity > 0
 
@@ -970,7 +969,7 @@ PanelWindow {
                                             color: Theme.textPrimary
                                             font.pixelSize: 13
                                             font.bold: true
-                                            font.family: Theme.fontMono
+                                            font.family: Theme.fontText
                                         }
 
                                         Row {
@@ -985,7 +984,7 @@ PanelWindow {
                                                     required property var modelData
                                                     width: btnText.implicitWidth + 26
                                                     height: 28
-                                                    radius: 14
+                                                    radius: height / 2
                                                     color: btn.modelData.danger
                                                            ? Theme.alpha(Theme.error, btnArea.containsMouse ? 0.9 : 0.7)
                                                            : Theme.alpha(Theme.foreground, btnArea.containsMouse ? 0.2 : 0.12)
@@ -996,10 +995,10 @@ PanelWindow {
                                                         id: btnText
                                                         anchors.centerIn: parent
                                                         text: btn.modelData.label
-                                                        color: "#ffffff"
+                                                        color: Theme.knob
                                                         font.pixelSize: 11
                                                         font.bold: true
-                                                        font.family: Theme.fontMono
+                                                        font.family: Theme.fontText
                                                     }
 
                                                     MouseArea {
@@ -1044,8 +1043,8 @@ PanelWindow {
                                 anchors.rightMargin: -8
                                 width: 24
                                 height: 24
-                                radius: 12
-                                color: removeArea.containsMouse ? Theme.error : Theme.glass
+                                radius: height / 2
+                                color: removeArea.containsMouse ? Theme.error : Theme.surface
                                 border.width: 1
                                 border.color: Theme.outline
                                 visible: overview.canRemove(card.d)
@@ -1092,7 +1091,7 @@ PanelWindow {
                                 anchors.verticalCenter: parent.verticalCenter
                                 width: Math.max(24, num.implicitWidth + 16)
                                 height: 22
-                                radius: 11
+                                radius: height / 2
                                 color: card.chosen ? Theme.accent : Theme.alpha(Theme.foreground, 0.1)
 
                                 Behavior on color { ColorAnimation { duration: 180 } }
@@ -1104,7 +1103,7 @@ PanelWindow {
                                     color: card.chosen ? Theme.accentText : Theme.textPrimary
                                     font.pixelSize: 12
                                     font.bold: true
-                                    font.family: Theme.fontMono
+                                    font.family: Theme.fontText
 
                                     Behavior on color { ColorAnimation { duration: 180 } }
                                 }
@@ -1142,7 +1141,7 @@ PanelWindow {
                                 text: "+" + ((card.d.apps || []).length - 4)
                                 color: Theme.textMuted
                                 font.pixelSize: 11
-                                font.family: Theme.fontMono
+                                font.family: Theme.fontText
                             }
                         }
                     }

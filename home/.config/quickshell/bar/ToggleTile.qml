@@ -22,7 +22,7 @@ Rectangle {
     signal tapped()
 
     implicitHeight: 56
-    radius: 16
+    radius: Theme.radiusLarge
     color: root.active ? Theme.accent : Theme.surfaceContainer
 
     readonly property color ink: root.active ? Theme.accentText : Theme.textPrimary
@@ -56,7 +56,7 @@ Rectangle {
                 color: root.ink
                 font.pixelSize: 12
                 font.bold: true
-                font.family: Theme.fontMono
+                font.family: Theme.fontText
                 elide: Text.ElideRight
                 Behavior on color { ColorAnimation { duration: Theme.durMedium } }
             }
@@ -66,7 +66,7 @@ Rectangle {
                 text: root.detail
                 color: root.active ? Theme.alpha(Theme.accentText, 0.62) : Theme.textMuted
                 font.pixelSize: 10
-                font.family: Theme.fontMono
+                font.family: Theme.fontText
                 elide: Text.ElideRight
                 Behavior on color { ColorAnimation { duration: Theme.durMedium } }
             }

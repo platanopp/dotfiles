@@ -66,7 +66,10 @@ Rectangle {
             TintBadge {
                 visible: row.icon.length > 0
                 icon: row.icon
-                tint: row.tint
+                // Neutral: a badge on every row is a label, not a state. The
+                // row's tint still reaches its switch or slider, which is
+                // where "on" is shown.
+                tint: Theme.textSecondary
                 box: 32
             }
 
@@ -81,7 +84,7 @@ Rectangle {
                     color: Theme.textPrimary
                     font.pixelSize: 13
                     font.bold: true
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontText
                     elide: Text.ElideRight
                 }
 
@@ -91,7 +94,7 @@ Rectangle {
                     visible: text.length > 0
                     color: Theme.textMuted
                     font.pixelSize: 10
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontText
                     wrapMode: Text.WordWrap
                 }
             }
@@ -99,30 +102,29 @@ Rectangle {
             Text {
                 visible: row.stacked && row.value.length > 0
                 text: row.value
-                color: row.tint
+                color: Theme.textPrimary
                 font.pixelSize: 13
                 font.bold: true
-                font.family: Theme.fontMono
+                font.family: Theme.fontText
             }
 
             Rectangle {
                 visible: row.resettable
                 Layout.preferredWidth: 28
                 Layout.preferredHeight: 28
-                radius: 14
-                color: resetState.hovered ? Theme.alpha(row.tint, 0.22) : Theme.alpha(row.tint, 0.1)
+                radius: height / 2
+                color: resetState.hovered ? Theme.surfaceContainerHigh : Theme.surfaceContainer
 
                 IconGlyph {
                     anchors.centerIn: parent
                     text: "\u{F099B}"
                     size: Theme.iconTiny
-                    color: row.tint
+                    color: Theme.textSecondary
                 }
 
                 StateLayer {
                     id: resetState
-                    radius: 14
-                    tint: row.tint
+                    radius: height / 2
                     onTapped: row.reset()
                 }
             }

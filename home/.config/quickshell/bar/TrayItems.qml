@@ -58,7 +58,7 @@ RowLayout {
                 anchors.centerIn: parent
                 width: 18
                 height: 18
-                radius: 6
+                radius: Theme.radiusSmall
                 visible: !trayItem.iconAvailable
                 color: Theme.surfaceContainerHigh
 
@@ -71,7 +71,7 @@ RowLayout {
                     color: Theme.textSecondary
                     font.pixelSize: 10
                     font.bold: true
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontText
                 }
             }
 

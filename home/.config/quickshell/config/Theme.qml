@@ -14,20 +14,30 @@ Singleton {
     property color color1: "#e06c75"
     property color color2: "#98c379"
     property color color3: "#e5c07b"
-    property color color4: "#d8d8d8"
+    property color color4: neutralAccent
+
+    // What the accent falls back to while no wallpaper colour has been picked,
+    // or when the wallpaper is a grey with nothing to pick (services/Accent).
+    readonly property color neutralAccent: "#d8d8d8"
 
     // ── Semantic tokens ──────────────────────────────────────────────────
     readonly property color accent: color4
 
-    // Text drawn on top of an accent fill. Follows the accent's luminance, so
-    // a dark wallpaper palette does not leave dark text on a dark pill.
-    // Note: these must not be named onAccent/onSurface — QML reads any
+    // Text drawn on top of an accent fill: whichever of the dark or the white
+    // ink reads better on it, by WCAG contrast rather than by a luminance
+    // cut-off. The accent now follows the wallpaper, and a mid-tone blue or
+    // red sits exactly where a 0.5 threshold picks the worse of the two.
+    // Note: these must not be named onAccent/onSurface -- QML reads any
     // `on<Capital>` identifier as a signal handler, not a property.
-    readonly property color accentText: luminance(accent) > 0.5 ? "#101014" : "#ffffff"
+    readonly property color accentText: inkOn(accent)
 
     readonly property color textPrimary: foreground
     readonly property color textSecondary: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.66)
-    readonly property color textMuted: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.45)
+    // 0.62, not the 0.45 it was: at 0.45 muted text measured 3.2:1 over a
+    // light wallpaper and 3.8:1 on a raised fill, under the 4.5:1 WCAG AA asks
+    // of body text. With the glass at 0.9 it now clears 4.5:1 on every fill
+    // here, white wallpaper behind included.
+    readonly property color textMuted: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.62)
 
     // Translucent fills layered over the panel glass.
     readonly property color surfaceContainer: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.08)
@@ -39,8 +49,25 @@ Singleton {
     readonly property color warning: color3
     readonly property color success: color2
 
-    // Panel glass: the background at 80% so the compositor blur shows through.
-    readonly property color glass: Qt.rgba(background.r, background.g, background.b, 0.8)
+    // Panel glass: the background at 90% so the compositor blur shows through.
+    // Glass belongs to the bar's pills and the panels that open out of them,
+    // and to nothing else: it is the shell's one signature surface, and on
+    // every layer at once it stopped marking anything. 0.9 rather than 0.8 so
+    // text on it keeps AA contrast over the brightest wallpaper.
+    readonly property color glass: Qt.rgba(background.r, background.g, background.b, 0.9)
+
+    // The full-screen overlays (launcher, overview, wallpapers, keybinds) draw
+    // their cards on this instead: opaque, so what they hold reads the same
+    // over any desktop, and with no compositor blur under them -- a blurred
+    // full-screen layer is the most expensive thing the shell can ask for.
+    readonly property color surface: Qt.tint(background, Qt.rgba(foreground.r, foreground.g, foreground.b, 0.05))
+    // The dim behind those cards. Without blur it is what keeps the desktop
+    // from competing with the card, so it is darker than the old tint was.
+    readonly property color scrim: Qt.rgba(background.r, background.g, background.b, 0.6)
+
+    // Shadow under a raised surface, and the white of a switch's knob.
+    readonly property color shadow: "#000000"
+    readonly property color knob: "#ffffff"
 
     // ── Type and icons ───────────────────────────────────────────────────
     // The shell asked for "JetBrainsMono Nerd Font", which is not installed
@@ -49,6 +76,15 @@ Singleton {
     // size and style. Only the exact family name resolves -- "SFMono Nerd
     // Font" alone falls back, "SFMono Nerd Font Mono" does not.
     readonly property string fontMono: "SFMono Nerd Font Mono"
+
+    // Words are set in SF Pro: Text for labels and body, Display for titles
+    // of 20px and up, the cut it was drawn for. Mono stays for the Nerd Font
+    // glyphs, which only it carries. Figures that tick (the clock, a timer, a
+    // percentage) use SF Pro's tabular figures instead -- the reason the whole
+    // shell used to be monospaced, now kept to the places that need it.
+    readonly property string fontText: "SF Pro Text"
+    readonly property string fontDisplay: "SF Pro Display"
+    readonly property var tabular: ({ "tnum": 1 })
 
     // One icon scale, picked by role rather than per call site. These are
     // optical sizes: the box the glyph's ink fills, not the em box it is
@@ -87,6 +123,15 @@ Singleton {
     // adds only the padding.
     readonly property int pillPaddingH: 16
 
+    // ── Corners ──────────────────────────────────────────────────────────
+    // Four radii, by how big the thing is, plus fully round (height / 2) for
+    // pills, dots and round buttons. The shell had grown sixteen values
+    // between 3 and 26; each one now rounds to the nearest of these.
+    readonly property int radiusSmall: 6     // keycaps, chips, tiny badges
+    readonly property int radiusMedium: 12   // rows, tiles, inputs
+    readonly property int radiusLarge: 18    // cards and panel sections
+    readonly property int radiusXLarge: 24   // whole panels and overlay cards
+
     // ── Motion ───────────────────────────────────────────────────────────
     // One duration scale, so every animation in the shell is picked from the
     // same set instead of an ad-hoc magic number.
@@ -101,6 +146,23 @@ Singleton {
 
     function luminance(c) {
         return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b
+    }
+
+    // WCAG 2 relative luminance and contrast ratio, for picking ink and for
+    // the accent's legibility check.
+    function relLuminance(c) {
+        function lin(v) { return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4) }
+        return 0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b)
+    }
+
+    function contrast(a, b) {
+        var la = relLuminance(a), lb = relLuminance(b)
+        return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05)
+    }
+
+    // The dark or the white ink, whichever reads better on a fill.
+    function inkOn(fill) {
+        return contrast(fill, background) >= contrast(fill, knob) ? background : knob
     }
 
     // Alpha-blended variant of any token, for one-off overlays.

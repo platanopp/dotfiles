@@ -9,7 +9,7 @@ Rectangle {
     property bool checked: false
     property bool available: true
     property color tint: Theme.accent
-    readonly property color onTint: Theme.luminance(root.tint) > 0.5 ? Theme.background : "#ffffff"
+    readonly property color onTint: Theme.inkOn(root.tint)
     signal toggled(bool checked)
 
     implicitWidth: 50

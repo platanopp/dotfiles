@@ -22,7 +22,7 @@ Scope {
     // are only read from a panel or a Settings page, and what they do on
     // their own -- the IPC targets, the keyboard's colours following the
     // wallpaper -- has to be running before that.
-    readonly property var services: [AppImages, Audio, Bluetooth, Clock, Display, Hypr, KeyboardRgb,
+    readonly property var services: [Accent, AppImages, Audio, Bluetooth, Clock, Display, Hypr, KeyboardRgb,
                                      Keybinds, Network, Panels, Power, Profile, Recorder, System, Tablet,
                                      Wallpaper]
 
@@ -270,7 +270,7 @@ Scope {
                 Rectangle {
                     id: leftGlass
                     anchors.fill: parent
-                    radius: 20
+                    radius: height / 2
                     color: Theme.glass
                     visible: false
                     layer.enabled: true
@@ -280,7 +280,7 @@ Scope {
                     source: leftGlass
                     anchors.fill: leftGlass
                     shadowEnabled: true
-                    shadowColor: "#000000"
+                    shadowColor: Theme.shadow
                     shadowOpacity: 0.5
                     shadowBlur: 0.7
                     shadowVerticalOffset: 4

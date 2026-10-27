@@ -67,7 +67,7 @@ Singleton {
         if (wmoCode === 85 || wmoCode === 86) return "Snow showers"
         if (wmoCode === 95) return "Thunderstorm"
         if (wmoCode >= 96) return "Thunderstorm with hail"
-        return "—"
+        return "Conditions unknown"
     }
 
     function load(text) {

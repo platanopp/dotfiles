@@ -137,7 +137,7 @@ Item {
         radius: knob.radius
         blur: 8
         spread: 1
-        color: Qt.rgba(0, 0, 0, 0.45)
+        color: Theme.alpha(Theme.shadow, 0.45)
         scale: knob.scale
     }
 
@@ -145,7 +145,7 @@ Item {
     Rectangle {
         width: bubbleText.implicitWidth + 16
         height: 22
-        radius: 11
+        radius: height / 2
         x: Math.max(0, Math.min(root.width - width, knob.x + knob.width / 2 - width / 2))
         y: -height - 8
         color: Theme.accent
@@ -163,7 +163,8 @@ Item {
             text: root.format(root.shown)
             font.pixelSize: 10
             font.bold: true
-            font.family: Theme.fontMono
+            font.family: Theme.fontText
+            font.features: Theme.tabular
             color: Theme.accentText
         }
     }

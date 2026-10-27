@@ -27,12 +27,10 @@ PanelWindow {
 
     // A group's name over its rows: the launcher's section label.
     component SectionLabel: Text {
-        color: Theme.textMuted
-        font.pixelSize: 10
-        font.bold: true
-        font.letterSpacing: 1.2
-        font.capitalization: Font.AllUppercase
-        font.family: Theme.fontMono
+        color: Theme.textSecondary
+        font.pixelSize: 11
+        font.weight: Font.DemiBold
+        font.family: Theme.fontText
     }
 
     // A key, drawn as a key -- the caps the launcher, the overview and the
@@ -73,7 +71,7 @@ PanelWindow {
             text: hint.label
             color: Theme.textMuted
             font.pixelSize: 10
-            font.family: Theme.fontMono
+            font.family: Theme.fontText
         }
     }
 
@@ -127,8 +125,8 @@ PanelWindow {
     //
     // The launcher's: a proportional face for what the binds do, which is
     // the content here, and the monospace only on the keys.
-    readonly property string fontDisplay: "SF Pro Display"
-    readonly property string fontText: "SF Pro Text"
+    readonly property string fontDisplay: Theme.fontDisplay
+    readonly property string fontText: Theme.fontText
 
     // Never below a sane floor. The window is 0x0 until Hyprland first sizes
     // it, and a panel worked out from that came to -120px wide -- with a
@@ -496,11 +494,11 @@ PanelWindow {
 
     // ── Backdrop ─────────────────────────────────────────────────────────
 
-    // Light: the compositor blurs what is behind this surface (the
-    // quickshell:keybinds layer rule), so the tint only settles the contrast.
+    // The overlays' scrim. There is no compositor blur under it any more, so
+    // it is what keeps the windows behind from competing with the sheet.
     Rectangle {
         anchors.fill: parent
-        color: Theme.alpha(Theme.background, 0.38)
+        color: Theme.scrim
         opacity: overlay.open ? 1 : 0
         visible: opacity > 0
 
@@ -553,12 +551,12 @@ PanelWindow {
             NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic }
         }
 
-        // The shell's glass and shadow, no outline.
+        // The overlays' solid card and shadow, no outline.
         Rectangle {
             id: card
             anchors.fill: parent
-            radius: 26
-            color: Theme.glass
+            radius: Theme.radiusXLarge
+            color: Theme.surface
             visible: false
             layer.enabled: true
         }
@@ -567,7 +565,7 @@ PanelWindow {
             source: card
             anchors.fill: card
             shadowEnabled: true
-            shadowColor: "#000000"
+            shadowColor: Theme.shadow
             shadowOpacity: 0.55
             shadowBlur: 1.0
             shadowVerticalOffset: 10
@@ -656,7 +654,7 @@ PanelWindow {
 
                     Rectangle {
                         anchors.fill: parent
-                        radius: 13
+                        radius: Theme.radiusMedium
                         color: Theme.surfaceContainer
 
                         IconGlyph {
@@ -750,7 +748,7 @@ PanelWindow {
                                         text: tab.modelData.name
                                         font.pixelSize: 12
                                         font.bold: tab.selected
-                                        font.family: Theme.fontMono
+                                        font.family: Theme.fontText
                                         color: tab.selected ? Theme.accentText : Theme.textSecondary
                                         Behavior on color { ColorAnimation { duration: Theme.durMedium } }
                                     }
@@ -759,7 +757,8 @@ PanelWindow {
                                         anchors.verticalCenter: parent.verticalCenter
                                         text: tab.count
                                         font.pixelSize: 10
-                                        font.family: Theme.fontMono
+                                        font.family: Theme.fontText
+                                        font.features: Theme.tabular
                                         color: tab.selected ? Theme.alpha(Theme.accentText, 0.6) : Theme.textMuted
                                         Behavior on color { ColorAnimation { duration: Theme.durMedium } }
                                     }
@@ -880,7 +879,7 @@ PanelWindow {
                                         text: "cont."
                                         color: Theme.alpha(Theme.textMuted, 0.6)
                                         font.pixelSize: 10
-                                        font.family: Theme.fontMono
+                                        font.family: Theme.fontText
                                     }
                                 }
 
@@ -899,7 +898,7 @@ PanelWindow {
                                             anchors.fill: parent
                                             anchors.leftMargin: -10
                                             anchors.rightMargin: -10
-                                            radius: 10
+                                            radius: Theme.radiusMedium
                                             color: Theme.foreground
                                             opacity: rowHover.hovered ? 0.06 : 0
 
@@ -937,7 +936,7 @@ PanelWindow {
                                                 text: row.modelData.command
                                                 color: Theme.textMuted
                                                 font.pixelSize: 10
-                                                font.family: Theme.fontMono
+                                                font.family: Theme.fontText
                                                 elide: Text.ElideRight
                                             }
                                         }
@@ -1053,7 +1052,8 @@ PanelWindow {
                     text: overlay.terms.length > 0 ? shown + " of " + total : total + " shortcuts"
                     color: Theme.textMuted
                     font.pixelSize: 10
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontText
+                    font.features: Theme.tabular
                 }
 
                 KeyHint { key: "esc"; label: overlay.query.length > 0 ? "Clear" : "Close" }

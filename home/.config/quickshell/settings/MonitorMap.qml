@@ -16,7 +16,7 @@ Item {
 
     property string selected: ""
     property color tint: Theme.accent
-    readonly property color onTint: Theme.luminance(map.tint) > 0.5 ? Theme.background : "#ffffff"
+    readonly property color onTint: Theme.inkOn(map.tint)
     signal picked(string name)
 
     readonly property var monitors: Display.displayState.monitors || []
@@ -109,7 +109,7 @@ Item {
             y: plate.lifted ? plate.dragY : map.offY + plate.pos.y * map.fit
             width: Math.max(40, plate.size.w * map.fit)
             height: Math.max(28, plate.size.h * map.fit)
-            radius: 10
+            radius: Theme.radiusMedium
             z: plate.lifted ? 2 : 1
             color: "transparent"
             scale: plate.lifted ? 1.03 : 1
@@ -138,7 +138,7 @@ Item {
 
                 Rectangle {
                     anchors.fill: parent
-                    color: Qt.rgba(0, 0, 0, plate.chosen ? 0.35 : 0.62)
+                    color: Theme.alpha(Theme.shadow, plate.chosen ? 0.35 : 0.62)
                     Behavior on color { ColorAnimation { duration: Theme.durShort } }
                 }
             }
@@ -164,7 +164,7 @@ Item {
                     color: plate.ink
                     font.pixelSize: 11
                     font.bold: true
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontText
                     elide: Text.ElideRight
                 }
 
@@ -175,7 +175,7 @@ Item {
                     text: plate.modelData.name + "  ·  " + plate.modelData.width + "×" + plate.modelData.height
                     color: Theme.textSecondary
                     font.pixelSize: 9
-                    font.family: Theme.fontMono
+                    font.family: Theme.fontText
                     elide: Text.ElideRight
                 }
             }

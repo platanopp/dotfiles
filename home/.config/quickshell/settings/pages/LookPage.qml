@@ -32,7 +32,7 @@ Column {
         id: preview
         width: parent.width
         height: 210
-        radius: 22
+        radius: Theme.radiusXLarge
         color: Theme.surfaceContainer
 
         // Scaled from a 1080-tall screen into the preview, then doubled:
@@ -53,7 +53,7 @@ Column {
             id: mock
             anchors.fill: parent
             anchors.margins: 12
-            radius: 14
+            radius: Theme.radiusMedium
             color: Theme.background
 
             Image {
@@ -100,7 +100,7 @@ Column {
                         radius: preview.round
                         blur: 14
                         offset.y: 3
-                        color: Qt.rgba(0, 0, 0, 0.5)
+                        color: Theme.alpha(Theme.shadow, 0.5)
                     }
 
                     Rectangle {
@@ -134,7 +134,7 @@ Column {
                             anchors.fill: parent
                             radius: parent.radius
                             visible: !win.focused && page.val("dim_inactive", false)
-                            color: Qt.rgba(0, 0, 0, 0.35)
+                            color: Theme.alpha(Theme.shadow, 0.35)
                         }
                     }
                 }
