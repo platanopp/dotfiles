@@ -216,7 +216,7 @@ hl.device({
 
 hl.bind(mainMod .. " + T", hl.dsp.exec_cmd(terminal))
 local closeWindowBind = hl.bind(mainMod .. " + Q", hl.dsp.window.close())
-hl.bind(mainMod .. " + C", hl.dsp.exec_cmd(terminal .. " --directory /home/gone claude --continue"))
+hl.bind(mainMod .. " + C", hl.dsp.exec_cmd(terminal .. " --directory $HOME claude --continue"))
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager))
 hl.bind(mainMod .. " + V", hl.dsp.window.float({ action = "toggle" }))
 -- Handled inside the shell, which registers the name over Hyprland's

@@ -170,6 +170,17 @@ install_post() {
         note "spicetify not installed; skipping"
     fi
 
+    # The units live in the configuration they belong to, and systemd only
+    # knows about them through symlinks in ~/.config/systemd/user, which this
+    # repo does not carry. Without the target, hyprland.lua's
+    # `systemctl --user start hyprland-session.target` fails at every login
+    # and nothing wanted by graphical-session.target ever starts.
+    if command -v systemctl >/dev/null; then
+        note "user units"
+        run systemctl --user enable "$HOME/.config/hypr/hyprland-session.target" \
+                                    "$HOME/.config/quickshell/scripts/osu-mpris.service"
+    fi
+
     if command -v fc-cache >/dev/null; then
         note "font cache"
         run fc-cache -f
@@ -200,6 +211,10 @@ install_post() {
 
     say "Left to do by hand"
     note "Vencord: run the installer once so it patches your Discord"
+    note "ddcutil needs i2c-dev at boot, for switching the side display off:"
+    note "  echo i2c-dev | sudo tee /etc/modules-load.d/i2c-dev.conf"
+    note "Wooting RGB: the SDK and wooting-bg-service are built into ~/.local"
+    note "by hand; without them the keyboard lighting just stays off"
     note "Zen, Discord and Obsidian keep accounts and sessions, which this"
     note "repo deliberately does not carry -- sign in on the new machine"
 }

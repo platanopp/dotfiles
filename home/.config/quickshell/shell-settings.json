@@ -13,7 +13,7 @@
     "recordAudio": "system",
     "recordCodec": "h264",
     "recordCursor": true,
-    "recordFolder": "/home/gone/Videos/Recordings",
+    "recordFolder": "",
     "recordFps": 60,
     "recordQuality": "very_high",
     "recordResolution": "1080"

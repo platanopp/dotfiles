@@ -161,7 +161,6 @@ pv
 python
 python-defusedxml
 python-packaging
-python-pywal
 qbittorrent
 qt5ct
 qt6ct

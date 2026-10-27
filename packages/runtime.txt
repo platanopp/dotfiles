@@ -17,6 +17,16 @@
 #               needs the i2c-dev module loaded (modules-load.d)
 # ffmpeg        stills of the video wallpapers (scripts/video_wallpaper.py)
 # python-pillow thumbnails for the wallpaper carousel (scripts/wallpaper_thumbs.py)
+# qt6-5compat   OpacityMask, for the album art and the lock screen's card;
+#               without it MediaWidget and LockScreen fail to load at all
+# python-numpy  the bar's spectrum (scripts/spectrum.py)
+# python-gobject  osu-mpris.py publishes on D-Bus through it
+# wl-clipboard  wl-copy, copying a result out of the launcher
+# libnotify     notify-send, when a recording starts and stops
+# zenity        the recorder's folder picker
+# cava, btop, tty-clock  the three terminal widgets hyprland.lua opens
+# tailscale     its tray icon, started from hyprland.lua
+# thunar        the file manager hyprland.lua binds to Super + E
 imagemagick
 lua
 libpulse
@@ -29,3 +39,14 @@ ffmpeg
 python-pillow
 openrgb
 gpu-screen-recorder
+qt6-5compat
+python-numpy
+python-gobject
+wl-clipboard
+libnotify
+zenity
+cava
+btop
+tty-clock
+tailscale
+thunar
