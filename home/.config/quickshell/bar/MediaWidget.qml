@@ -221,13 +221,15 @@ PanelWindow {
         Rectangle {
             id: mediaGlass
             anchors.fill: parent
-            radius: mediaWidgetItem.panelOpen ? 26 : 20
+            // The panel's radius is the cover's (heroMask), so the cover's
+            // corners sit exactly in the glass's; the pill is round-ended.
+            radius: mediaWidgetItem.panelOpen ? Theme.radiusXLarge : mediaWidgetItem.compactInner / 2
             color: Theme.glass
             visible: false
             layer.enabled: true
 
             Behavior on radius {
-                NumberAnimation { duration: 200 }
+                NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic }
             }
         }
 
@@ -264,7 +266,7 @@ PanelWindow {
             opacity: mediaWidgetItem.compactShown ? 1 : 0
 
             Behavior on opacity {
-                NumberAnimation { duration: 150 }
+                NumberAnimation { duration: Theme.durShort }
             }
 
             readonly property bool hasArt: coverImage.status === Image.Ready
@@ -366,7 +368,7 @@ PanelWindow {
             opacity: mediaWidgetItem.compactShown ? 1 : 0
 
             Behavior on opacity {
-                NumberAnimation { duration: 150 }
+                NumberAnimation { duration: Theme.durShort }
             }
 
             Column {
@@ -451,7 +453,7 @@ PanelWindow {
                 Text {
                     text: bar.trackArtist
                     color: Theme.textSecondary
-                    font.pixelSize: 10
+                    font.pixelSize: 11
                     font.family: Theme.fontText
                     elide: Text.ElideRight
                     width: Math.min(implicitWidth, 180)
@@ -507,7 +509,7 @@ PanelWindow {
                 opacity: mediaWidgetItem.panelOpen ? 1 : 0
 
                 Behavior on opacity {
-                    NumberAnimation { duration: mediaWidgetItem.panelOpen ? 200 : 90 }
+                    NumberAnimation { duration: mediaWidgetItem.panelOpen ? Theme.durMedium : Theme.durShort }
                 }
 
                 readonly property bool hasArt: heroImage.status === Image.Ready
@@ -623,7 +625,7 @@ PanelWindow {
             boundsBehavior: Flickable.StopAtBounds
 
             Behavior on opacity {
-                NumberAnimation { duration: 200 }
+                NumberAnimation { duration: Theme.durMedium }
             }
 
             Column {
@@ -687,7 +689,7 @@ PanelWindow {
                             anchors.verticalCenter: parent.verticalCenter
                             width: parent.width
                             height: 5
-                            radius: 3
+                            radius: height / 2
                             color: Theme.track
 
                             Rectangle {
@@ -696,14 +698,14 @@ PanelWindow {
                                     ? seekTrack.width * Math.min(1, mediaWidgetItem.currentPosition / mediaWidgetItem.trackLength)
                                     : 0
                                 height: parent.height
-                                radius: 3
+                                radius: height / 2
                                 color: Theme.accent
                             }
 
                             Rectangle {
                                 width: 11
                                 height: 11
-                                radius: 5.5
+                                radius: height / 2
                                 color: Theme.textPrimary
                                 visible: seekArea.containsMouse || seekArea.pressed
                                 anchors.verticalCenter: parent.verticalCenter
@@ -769,12 +771,15 @@ PanelWindow {
                         onTapped: mediaWidgetItem.player.previous()
                     }
 
-                    // Play sits in a filled circle, as the primary action.
+                    // Play sits in a filled circle, as the primary action. In
+                    // the text colour, not the accent: the accent here marks
+                    // state (how far along, which toggles are on), and a play
+                    // button is there whether anything is on or not.
                     Rectangle {
                         Layout.preferredWidth: 48
                         Layout.preferredHeight: 48
                         radius: height / 2
-                        color: Theme.accent
+                        color: Theme.textPrimary
                         scale: playState.pressed ? 0.94 : 1.0
 
                         Behavior on scale {
@@ -784,13 +789,13 @@ PanelWindow {
                         IconGlyph {
                             anchors.centerIn: parent
                             text: bar.isPlaying ? "󰏤" : "󰐊"
-                            color: Theme.accentText
+                            color: Theme.inkOn(Theme.textPrimary)
                             size: Theme.iconLarge
                         }
 
                         StateLayer {
                             id: playState
-                            tint: Theme.accentText
+                            tint: Theme.inkOn(Theme.textPrimary)
                             interactive: bar.canTogglePlaying
                             onTapped: mediaWidgetItem.player.togglePlaying()
                         }
@@ -865,7 +870,7 @@ PanelWindow {
                         text: Math.round(mediaWidgetItem.shownVolume) + "%"
                             + (mediaWidgetItem.onAppVolume ? "" : " · system")
                         color: Theme.textMuted
-                        font.pixelSize: 10
+                        font.pixelSize: 11
                         font.family: Theme.fontText
                         font.features: Theme.tabular
                     }
@@ -918,14 +923,16 @@ PanelWindow {
                             visible: mediaWidgetItem.playerCount > 1
                             text: (bar.activePlayerIndex + 1) + "/" + mediaWidgetItem.playerCount
                             color: Theme.textMuted
-                            font.pixelSize: 10
+                            font.pixelSize: 11
                             font.family: Theme.fontText
                             font.features: Theme.tabular
                         }
 
                         IconGlyph {
                             visible: mediaWidgetItem.canCyclePlayer
-                            text: "󰅀"
+                            // Swap, not a chevron: the tap moves to the next
+                            // player, it opens no list.
+                            text: "󰓡"
                             color: Theme.textMuted
                             size: Theme.iconSmall
                         }
