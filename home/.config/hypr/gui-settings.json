@@ -38,7 +38,7 @@
     "base": 1
   },
   "blur": {
-    "value": false,
+    "value": true,
     "base": true
   }
 }
