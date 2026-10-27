@@ -36,5 +36,9 @@
   "follow_mouse": {
     "value": 1,
     "base": 1
+  },
+  "blur": {
+    "value": false,
+    "base": true
   }
 }
