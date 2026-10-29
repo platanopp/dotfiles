@@ -169,8 +169,8 @@ PanelWindow {
     readonly property int searchHeight: 62
     readonly property int rowHeight: 46
     readonly property int headerHeight: 28
-    // How far one notch of the mouse wheel moves the results: two rows.
-    readonly property int wheelStep: overlay.rowHeight * 2
+    // How far one notch of the mouse wheel moves the results: three rows.
+    readonly property int wheelStep: overlay.rowHeight * 3
     readonly property int maxListHeight: 440
     readonly property int listPad: 6
     readonly property int footerHeight: 36
@@ -1037,15 +1037,16 @@ PanelWindow {
         // a short and different way each time, and a high-resolution wheel's
         // many small events added up to a crawl. Deltas are taken as they
         // come, so a high-resolution wheel moves the same per notch, only
-        // more finely. A touchpad's pixel scrolling is left to the ListView,
-        // which already follows the fingers.
+        // more finely. Every wheel event is taken, pixel deltas included: the
+        // Logitech's high-resolution wheel sends them too, and leaving those
+        // to the ListView left the wheel as slow as before.
         MouseArea {
             anchors.fill: list
             visible: list.visible
             acceptedButtons: Qt.NoButton
 
             onWheel: wheel => {
-                if (wheel.pixelDelta.y !== 0 || wheel.angleDelta.y === 0) {
+                if (wheel.angleDelta.y === 0) {
                     wheel.accepted = false
                     return
                 }
