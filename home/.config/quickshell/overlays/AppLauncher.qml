@@ -169,8 +169,9 @@ PanelWindow {
     readonly property int searchHeight: 62
     readonly property int rowHeight: 46
     readonly property int headerHeight: 28
-    // How far one notch of the mouse wheel moves the results: three rows.
-    readonly property int wheelStep: overlay.rowHeight * 3
+    // How far one notch of the mouse wheel moves the results: two and a
+    // half rows. Three was a little too far, two the old crawl's neighbour.
+    readonly property int wheelStep: Math.round(overlay.rowHeight * 2.5)
     readonly property int maxListHeight: 440
     readonly property int listPad: 6
     readonly property int footerHeight: 36
