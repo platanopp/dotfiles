@@ -918,12 +918,11 @@ PanelWindow {
 
                 Repeater {
                     model: [
-                        { key: "settings", icon: "\u{F0493}", label: "Settings",
-                          detail: "Display, idle" },
+                        // No second line: the name is enough. Only a
+                        // problem earns one -- binds that could not be read.
+                        { key: "settings", icon: "\u{F0493}", label: "Settings", detail: "" },
                         { key: "binds", icon: "\u{F030C}", label: "Shortcuts",
-                          detail: Keybinds.hyprBindsError.length > 0 ? "Config unread"
-                                : Keybinds.hyprOverlayKeys.length > 0 ? Keybinds.hyprOverlayKeys
-                                : Keybinds.hyprBindCount + " binds" }
+                          detail: Keybinds.hyprBindsError.length > 0 ? "Config unread" : "" }
                     ]
 
                     Rectangle {
@@ -962,9 +961,9 @@ PanelWindow {
 
                                 Text {
                                     Layout.fillWidth: true
+                                    visible: text.length > 0
                                     text: link.modelData.detail
-                                    color: link.modelData.key === "binds" && Keybinds.hyprBindsError.length > 0
-                                         ? Theme.error : Theme.textMuted
+                                    color: Theme.error
                                     font.pixelSize: 10
                                     font.family: Theme.fontText
                                     elide: Text.ElideRight
