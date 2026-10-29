@@ -45,8 +45,8 @@ Rectangle {
         radius: height / 2
         color: root.tint
 
-        Behavior on x { NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic } }
-        Behavior on width { NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic } }
+        Behavior on x { Elastic { small: true } }
+        Behavior on width { Elastic { small: true } }
     }
 
     Row {
@@ -67,7 +67,7 @@ Rectangle {
                 width: label.implicitWidth + (seg.chosen ? 18 : 0) + 28
                 height: root.height - 8
 
-                Behavior on width { NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic } }
+                Behavior on width { Elastic { small: true } }
 
                 Row {
                     anchors.centerIn: parent

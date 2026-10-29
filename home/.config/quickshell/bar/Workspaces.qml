@@ -125,7 +125,7 @@ Item {
         height: root.slotHeight
 
         Behavior on width {
-            NumberAnimation { duration: Theme.durLong; easing.type: Easing.OutCubic }
+            Elastic { small: true }
         }
 
         // The active workspace: one pill that slides, rather than two dots
@@ -141,7 +141,7 @@ Item {
             color: Theme.accent
 
             Behavior on x {
-                NumberAnimation { duration: Theme.durLong; easing.type: Easing.OutCubic }
+                Elastic { small: true }
             }
         }
 
@@ -161,8 +161,8 @@ Item {
                 width: slot.active ? root.activeSlot : root.dotSlot
                 height: root.slotHeight
 
-                Behavior on x { NumberAnimation { duration: Theme.durLong; easing.type: Easing.OutCubic } }
-                Behavior on width { NumberAnimation { duration: Theme.durLong; easing.type: Easing.OutCubic } }
+                Behavior on x { Elastic { small: true } }
+                Behavior on width { Elastic { small: true } }
 
                 // Under the pointer, the same soft disc as every other button.
                 Rectangle {
@@ -186,7 +186,7 @@ Item {
                     color: slot.urgent ? Theme.error
                          : Theme.alpha(Theme.foreground, slot.occupied ? 0.7 : 0.25)
 
-                    Behavior on width { NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic } }
+                    Behavior on width { Elastic { small: true } }
                     Behavior on color { ColorAnimation { duration: Theme.durMedium } }
 
                     // Asking for attention: a slow pulse, only while it asks.

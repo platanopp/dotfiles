@@ -1180,7 +1180,7 @@ Scope {
                             }
 
                             Behavior on Layout.preferredWidth {
-                                NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic }
+                                Elastic { small: true }
                             }
 
                             Behavior on color { ColorAnimation { duration: Theme.durMedium } }

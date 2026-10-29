@@ -415,7 +415,7 @@ PanelWindow {
     property real shownHeight: overview.cardHeight
     Behavior on shownHeight {
         enabled: !overview.opening
-        NumberAnimation { duration: 280; easing.type: Easing.OutCubic }
+        Elastic {}
     }
 
     readonly property int cardSpacing: 26
@@ -542,14 +542,14 @@ PanelWindow {
         id: content
         anchors.fill: parent
         opacity: overview.open && !overview.leaving ? 1 : 0
-        scale: overview.open ? 1 : 0.97
+        scale: overview.open ? 1 : 0.94
 
         Behavior on opacity {
             enabled: !overview.leaving
             NumberAnimation { duration: 200; easing.type: Easing.OutQuad }
         }
         Behavior on scale {
-            NumberAnimation { duration: 240; easing.type: Easing.OutCubic }
+            Elastic { small: true }
         }
 
         HoverHandler {
@@ -691,8 +691,8 @@ PanelWindow {
                             PauseAnimation { duration: overview.opening ? Math.max(0, card.index) * 40 : 0 }
                             ParallelAnimation {
                                 NumberAnimation { target: card; property: "opacity"; to: 1; duration: 220; easing.type: Easing.OutQuad }
-                                NumberAnimation { target: card; property: "scale"; to: 1; duration: 380; easing.type: Easing.OutBack; easing.overshoot: 1.1 }
-                                NumberAnimation { target: card; property: "rise"; to: 0; duration: 380; easing.type: Easing.OutCubic }
+                                Elastic { target: card; property: "scale"; to: 1 }
+                                Elastic { target: card; property: "rise"; to: 0 }
                             }
                         }
 
@@ -738,8 +738,8 @@ PanelWindow {
                             y: card.hovered ? -4 : 0
                             scale: card.hovered ? 1.015 : 1
 
-                            Behavior on y { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-                            Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+                            Behavior on y { Elastic { small: true } }
+                            Behavior on scale { Elastic { small: true } }
 
                             // One cheap shadow (a signed-distance rectangle,
                             // not a blurred layer), deeper when lifted.
@@ -1031,7 +1031,7 @@ PanelWindow {
                                 scale: opacity > 0 ? 1 : 0.97
 
                                 Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutQuad } }
-                                Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+                                Behavior on scale { Elastic { small: true } }
                             }
 
                             // Remove the workspace. Last, so it is on top of
@@ -1052,7 +1052,7 @@ PanelWindow {
                                 scale: opacity > 0.5 ? 1 : 0.6
 
                                 Behavior on opacity { NumberAnimation { duration: 160 } }
-                                Behavior on scale { NumberAnimation { duration: 200; easing.type: Easing.OutBack } }
+                                Behavior on scale { Elastic { small: true } }
                                 Behavior on color { ColorAnimation { duration: 120 } }
 
                                 IconGlyph {

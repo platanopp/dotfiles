@@ -280,7 +280,7 @@ PanelWindow {
     property real expansion: overlay.wantExpanded && overlay.open && !overlay.framing ? 1 : 0
 
     Behavior on expansion {
-        NumberAnimation { duration: Theme.durLong; easing.type: Easing.OutCubic }
+        Elastic {}
     }
 
     // Anything that moves the row folds the panel and starts the wait over;
@@ -587,14 +587,14 @@ PanelWindow {
         }
 
         opacity: overlay.open ? 1 : 0
-        scale: overlay.open ? 1 : 0.97
+        scale: overlay.open ? 1 : 0.94
         visible: opacity > 0
 
         Behavior on opacity {
             NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic }
         }
         Behavior on scale {
-            NumberAnimation { duration: Theme.durLong; easing.type: Easing.OutCubic }
+            Elastic { small: true }
         }
 
         // Stepping into the framing editor and back.
@@ -623,7 +623,7 @@ PanelWindow {
             }
 
             Behavior on scale {
-                NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic }
+                Elastic { small: true }
             }
 
             // The section switch, in the title's place. Two segments in one
@@ -660,10 +660,10 @@ PanelWindow {
                     width: overlay.videos ? videosTab.width : imagesTab.width
 
                     Behavior on x {
-                        NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic }
+                        Elastic { small: true }
                     }
                     Behavior on width {
-                        NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic }
+                        Elastic { small: true }
                     }
                 }
 
@@ -1072,7 +1072,7 @@ PanelWindow {
                                 visible: opacity > 0
 
                                 Behavior on opacity { NumberAnimation { duration: Theme.durMedium } }
-                                Behavior on scale { NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutBack } }
+                                Behavior on scale { Elastic { small: true } }
 
                                 Row {
                                     id: inUseRow
@@ -1279,7 +1279,7 @@ PanelWindow {
             }
 
             Behavior on scale {
-                NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic }
+                Elastic { small: true }
             }
 
             readonly property var info: Wallpaper.wallpaperCropInfo

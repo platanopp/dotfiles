@@ -45,7 +45,7 @@ Rectangle {
     height: implicitHeight
     clip: true
 
-    Behavior on implicitHeight { NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic } }
+    Behavior on implicitHeight { Elastic {} }
 
     // The folded line: badge, title, and the value with a chevron.
     Item {
@@ -105,7 +105,7 @@ Rectangle {
                         size: Theme.iconSmall
                         color: Theme.textSecondary
                         rotation: row.open ? 180 : 0
-                        Behavior on rotation { NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic } }
+                        Behavior on rotation { Elastic { small: true } }
                     }
                 }
             }

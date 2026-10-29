@@ -9,6 +9,7 @@ import QtQuick
 import QtQuick.Effects
 import QtQuick.Layouts
 import qs.bar
+import qs.components
 import qs.config
 import qs.lock
 import qs.overlays
@@ -288,7 +289,7 @@ Scope {
                 }
 
                 Behavior on implicitWidth {
-                    NumberAnimation { duration: 280; easing.type: Easing.OutCubic }
+                    Elastic { small: true }
                 }
 
                 RowLayout {

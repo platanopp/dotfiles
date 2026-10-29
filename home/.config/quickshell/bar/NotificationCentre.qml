@@ -152,14 +152,14 @@ Item {
 
             add: Transition {
                 NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.durMedium }
-                NumberAnimation { property: "x"; from: 30; to: 0; duration: Theme.durLong; easing.type: Easing.OutCubic }
+                Elastic { property: "x"; from: 30; to: 0 }
             }
             remove: Transition {
                 NumberAnimation { property: "opacity"; to: 0; duration: Theme.durShort }
                 NumberAnimation { property: "x"; to: 60; duration: Theme.durMedium; easing.type: Easing.InCubic }
             }
             displaced: Transition {
-                NumberAnimation { property: "y"; duration: Theme.durMedium; easing.type: Easing.OutCubic }
+                Elastic { property: "y"; small: true }
             }
 
             delegate: Rectangle {

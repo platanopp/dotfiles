@@ -137,11 +137,17 @@ hl.curve("linear",         { type = "bezier", points = { {0, 0},       {1, 1}   
 hl.curve("almostLinear",   { type = "bezier", points = { {0.5, 0.5},   {0.75, 1}    } })
 hl.curve("quick",          { type = "bezier", points = { {0.15, 0},    {0.1, 1}     } })
 hl.curve("easy",           { type = "spring", mass = 1, stiffness = 238.1191, dampening = 24.21279333 })
+-- The shell's spring (Theme.springOvershoot in quickshell): the same
+-- stiffness as "easy", damped to a ratio of 0.68 instead of 0.78, so it runs
+-- about 5% past and settles -- what the bar's panels and overlays do, so a
+-- window opening and a panel opening move alike. Arrivals only; leaving and
+-- fading stay on the plain curves.
+hl.curve("soft",           { type = "spring", mass = 1, stiffness = 238.1191, dampening = 21 })
 
 hl.animation({ leaf = "global",        enabled = true,  speed = 10,   bezier = "default" })
 hl.animation({ leaf = "border",        enabled = true,  speed = 5.39, bezier = "easeOutQuint" })
-hl.animation({ leaf = "windows",       enabled = true,  speed = 4.79, spring = "easy" })
-hl.animation({ leaf = "windowsIn",     enabled = true,  speed = 4.1,  spring = "easy",         style = "popin 87%" })
+hl.animation({ leaf = "windows",       enabled = true,  speed = 4.79, spring = "soft" })
+hl.animation({ leaf = "windowsIn",     enabled = true,  speed = 4.1,  spring = "soft",         style = "popin 80%" })
 hl.animation({ leaf = "windowsOut",    enabled = true,  speed = 1.49, bezier = "linear",       style = "popin 87%" })
 hl.animation({ leaf = "fadeIn",        enabled = true,  speed = 1.73, bezier = "almostLinear" })
 hl.animation({ leaf = "fadeOut",       enabled = true,  speed = 1.46, bezier = "almostLinear" })
@@ -151,9 +157,11 @@ hl.animation({ leaf = "layersIn",      enabled = true,  speed = 4,    bezier = "
 hl.animation({ leaf = "layersOut",     enabled = true,  speed = 1.5,  bezier = "linear",       style = "fade" })
 hl.animation({ leaf = "fadeLayersIn",  enabled = true,  speed = 1.79, bezier = "almostLinear" })
 hl.animation({ leaf = "fadeLayersOut", enabled = true,  speed = 1.39, bezier = "almostLinear" })
-hl.animation({ leaf = "workspaces",    enabled = true,  speed = 1.94, bezier = "almostLinear", style = "fade" })
-hl.animation({ leaf = "workspacesIn",  enabled = true,  speed = 1.21, bezier = "almostLinear", style = "fade" })
-hl.animation({ leaf = "workspacesOut", enabled = true,  speed = 1.94, bezier = "almostLinear", style = "fade" })
+-- Workspaces slide a fifth of the way while they fade, on the spring: a
+-- full-width slide would show the overshoot as a strip of the next desktop.
+hl.animation({ leaf = "workspaces",    enabled = true,  speed = 4.1,  spring = "soft",         style = "slidefade 20%" })
+hl.animation({ leaf = "workspacesIn",  enabled = true,  speed = 4.1,  spring = "soft",         style = "slidefade 20%" })
+hl.animation({ leaf = "workspacesOut", enabled = true,  speed = 4.1,  spring = "soft",         style = "slidefade 20%" })
 hl.animation({ leaf = "zoomFactor",    enabled = true,  speed = 7,    bezier = "quick" })
 
 hl.config({
@@ -736,13 +744,6 @@ hl.config({
         -- it applies the moment that is no longer so.
         direct_scanout = 1,
     },
-})
-
-hl.animation({
-    leaf = "windows",
-    enabled = true,
-    speed = 4.79,
-    bezier = "default",
 })
 
 -- After the catch-all monitor rule at the top of the file, so these win for

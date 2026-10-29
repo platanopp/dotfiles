@@ -75,7 +75,7 @@ PanelWindow {
         spacing: 10
 
         move: Transition {
-            NumberAnimation { properties: "y"; duration: Theme.durMedium; easing.type: Easing.OutCubic }
+            Elastic { properties: "y"; small: true }
         }
 
         Repeater {
@@ -182,7 +182,7 @@ PanelWindow {
                 ParallelAnimation {
                     id: entrance
                     NumberAnimation { target: card; property: "opacity"; to: 1; duration: Theme.durMedium }
-                    NumberAnimation { target: card; property: "x"; to: 0; duration: Theme.durLong; easing.type: Easing.OutCubic }
+                    Elastic { target: card; property: "x"; to: 0 }
                 }
 
                 HoverHandler {

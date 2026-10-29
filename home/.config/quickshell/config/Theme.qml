@@ -140,6 +140,25 @@ Singleton {
     readonly property int durLong: 300
     readonly property int durExtraLong: 450
 
+    // Springs, for things that arrive: a panel growing out of its pill, an
+    // overlay's card, a notification sliding in, an indicator landing on the
+    // tab it moved to. They run past where they are going and settle back,
+    // the soft give of a damped spring (components/Elastic.qml). Leaving,
+    // fading and colour stay on the plain curves above: a spring on the way
+    // out reads as hesitation, and opacity has no "past".
+    //
+    // The overshoot is OutBack's parameter. Its peak is 4s^3 / 27(s+1)^2 of
+    // the distance travelled: 1.2 runs ~5% past, about what Hyprland's "soft"
+    // spring does, so windows and the shell move alike. Small moves (a knob,
+    // a tab indicator) get more, or their few pixels of give are invisible.
+    readonly property int durSpring: 460
+    readonly property int durSpringSmall: 340
+    readonly property real springOvershoot: 1.2        // ~5% past
+    readonly property real springOvershootSmall: 1.8   // ~11% past
+    // How far past, as a fraction of the move: room a window must keep so
+    // the overshoot is not cut off at its edge.
+    readonly property real springReach: 0.06
+
     // State layer opacities for hover / press feedback.
     readonly property real hoverOpacity: 0.08
     readonly property real pressOpacity: 0.14

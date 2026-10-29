@@ -529,18 +529,18 @@ PanelWindow {
 
         opacity: overlay.open ? 1 : 0
         visible: opacity > 0
-        scale: overlay.open ? 1 : 0.97
+        scale: overlay.open ? 1 : 0.94
 
         // Drops in a few pixels as it appears, the way the launcher does.
         transform: Translate {
             y: overlay.open ? 0 : -8
             Behavior on y {
-                NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic }
+                Elastic { small: true }
             }
         }
 
         Behavior on height {
-            NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic }
+            Elastic {}
         }
 
         Behavior on opacity {
@@ -548,7 +548,7 @@ PanelWindow {
         }
 
         Behavior on scale {
-            NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic }
+            Elastic { small: true }
         }
 
         // The overlays' solid card and shadow, no outline.
@@ -696,10 +696,10 @@ PanelWindow {
                         width: overlay.section === "yazi" ? yaziTab.width : hyprTab.width
 
                         Behavior on x {
-                            NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic }
+                            Elastic { small: true }
                         }
                         Behavior on width {
-                            NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic }
+                            Elastic { small: true }
                         }
                     }
 

@@ -447,7 +447,7 @@ PanelWindow {
                         clip: true
 
                         Behavior on Layout.preferredHeight {
-                            NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic }
+                            Elastic {}
                         }
 
                         WheelHandler {

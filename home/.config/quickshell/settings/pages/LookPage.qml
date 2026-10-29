@@ -88,11 +88,11 @@ Column {
                                             : win.areaW * (1 - win.share)) - preview.gapIn * 2
                     height: mock.height - preview.gapTop - preview.gapOut - preview.gapIn * 2
 
-                    Behavior on y { NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic } }
-                    Behavior on height { NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic } }
+                    Behavior on y { Elastic {} }
+                    Behavior on height { Elastic {} }
 
-                    Behavior on x { NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic } }
-                    Behavior on width { NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic } }
+                    Behavior on x { Elastic {} }
+                    Behavior on width { Elastic {} }
 
                     RectangularShadow {
                         anchors.fill: parent

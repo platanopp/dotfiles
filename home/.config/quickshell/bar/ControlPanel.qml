@@ -192,6 +192,8 @@ PanelWindow {
         // there -- the pill flicked left before growing.
         minWindowWidth: settingsItem.settingsWidth
         minWindowHeight: Math.max(settingsItem.settingsHeight, settingsItem.screen.height - 48)
+        // The spring's room on top of that would run off the screen.
+        maxWindowHeight: settingsItem.screen.height
         targetWidth: settingsItem.settingsOpen ? settingsItem.settingsWidth
                    : settingsItem.panelOpen || settingsItem.notifOpen ? 372
                    : compactRow.implicitWidth + 24 + Theme.pillPaddingH * 2
@@ -856,7 +858,7 @@ PanelWindow {
                         color: Theme.accent
 
                         Behavior on x {
-                            NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic }
+                            Elastic { small: true }
                         }
                     }
 

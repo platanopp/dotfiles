@@ -31,7 +31,7 @@ Rectangle {
         x: root.checked ? root.width - width - 4 : 4
         color: root.checked ? root.onTint : Theme.textSecondary
 
-        Behavior on x { NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic } }
+        Behavior on x { Elastic { small: true } }
         Behavior on color { ColorAnimation { duration: Theme.durMedium } }
 
         IconGlyph {

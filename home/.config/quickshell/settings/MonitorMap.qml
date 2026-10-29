@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell.Widgets
+import qs.components
 import qs.config
 import qs.services
 
@@ -114,8 +115,8 @@ Item {
             color: "transparent"
             scale: plate.lifted ? 1.03 : 1
 
-            Behavior on x { enabled: !plate.lifted; NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic } }
-            Behavior on y { enabled: !plate.lifted; NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic } }
+            Behavior on x { enabled: !plate.lifted; Elastic { small: true } }
+            Behavior on y { enabled: !plate.lifted; Elastic { small: true } }
             Behavior on scale { NumberAnimation { duration: Theme.durShort } }
 
             readonly property color ink: Theme.textPrimary

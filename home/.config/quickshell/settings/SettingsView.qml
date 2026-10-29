@@ -294,7 +294,7 @@ Item {
                     ParallelAnimation {
                         id: arrive
                         NumberAnimation { target: pageLoader; property: "opacity"; from: 0; to: 1; duration: Theme.durMedium; easing.type: Easing.OutCubic }
-                        NumberAnimation { target: rise; property: "y"; from: 12; to: 0; duration: Theme.durMedium; easing.type: Easing.OutCubic }
+                        Elastic { target: rise; property: "y"; from: 12; to: 0 }
                     }
                 }
             }
@@ -348,7 +348,7 @@ Item {
 
                 onLastChanged: if (toast.last) { toast.shown = true; hideToast.restart() }
 
-                Behavior on anchors.bottomMargin { NumberAnimation { id: toastSlide; duration: Theme.durMedium; easing.type: Easing.OutCubic } }
+                Behavior on anchors.bottomMargin { Elastic { id: toastSlide } }
 
                 Timer {
                     id: hideToast
