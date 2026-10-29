@@ -169,6 +169,8 @@ PanelWindow {
     readonly property int searchHeight: 62
     readonly property int rowHeight: 46
     readonly property int headerHeight: 28
+    // How far one notch of the mouse wheel moves the results: two rows.
+    readonly property int wheelStep: overlay.rowHeight * 2
     readonly property int maxListHeight: 440
     readonly property int listPad: 6
     readonly property int footerHeight: 36
@@ -1028,6 +1030,40 @@ PanelWindow {
                     }
                 }
             }
+        }
+
+        // The wheel moves the list a fixed distance per notch, eased there.
+        // Left to the ListView, a wheel flicks it by velocity: one notch went
+        // a short and different way each time, and a high-resolution wheel's
+        // many small events added up to a crawl. Deltas are taken as they
+        // come, so a high-resolution wheel moves the same per notch, only
+        // more finely. A touchpad's pixel scrolling is left to the ListView,
+        // which already follows the fingers.
+        MouseArea {
+            anchors.fill: list
+            visible: list.visible
+            acceptedButtons: Qt.NoButton
+
+            onWheel: wheel => {
+                if (wheel.pixelDelta.y !== 0 || wheel.angleDelta.y === 0) {
+                    wheel.accepted = false
+                    return
+                }
+                var top = list.originY
+                var bottom = Math.max(top, list.originY + list.contentHeight - list.height)
+                var from = wheelScroll.running ? wheelScroll.to : list.contentY
+                wheelScroll.to = Math.max(top, Math.min(bottom,
+                    from - wheel.angleDelta.y / 120 * overlay.wheelStep))
+                wheelScroll.restart()
+            }
+        }
+
+        NumberAnimation {
+            id: wheelScroll
+            target: list
+            property: "contentY"
+            duration: Theme.durMedium
+            easing.type: Easing.OutCubic
         }
 
         // ── Footer ───────────────────────────────────────────────────────
