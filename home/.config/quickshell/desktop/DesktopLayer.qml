@@ -62,6 +62,7 @@ PanelWindow {
     }
 
     Item {
+        id: area
         anchors.fill: parent
         visible: !layer.editing
 
@@ -70,15 +71,18 @@ PanelWindow {
 
             WidgetHost {
                 // Kept on the monitor if it has shrunk since the widget was
-                // put there.
-                x: Math.max(0, Math.min(model.wx, layer.width - width))
-                y: Math.max(0, Math.min(model.wy, layer.height - height))
+                // put there. Measured on this item, not the window: a
+                // PanelWindow's width and height are the size it asked for,
+                // 0 when anchored to every edge, and clamping to those put
+                // every widget in the top-left corner.
+                x: Math.max(0, Math.min(model.wx, area.width - width))
+                y: Math.max(0, Math.min(model.wy, area.height - height))
                 kind: model.kind
                 bar: layer.bar
                 // A hidden window keeps its items, so this has to say so
                 // itself: nothing redraws or listens while covered, under a
                 // fullscreen window, or while the picker shows its own copy.
-                live: layer.visible && !layer.editing && !Widgets.isCovered(layer.screenName)
+                live: layer.visible === true && !layer.editing && !Widgets.isCovered(layer.screenName)
             }
         }
     }
