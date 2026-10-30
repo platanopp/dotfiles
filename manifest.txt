@@ -1,5 +1,11 @@
 # What this repo tracks, as paths relative to $HOME.
 #
+# The shell, the Hyprland configuration it runs on, and the theming that makes
+# the rest of the desktop match it -- nothing else. It is published for anyone
+# to install the shell from, so the user's own programs (their terminal and
+# editors, chat, torrents, music) are not in it: those are backed up in a
+# private repository of their own, ~/dotfiles-private, which is never pushed.
+#
 # An allowlist, not a denylist. ~/.config is 1.5 GB and most of it is state:
 # browser profiles, Electron caches, session tokens, game saves. Listing what
 # to keep means a new app dropping a token in there is out by default; a
@@ -7,49 +13,9 @@
 #
 # Lines are paths. Blank lines and # comments are ignored.
 
-# ── Shell ────────────────────────────────────────────────────────────────
-.zshrc
-.zprofile
-# Read by greetd, which starts the session with /bin/sh rather than zsh --
-# the session's PATH comes from here.
-.profile
-.config/zsh
-.config/starship.toml
-.config/fish
-
-# ── Compositor and the shell that runs on it ─────────────────────────────
-.config/hypr
+# ── The shell and the compositor it runs on ──────────────────────────────
 .config/quickshell
-.config/fuzzel
-
-# ── Terminal and editors ─────────────────────────────────────────────────
-.config/kitty
-.config/nvim
-.config/micro/settings.json
-.config/micro/colorschemes
-
-# ── Tools ────────────────────────────────────────────────────────────────
-.config/yazi
-.config/eza
-.config/fastfetch
-.config/qBittorrent/qBittorrent.conf
-.config/qBittorrent/categories.json
-.config/qBittorrent/watched_folders.json
-
-# ── Theming ──────────────────────────────────────────────────────────────
-.config/matugen
-.config/wallust
-.config/qt5ct
-.config/qt6ct
-.config/kdeglobals
-.config/nwg-look
-.config/dolphinrc
-
-# ── Desktop plumbing ─────────────────────────────────────────────────────
-.config/mimeapps.list
-.config/xdg-desktop-portal
-.config/autostart
-.config/trashrc
+.config/hypr
 
 # ── Cursor ───────────────────────────────────────────────────────────────
 #
@@ -65,14 +31,18 @@
 .local/share/icons/Posy_Cursor
 .local/share/icons/Posy_Cursor-hyprcursor
 
-# ── Application tweaks ───────────────────────────────────────────────────
-.config/spicetify/config-xpui.ini
-.config/Vencord/settings
-.config/gtk-3.0
-.config/xfce4/xfconf/xfce-perchannel-xml/thunar.xml
-.config/xfce4/helpers.rc
-.local/share/xfce4/helpers/kitty.desktop
-.config/Thunar
-.local/share/icons/Papirus-Dark-Grey
+# ── Theming: GTK and Qt applications in the shell's colours ──────────────
+#
+# gtk-3.0 by file: its bookmarks are this user's folders and network shares,
+# and go with the private repository.
+.config/gtk-3.0/gtk.css
+.config/gtk-3.0/settings.ini
+.config/nwg-look
 .local/share/themes/Adwaita-dark
-.local/share/applications/vlc.desktop
+.local/share/icons/Papirus-Dark-Grey
+.config/qt5ct
+.config/qt6ct
+.config/kdeglobals
+# Which portal answers which question: hyprland's for the screen, GTK's for
+# settings, so applications asking for the colour scheme are told dark.
+.config/xdg-desktop-portal

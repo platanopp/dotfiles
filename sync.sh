@@ -43,11 +43,11 @@ done < "$repo/manifest.txt"
 
 echo "synced $copied entries"
 
-# A few files hold this machine's home as an absolute path: GTK's bookmarks,
-# qt6ct's colour scheme, qBittorrent's and spicetify's own records -- formats
-# that read neither $HOME nor ~ -- and hyprpaper's wallpaper, which the shell
-# writes out in full. Copied as they are, they pointed a fresh install into
-# this user's home. The
+# A few files hold this machine's home as an absolute path: qt6ct's colour
+# scheme, GTK's bookmarks, qBittorrent's and spicetify's own records --
+# formats that read neither $HOME nor ~ -- and hyprpaper's wallpaper, which
+# the shell writes out in full. Copied as they are, they pointed a fresh
+# install into this user's home. The
 # repo keeps @HOME@ in its place instead, and install.sh (and the shell's
 # updater) writes back the home of whoever installs. Only a whole path
 # segment is replaced: /home/ana, not the start of /home/ana2.

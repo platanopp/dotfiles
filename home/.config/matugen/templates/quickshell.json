@@ -1,4 +1,0 @@
-{
-    "background": "{{colors.background.default.hex}}",
-    "accent": "{{colors.primary.default.hex}}"
-}

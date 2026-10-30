@@ -8,7 +8,7 @@
 #
 #   ./install.sh              everything
 #   ./install.sh --dry-run    say what it would do, touch nothing
-#   ./install.sh packages     only the package lists
+#   ./install.sh packages     only the packages (packages/shell.txt)
 #   ./install.sh config       only the dotfiles
 #   ./install.sh post         only the post-install steps
 
@@ -48,31 +48,39 @@ install_packages() {
         return
     fi
 
-    say "Repository packages"
-    # Two lists, read as one. runtime.txt names what this configuration calls
-    # and pacman.txt what the machine had; the overlap is harmless because
-    # pacman is asked only for what is actually missing.
+    say "Packages"
+    # Every list under packages/ -- here shell.txt, what the shell and its
+    # configuration need, and only that. Filtered against what is already
+    # installed, so a rerun asks for nothing; then split by where each one
+    # lives -- the repositories this machine has, or the AUR. A name the
+    # repositories lack would make pacman refuse the whole list, and which
+    # side a package is on varies between Arch and its derivatives.
     local wanted
-    wanted="$(cat "$repo/packages/runtime.txt" "$repo/packages/pacman.txt" \
-              | sed 's/#.*//' | tr -d ' \t' | grep -v '^$' | sort -u)"
+    wanted="$(cat "$repo"/packages/*.txt | sed 's/#.*//' | tr -d ' \t' | grep -v '^$' | sort -u)"
 
-    # Filtered against what is already installed so the list pacman is handed
-    # is only what is actually missing -- otherwise a rerun reinstalls 200
-    # packages to end up where it started.
-    local missing=()
+    local repo_missing=() aur_missing=()
     while read -r pkg; do
         [ -z "$pkg" ] && continue
-        pacman -Qq "$pkg" >/dev/null 2>&1 || missing+=("$pkg")
+        pacman -Qq "$pkg" >/dev/null 2>&1 && continue
+        if pacman -Si "$pkg" >/dev/null 2>&1; then
+            repo_missing+=("$pkg")
+        else
+            aur_missing+=("$pkg")
+        fi
     done <<< "$wanted"
 
-    if [ ${#missing[@]} -eq 0 ]; then
+    if [ ${#repo_missing[@]} -eq 0 ] && [ ${#aur_missing[@]} -eq 0 ]; then
         ok "all $(wc -l <<< "$wanted") already installed"
-    else
-        note "${#missing[@]} missing of $(wc -l <<< "$wanted")"
-        run sudo pacman -S --needed --noconfirm "${missing[@]}"
+        return
     fi
 
-    say "AUR packages"
+    if [ ${#repo_missing[@]} -gt 0 ]; then
+        note "${#repo_missing[@]} from the repositories"
+        run sudo pacman -S --needed --noconfirm "${repo_missing[@]}"
+    fi
+
+    [ ${#aur_missing[@]} -eq 0 ] && return
+    note "${#aur_missing[@]} from the AUR: ${aur_missing[*]}"
     local helper=""
     for candidate in paru yay; do
         command -v "$candidate" >/dev/null && { helper="$candidate"; break; }
@@ -89,21 +97,10 @@ install_packages() {
               && helper=paru
             rm -rf "$tmp"
         fi
-        [ -z "$helper" ] && { warn "could not get an AUR helper; skipping AUR packages"; return; }
+        [ -z "$helper" ] && { warn "could not get an AUR helper; skipping: ${aur_missing[*]}"; return; }
     fi
 
-    local aur_missing=()
-    while read -r pkg; do
-        [ -z "$pkg" ] && continue
-        pacman -Qq "$pkg" >/dev/null 2>&1 || aur_missing+=("$pkg")
-    done < "$repo/packages/aur.txt"
-
-    if [ ${#aur_missing[@]} -eq 0 ]; then
-        ok "all $(wc -l < "$repo/packages/aur.txt") already installed"
-    else
-        note "${#aur_missing[@]} missing: ${aur_missing[*]}"
-        run "$helper" -S --needed --noconfirm "${aur_missing[@]}"
-    fi
+    run "$helper" -S --needed --noconfirm "${aur_missing[@]}"
 }
 
 # ── Dotfiles ─────────────────────────────────────────────────────────────
@@ -157,25 +154,7 @@ install_config() {
 # ── Everything that has its own manifest ─────────────────────────────────
 
 install_post() {
-    say "Plugins and themes"
-
-    # Tracked as a lockfile rather than as the plugins themselves: the repo
-    # keeps yazi's package.toml, and yazi fetches what it names.
-    if command -v ya >/dev/null && [ -f "$HOME/.config/yazi/package.toml" ]; then
-        note "yazi plugins"
-        run ya pkg install
-    else
-        note "yazi not installed yet; skipping its plugins"
-    fi
-
-    # Spicetify patches the Spotify client in place, so it has to be re-run
-    # on the target machine; the repo only carries which theme was chosen.
-    if command -v spicetify >/dev/null; then
-        note "spicetify"
-        run spicetify backup apply
-    else
-        note "spicetify not installed; skipping"
-    fi
+    say "Services and fonts"
 
     # The units live in the configuration they belong to, and systemd only
     # knows about them through symlinks in ~/.config/systemd/user, which this
@@ -217,13 +196,10 @@ install_post() {
     fi
 
     say "Left to do by hand"
-    note "Vencord: run the installer once so it patches your Discord"
-    note "ddcutil needs i2c-dev at boot, for switching the side display off:"
+    note "ddcutil needs i2c-dev at boot, for switching a side display off:"
     note "  echo i2c-dev | sudo tee /etc/modules-load.d/i2c-dev.conf"
-    note "Wooting RGB: the SDK and wooting-bg-service are built into ~/.local"
-    note "by hand; without them the keyboard lighting just stays off"
-    note "Zen, Discord and Obsidian keep accounts and sessions, which this"
-    note "repo deliberately does not carry -- sign in on the new machine"
+    note "hypr/monitors.lua describes the publisher's two monitors; set yours"
+    note "in Settings -> Displays and it is rewritten for this machine"
 }
 
 case "$STAGE" in

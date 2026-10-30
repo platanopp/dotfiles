@@ -1,0 +1,80 @@
+# What the shell, its Hyprland configuration and its theming need, by name.
+#
+# Only that: this is what install.sh installs for anyone setting the shell
+# up, so the rest of whatever the publishing machine happens to have (games,
+# chat, editors, drivers) is not in it. Each line is here because something
+# in home/ calls it or loads it; the comments say what. install.sh takes from
+# the distribution's repositories what they carry and asks an AUR helper for
+# the rest, so a name that is in the AUR on one Arch and in the repositories
+# on another (CachyOS carries quickshell) installs either way.
+
+# ── The session ──────────────────────────────────────────────────────────
+hyprland
+quickshell
+# The shortcut sheet, the overview and the display settings read hyprland.lua
+# with it
+lua
+xdg-desktop-portal-hyprland
+xdg-desktop-portal-gtk
+hyprpaper                     # the wallpaper
+mpvpaper                      # video wallpapers (scripts/video_wallpaper.py)
+hypridle                      # screens off and the lock after idle
+hyprsunset                    # night light (Settings -> Colour)
+hyprpolkitagent               # password prompts, started from hyprland.lua
+wlopm                         # panels off and on (hypr/scripts/idle-screens.sh)
+ddcutil                       # the side display off over DDC, same script
+qt6-5compat                   # OpacityMask: the media widget and the lock card
+
+# ── Type ─────────────────────────────────────────────────────────────────
+otf-apple-sf-pro              # SF Pro Text and Display, the shell's words
+nerd-fonts-sf-mono            # SFMono Nerd Font Mono, its icons and keycaps
+noto-fonts
+noto-fonts-emoji
+fontconfig
+
+# ── Theming: the rest of the desktop in the shell's colours ──────────────
+qt6ct
+qt5ct
+breeze-icons                  # qt6ct's icon theme
+
+# ── What the bar and the panels read and drive ───────────────────────────
+pipewire
+pipewire-pulse
+wireplumber                   # wpctl: outputs, inputs, volume
+libpulse                      # pactl and parec: per-app volume, the spectrum
+networkmanager                # nmcli: the network panel
+bluez
+bluez-utils                   # bluetoothctl: pairing
+power-profiles-daemon
+upower                        # power profiles and battery
+brightnessctl                 # brightness keys (hyprland.lua)
+playerctl                     # media keys (hyprland.lua)
+openrgb                       # keyboard lighting, when a keyboard has some
+nvibrant-bin                  # NVIDIA digital vibrance (Settings -> Colour)
+
+# ── What the shell's scripts run ─────────────────────────────────────────
+python
+python-pillow                 # wallpaper thumbnails
+python-numpy                  # the spectrum
+python-gobject                # osu-mpris.py on D-Bus
+imagemagick                   # the wallpaper cropper, the profile picture
+ffmpeg                        # stills of video wallpapers
+curl                          # album art for the media panel's colours
+git                           # Settings -> About: updates and backup
+rsync                         # the backup's sync.sh
+diffutils
+which
+xdg-utils                     # xdg-open: recordings, launcher results
+xdg-user-dirs                 # where recordings go
+wl-clipboard                  # copying a launcher result
+libnotify                     # notify-send, around a recording
+zenity                        # the recorder's folder picker
+gpu-screen-recorder           # screen recording
+grim                          # the lock screen's backdrop
+grimblast-git                 # screenshots (Super + Shift + P)
+slurp                         # grimblast's area selection
+
+# ── Programs hyprland.lua binds ──────────────────────────────────────────
+kitty                         # the terminal (Super + T)
+thunar                        # the file manager (Super + E)
+yazi                          # its file manager window, and the sheet's Yazi tab
