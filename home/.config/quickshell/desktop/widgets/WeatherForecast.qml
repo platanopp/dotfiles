@@ -1,109 +1,126 @@
 import QtQuick
-import qs.components
+import QtQuick.Layouts
 import qs.config
 import qs.desktop
 import qs.services
 
-// The next five days: the sky, the high, the low.
+// The clock panel's forecast list on its own: one row a day, the sky, the
+// high and the low, today's row tinted in the accent as it is there.
 WidgetCard {
     id: root
 
     readonly property var shown: Weather.days.slice(0, 5)
 
-    Column {
+    ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 18
-        anchors.leftMargin: 22
-        anchors.rightMargin: 22
-        spacing: 12
+        anchors.margins: 16
+        spacing: 8
 
-        Item {
-            width: parent.width
-            height: title.implicitHeight
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 6
 
             Text {
-                id: title
                 text: "Forecast"
                 color: Theme.textPrimary
                 font.pixelSize: 13
-                font.weight: Font.DemiBold
+                font.bold: true
                 font.family: Theme.fontText
             }
 
             Text {
-                anchors.right: parent.right
-                anchors.baseline: title.baseline
-                width: Math.min(implicitWidth, parent.width - title.implicitWidth - 12)
-                horizontalAlignment: Text.AlignRight
+                Layout.fillWidth: true
                 text: Weather.city
                 color: Theme.textMuted
-                font.pixelSize: 12
+                font.pixelSize: 10
                 font.family: Theme.fontText
                 elide: Text.ElideRight
             }
         }
 
-        Row {
+        Column {
+            Layout.fillWidth: true
             visible: root.shown.length > 0
-            width: parent.width
+            spacing: 2
 
             Repeater {
                 model: root.shown
 
-                Column {
+                Rectangle {
                     id: day
                     required property var modelData
                     required property int index
-                    width: parent.width / 5
-                    spacing: 6
 
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: day.index === 0 ? "Today"
-                            : new Date(day.modelData.date + "T12:00").toLocaleDateString(Qt.locale("en_US"), "ddd")
-                        color: Theme.textSecondary
-                        font.pixelSize: 11
-                        font.weight: Font.DemiBold
-                        font.family: Theme.fontText
-                    }
+                    width: parent.width
+                    height: 26
+                    radius: Theme.radiusSmall
+                    color: index === 0 ? Theme.alpha(Theme.accent, 0.14) : "transparent"
 
-                    IconGlyph {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: Weather.icon(day.modelData.code, true)
-                        color: Theme.textPrimary
-                        size: 24
-                    }
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 10
+                        anchors.rightMargin: 10
+                        spacing: 8
 
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: Math.round(day.modelData.max) + "°"
-                        color: Theme.textPrimary
-                        font.pixelSize: 14
-                        font.weight: Font.DemiBold
-                        font.family: Theme.fontText
-                        font.features: Theme.tabular
-                    }
+                        Text {
+                            Layout.preferredWidth: 30
+                            text: day.index === 0 ? "today"
+                                : new Date(day.modelData.date + "T12:00").toLocaleDateString(Qt.locale("en_US"), "ddd")
+                            color: day.index === 0 ? Theme.accent : Theme.textSecondary
+                            font.pixelSize: 10
+                            font.bold: day.index === 0
+                            font.family: Theme.fontText
+                        }
 
-                    Text {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        text: Math.round(day.modelData.min) + "°"
-                        color: Theme.textMuted
-                        font.pixelSize: 12
-                        font.family: Theme.fontText
-                        font.features: Theme.tabular
+                        Text {
+                            text: Weather.icon(day.modelData.code, true)
+                            color: Theme.textPrimary
+                            font.pixelSize: 13
+                            font.family: Theme.fontMono
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: Weather.describe(day.modelData.code)
+                            color: Theme.textMuted
+                            font.pixelSize: 10
+                            font.family: Theme.fontText
+                            elide: Text.ElideRight
+                        }
+
+                        Text {
+                            text: Math.round(day.modelData.max) + "°"
+                            color: Theme.textPrimary
+                            font.pixelSize: 11
+                            font.bold: true
+                            font.family: Theme.fontText
+                            font.features: Theme.tabular
+                        }
+
+                        Text {
+                            Layout.preferredWidth: 26
+                            horizontalAlignment: Text.AlignRight
+                            text: Math.round(day.modelData.min) + "°"
+                            color: Theme.textMuted
+                            font.pixelSize: 11
+                            font.family: Theme.fontText
+                            font.features: Theme.tabular
+                        }
                     }
                 }
             }
         }
 
         Text {
+            Layout.fillWidth: true
             visible: root.shown.length === 0
-            width: parent.width
-            text: Weather.loading ? "Fetching the forecast" : "No forecast yet. It arrives once the network is up."
+            text: Weather.loading ? "Fetching the forecast..." : "No forecast yet. It arrives once the network is up."
             color: Theme.textMuted
-            font.pixelSize: 12
+            font.pixelSize: 11
             font.family: Theme.fontText
             wrapMode: Text.WordWrap
         }
+
+        Item { Layout.fillHeight: true }
     }
 }

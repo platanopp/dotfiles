@@ -1,90 +1,139 @@
 import QtQuick
+import QtQuick.Layouts
 import qs.components
 import qs.config
 import qs.desktop
 import qs.services
 
-// The temperature and the sky, from the bar's own forecast (Weather), with
-// today's high and low under them.
+// The clock panel's weather block on its own: the header with the city, and
+// the raised tile with the sky, the temperature, humidity and wind.
 WidgetCard {
     id: root
 
-    readonly property var todayRange: Weather.days.length > 0 ? Weather.days[0] : null
+    ColumnLayout {
+        anchors.fill: parent
+        anchors.margins: 16
+        spacing: 8
 
-    Row {
-        visible: Weather.ready
-        anchors.left: parent.left
-        anchors.leftMargin: 24
-        anchors.verticalCenter: parent.verticalCenter
-        spacing: 18
-
-        IconGlyph {
-            anchors.verticalCenter: parent.verticalCenter
-            text: Weather.icon(Weather.code, Weather.isDay)
-            color: Theme.textPrimary
-            size: 48
-        }
-
-        Column {
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: 0
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 6
 
             Text {
-                text: Math.round(Weather.temp) + "°"
+                text: "Weather"
                 color: Theme.textPrimary
-                font.pixelSize: 36
-                font.weight: Font.Bold
-                font.family: Theme.fontDisplay
-                font.features: Theme.tabular
-            }
-
-            Text {
-                text: Weather.describe(Weather.code)
-                color: Theme.textSecondary
                 font.pixelSize: 13
+                font.bold: true
                 font.family: Theme.fontText
             }
 
             Text {
-                visible: root.todayRange !== null
-                topPadding: 2
-                text: root.todayRange ? "H " + Math.round(root.todayRange.max) + "°  L "
-                                        + Math.round(root.todayRange.min) + "°" : ""
+                Layout.fillWidth: true
+                text: Weather.city
                 color: Theme.textMuted
-                font.pixelSize: 12
+                font.pixelSize: 10
                 font.family: Theme.fontText
-                font.features: Theme.tabular
+                elide: Text.ElideRight
             }
         }
-    }
 
-    // Before the first answer, or when there is none: say which.
-    Column {
-        visible: !Weather.ready
-        anchors.left: parent.left
-        anchors.leftMargin: 24
-        anchors.right: parent.right
-        anchors.rightMargin: 24
-        anchors.verticalCenter: parent.verticalCenter
-        spacing: 4
+        Rectangle {
+            visible: Weather.ready
+            Layout.fillWidth: true
+            Layout.preferredHeight: 70
+            radius: Theme.radiusLarge
+            color: Theme.surfaceContainer
 
-        Text {
-            text: Weather.loading ? "Fetching the forecast" : "No forecast yet"
-            color: Theme.textPrimary
-            font.pixelSize: 14
-            font.weight: Font.DemiBold
-            font.family: Theme.fontText
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 16
+                anchors.rightMargin: 16
+                spacing: 12
+
+                Text {
+                    text: Weather.icon(Weather.code, Weather.isDay)
+                    color: Theme.textPrimary
+                    font.pixelSize: 30
+                    font.family: Theme.fontMono
+                }
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 0
+
+                    Text {
+                        text: Math.round(Weather.temp) + "°"
+                        color: Theme.textPrimary
+                        font.pixelSize: 22
+                        font.bold: true
+                        font.family: Theme.fontDisplay
+                        font.features: Theme.tabular
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: Weather.describe(Weather.code)
+                        color: Theme.textSecondary
+                        font.pixelSize: 10
+                        font.family: Theme.fontText
+                        elide: Text.ElideRight
+                    }
+                }
+
+                ColumnLayout {
+                    spacing: 2
+
+                    RowLayout {
+                        spacing: 4
+
+                        IconGlyph {
+                            text: "󰖎"
+                            color: Theme.textMuted
+                            size: Theme.iconTiny
+                        }
+
+                        Text {
+                            text: Weather.humidity + "%"
+                            color: Theme.textMuted
+                            font.pixelSize: 11
+                            font.family: Theme.fontText
+                            font.features: Theme.tabular
+                        }
+                    }
+
+                    RowLayout {
+                        spacing: 4
+
+                        IconGlyph {
+                            text: "󰖝"
+                            color: Theme.textMuted
+                            size: Theme.iconTiny
+                        }
+
+                        Text {
+                            text: Math.round(Weather.wind) + " km/h"
+                            color: Theme.textMuted
+                            font.pixelSize: 11
+                            font.family: Theme.fontText
+                        }
+                    }
+                }
+            }
         }
 
+        // Before the first answer, or when there is none: say which.
         Text {
-            width: parent.width
-            text: Weather.error.length > 0 ? Weather.error : "It arrives once the network is up."
+            visible: !Weather.ready
+            Layout.fillWidth: true
+            text: Weather.loading ? "Fetching the forecast..."
+                : Weather.error.length > 0 ? "No forecast: " + Weather.error
+                : "No forecast yet. It arrives once the network is up."
             color: Theme.textMuted
-            font.pixelSize: 12
+            font.pixelSize: 11
             font.family: Theme.fontText
             wrapMode: Text.WordWrap
-            maximumLineCount: 2
-            elide: Text.ElideRight
         }
+
+        Item { Layout.fillHeight: true }
     }
 }

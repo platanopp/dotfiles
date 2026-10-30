@@ -390,14 +390,18 @@ hl.window_rule({
 --
 -- Drawn by the shell on its own layers: "quickshell:desktop" under the
 -- windows (one per monitor, unmapped when empty or under a fullscreen
--- window) and "quickshell:widgets", the picker, over everything. Neither is
--- blurred -- the widgets' cards are opaque, and the picker dims with its own
--- scrim, like the other overlays -- and both animate themselves.
+-- window) and "quickshell:widgets", the picker, over everything. The
+-- widgets are the bar panels' glass, blurred like the bar: same threshold,
+-- so the card is blurred and the transparent space around it is not, and
+-- the catch-all xray rule keeps it to the wallpaper, which is cached. The
+-- picker dims with its own scrim, like the other overlays. Both animate
+-- themselves.
 hl.layer_rule({
-    name    = "quickshell-desktop",
-    match   = { namespace = "^quickshell:desktop$" },
-    blur    = false,
-    no_anim = true,
+    name         = "quickshell-desktop",
+    match        = { namespace = "^quickshell:desktop$" },
+    blur         = true,
+    ignore_alpha = 0.3,
+    no_anim      = true,
 })
 
 hl.layer_rule({

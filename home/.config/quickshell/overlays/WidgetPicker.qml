@@ -276,7 +276,7 @@ PanelWindow {
 
                         RectangularShadow {
                             anchors.fill: host
-                            radius: host.kind === "clock-analog" ? width / 2 : Theme.radiusXLarge
+                            radius: host.kind === "clock-analog" || host.kind === "clock-pill" ? height / 2 : Theme.radiusXLarge
                             blur: 28
                             offset.y: 10
                             color: Theme.alpha(Theme.shadow, 0.5)
@@ -382,7 +382,7 @@ PanelWindow {
 
         RectangularShadow {
             anchors.fill: ghostHost
-            radius: ghost.kind === "clock-analog" ? width / 2 : Theme.radiusXLarge
+            radius: ghost.kind === "clock-analog" || ghost.kind === "clock-pill" ? height / 2 : Theme.radiusXLarge
             blur: 28
             offset.y: 10
             color: Theme.alpha(Theme.shadow, 0.5)

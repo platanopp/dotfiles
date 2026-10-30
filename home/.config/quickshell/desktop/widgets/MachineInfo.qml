@@ -1,14 +1,15 @@
 import QtQuick
+import QtQuick.Layouts
 import Quickshell.Io
-import qs.components
+import Quickshell.Widgets
 import qs.config
 import qs.desktop
 import qs.services
 
-// What fastfetch used to print in its terminal window: who and where, the
-// system, and the hardware under it. The same facts Settings -> About reads
-// (scripts/about.py), set as label and value rather than dressed up as a
-// terminal -- it is a card on the desktop, not a shell.
+// What fastfetch used to print in its terminal window, set as the control
+// panel's header sets the same facts: the user's picture and name, the host
+// and how long it has been up, then the system and the hardware under it as
+// label and value. The data is Settings -> About's (scripts/about.py).
 WidgetCard {
     id: root
 
@@ -26,7 +27,7 @@ WidgetCard {
         onLoaded: {
             var up = Number(uptimeFile.text().split(" ")[0])
             var d = Math.floor(up / 86400), h = Math.floor(up % 86400 / 3600), m = Math.floor(up % 3600 / 60)
-            root.uptime = (d > 0 ? d + "d " : "") + h + "h " + m + "m"
+            root.uptime = "up " + (d > 0 ? d + "d " : "") + h + "h " + m + "m"
         }
     }
 
@@ -50,9 +51,7 @@ WidgetCard {
     }
 
     readonly property var rows: [
-        { label: "OS", value: root.info.os || "" },
         { label: "Kernel", value: root.info.kernel || "" },
-        { label: "Uptime", value: root.uptime },
         { label: "Packages", value: root.info.packages ? root.info.packages + " (pacman)" : "" },
         { label: "Shell", value: root.info.shell || "" },
         { label: "WM", value: root.info.hyprland ? "Hyprland " + root.info.hyprland : "" },
@@ -61,65 +60,140 @@ WidgetCard {
         { label: "Memory", value: root.info.memory || "" }
     ]
 
-    Column {
+    ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 22
-        anchors.topMargin: 20
+        anchors.margins: 18
         spacing: 14
 
-        Row {
+        // The control panel's header: picture in a ring, name, then host and
+        // uptime, then the distribution, each line quieter than the last.
+        RowLayout {
+            Layout.fillWidth: true
             spacing: 12
 
-            IconGlyph {
-                anchors.verticalCenter: parent.verticalCenter
-                text: "\u{F303}"
-                color: Theme.textPrimary
-                size: 26
+            Item {
+                Layout.preferredWidth: 46
+                Layout.preferredHeight: 46
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: width / 2
+                    color: "transparent"
+                    border.width: 2
+                    border.color: Theme.alpha(Theme.foreground, 0.35)
+                }
+
+                ClippingRectangle {
+                    anchors.fill: parent
+                    anchors.margins: 3
+                    radius: width / 2
+                    color: Theme.surfaceContainerHigh
+
+                    Image {
+                        id: avatar
+                        anchors.fill: parent
+                        source: Profile.avatarSource
+                        fillMode: Image.PreserveAspectCrop
+                        asynchronous: true
+                        sourceSize.width: 128
+                        visible: status === Image.Ready
+                    }
+
+                    Text {
+                        anchors.centerIn: parent
+                        visible: avatar.status !== Image.Ready
+                        text: Profile.username.length > 0 ? Profile.username.charAt(0).toUpperCase() : "?"
+                        color: Theme.textPrimary
+                        font.pixelSize: 18
+                        font.bold: true
+                        font.family: Theme.fontText
+                    }
+                }
             }
 
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: root.info.user ? root.info.user + "@" + root.info.host : "This machine"
-                color: Theme.textPrimary
-                font.pixelSize: 15
-                font.weight: Font.Bold
-                font.family: Theme.fontText
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 1
+
+                Text {
+                    Layout.fillWidth: true
+                    text: Profile.username
+                    color: Theme.textPrimary
+                    font.pixelSize: 14
+                    font.bold: true
+                    font.family: Theme.fontText
+                    elide: Text.ElideRight
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    text: [root.info.host || "", root.uptime].filter(s => s.length > 0).join(" · ")
+                    color: Theme.textMuted
+                    font.pixelSize: 10
+                    font.family: Theme.fontText
+                    elide: Text.ElideRight
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    visible: text.length > 0
+                    text: root.info.os || ""
+                    color: Theme.textMuted
+                    opacity: 0.7
+                    font.pixelSize: 10
+                    font.family: Theme.fontText
+                    elide: Text.ElideRight
+                }
             }
         }
 
-        Column {
-            width: parent.width
-            spacing: 6
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 1
+            color: Theme.outline
+        }
+
+        GridLayout {
+            Layout.fillWidth: true
+            columns: 2
+            rowSpacing: 6
+            columnSpacing: 12
 
             Repeater {
                 model: root.rows
 
-                Row {
-                    id: row
+                Text {
                     required property var modelData
-                    width: parent.width
-                    spacing: 12
+                    required property int index
+                    Layout.row: index
+                    Layout.column: 0
+                    text: modelData.label
+                    color: Theme.textSecondary
+                    font.pixelSize: 11
+                    font.weight: Font.DemiBold
+                    font.family: Theme.fontText
+                }
+            }
 
-                    Text {
-                        width: 72
-                        text: row.modelData.label
-                        color: Theme.textMuted
-                        font.pixelSize: 12
-                        font.weight: Font.DemiBold
-                        font.family: Theme.fontText
-                    }
+            Repeater {
+                model: root.rows
 
-                    Text {
-                        width: parent.width - 84
-                        text: row.modelData.value.length > 0 ? row.modelData.value : "Unknown"
-                        color: Theme.textPrimary
-                        font.pixelSize: 12
-                        font.family: Theme.fontText
-                        font.features: Theme.tabular
-                        elide: Text.ElideRight
-                    }
+                Text {
+                    required property var modelData
+                    required property int index
+                    Layout.row: index
+                    Layout.column: 1
+                    Layout.fillWidth: true
+                    text: modelData.value.length > 0 ? modelData.value : "Unknown"
+                    color: modelData.value.length > 0 ? Theme.textPrimary : Theme.textMuted
+                    font.pixelSize: 11
+                    font.family: Theme.fontText
+                    font.features: Theme.tabular
+                    elide: Text.ElideRight
                 }
             }
         }
+
+        Item { Layout.fillHeight: true }
     }
 }

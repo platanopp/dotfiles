@@ -20,6 +20,20 @@
             "screen": "HDMI-A-1",
             "x": 1704,
             "y": 872
+        },
+        {
+            "id": "wmvu93ile7e",
+            "kind": "weather-forecast",
+            "screen": "DP-2",
+            "x": 1608,
+            "y": 88
+        },
+        {
+            "id": "wmvu93k2m2o",
+            "kind": "machine",
+            "screen": "DP-2",
+            "x": 1528,
+            "y": 744
         }
     ]
 }

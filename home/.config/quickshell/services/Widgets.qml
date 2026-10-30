@@ -26,28 +26,28 @@ Singleton {
     readonly property var categories: ["Clock", "Calendar", "Weather", "Media", "System"]
 
     readonly property var catalog: [
-        { kind: "clock-stacked", name: "Stacked", category: "Clock", file: "StackedClock",
-          description: "Hour above minute, the date under them.", w: 232, h: 256 },
+        { kind: "clock-pill", name: "Pill", category: "Clock", file: "PillClock",
+          description: "The time and the day on one line, like the bar.", w: 352, h: 72 },
         { kind: "clock-digital", name: "Digital", category: "Clock", file: "DigitalClock",
-          description: "The time on one line, the date below it.", w: 320, h: 148 },
+          description: "The time large, the day under it.", w: 288, h: 120 },
         { kind: "clock-analog", name: "Analog", category: "Clock", file: "AnalogClock",
           description: "Hands on a dial, a tick for every hour.", w: 208, h: 208 },
         { kind: "calendar-month", name: "Month", category: "Calendar", file: "MonthCalendar",
-          description: "The whole month, today marked.", w: 288, h: 288 },
+          description: "The month, turned with the arrows or the wheel.", w: 288, h: 304 },
         { kind: "calendar-week", name: "Week", category: "Calendar", file: "WeekCalendar",
-          description: "This week on one strip.", w: 336, h: 112 },
+          description: "This week on one strip.", w: 288, h: 112 },
         { kind: "weather-now", name: "Now", category: "Weather", file: "WeatherNow",
-          description: "The temperature and the sky outside.", w: 288, h: 128 },
+          description: "The sky outside, humidity and wind.", w: 288, h: 128 },
         { kind: "weather-forecast", name: "Forecast", category: "Weather", file: "WeatherForecast",
-          description: "Highs and lows for the next five days.", w: 336, h: 176 },
+          description: "Highs and lows for the next five days.", w: 288, h: 200 },
         { kind: "media", name: "Now playing", category: "Media", file: "NowPlaying",
-          description: "Cover, progress and the controls.", w: 248, h: 392 },
+          description: "Cover, progress and the controls.", w: 288, h: 336 },
         { kind: "visualizer", name: "Visualizer", category: "Media", file: "Visualizer",
-          description: "What is playing, as a spectrum.", w: 384, h: 168 },
+          description: "What is playing, as a spectrum.", w: 368, h: 144 },
         { kind: "system", name: "Resources", category: "System", file: "SystemMeters",
-          description: "CPU, memory and GPU, as they work.", w: 320, h: 232 },
+          description: "CPU, memory and GPU, as they work.", w: 320, h: 248 },
         { kind: "machine", name: "This machine", category: "System", file: "MachineInfo",
-          description: "What it runs, and what it runs on.", w: 368, h: 276 }
+          description: "What it runs, and what it runs on.", w: 320, h: 256 }
     ]
 
     function spec(kind) {
