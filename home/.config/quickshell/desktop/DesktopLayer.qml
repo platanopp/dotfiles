@@ -11,8 +11,13 @@ import qs.services
 // a game more often than not; the surface then costs the compositor nothing
 // at all. Input is only taken over the widgets themselves (their regions in
 // the mask), so a click on the bare desktop goes wherever it went before.
+//
+// Not `id: layer`: inside the widgets that name is every Item's own `layer`
+// property (the offscreen-texture group), which shadows the id. Each
+// `layer.x` there read undefined -- the clamp put every widget in the top-left
+// corner, `live` never came on and the meters never asked for a reading.
 PanelWindow {
-    id: layer
+    id: desk
 
     property var bar: null
     screen: bar.screen
@@ -21,14 +26,15 @@ PanelWindow {
 
     WidgetModel {
         id: widgets
-        screenName: layer.screenName
+        screenName: desk.screenName
     }
 
     // The picker draws this monitor's widgets itself while it edits them, over
     // the windows, so they can be seen and carried; these step aside.
-    readonly property bool editing: Panels.widgetsOpen && Panels.widgetsScreen === layer.screenName
+    readonly property bool editing: Panels.widgetsOpen && Panels.widgetsScreen === desk.screenName
 
-    visible: widgets.count > 0 && !layer.bar.fullscreen
+    readonly property bool showing: widgets.count > 0 && !desk.bar.fullscreen
+    visible: desk.showing
 
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
@@ -44,12 +50,12 @@ PanelWindow {
     }
 
     mask: Region {
-        regions: layer.editing ? [] : hits.instances
+        regions: desk.editing ? [] : hits.instances
     }
 
     Variants {
         id: hits
-        model: layer.editing ? [] : Widgets.onScreen(layer.screenName)
+        model: desk.editing ? [] : Widgets.onScreen(desk.screenName)
 
         Region {
             required property var modelData
@@ -64,25 +70,22 @@ PanelWindow {
     Item {
         id: area
         anchors.fill: parent
-        visible: !layer.editing
+        visible: !desk.editing
 
         Repeater {
             model: widgets
 
             WidgetHost {
                 // Kept on the monitor if it has shrunk since the widget was
-                // put there. Measured on this item, not the window: a
-                // PanelWindow's width and height are the size it asked for,
-                // 0 when anchored to every edge, and clamping to those put
-                // every widget in the top-left corner.
+                // put there.
                 x: Math.max(0, Math.min(model.wx, area.width - width))
                 y: Math.max(0, Math.min(model.wy, area.height - height))
                 kind: model.kind
-                bar: layer.bar
+                bar: desk.bar
                 // A hidden window keeps its items, so this has to say so
                 // itself: nothing redraws or listens while covered, under a
                 // fullscreen window, or while the picker shows its own copy.
-                live: layer.visible === true && !layer.editing && !Widgets.isCovered(layer.screenName)
+                live: desk.showing && !desk.editing && !Widgets.isCovered(desk.screenName)
             }
         }
     }

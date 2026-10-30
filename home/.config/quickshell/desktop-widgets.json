@@ -1,4 +1,25 @@
 {
     "widgets": [
+        {
+            "id": "wmvu8cnhi98",
+            "kind": "calendar-month",
+            "screen": "HDMI-A-1",
+            "x": 2088,
+            "y": 488
+        },
+        {
+            "id": "wmvu8iozhtx",
+            "kind": "system",
+            "screen": "HDMI-A-1",
+            "x": 2040,
+            "y": 904
+        },
+        {
+            "id": "wmvu8k8uttb",
+            "kind": "media",
+            "screen": "HDMI-A-1",
+            "x": 1704,
+            "y": 872
+        }
     ]
 }

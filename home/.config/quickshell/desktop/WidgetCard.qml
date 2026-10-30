@@ -10,7 +10,10 @@ import qs.config
 // ones that redraw on their own (the spectrum, the meters, a song's progress)
 // stop with it. `bar` is the monitor's bar, for the media player it follows.
 Rectangle {
-    property bool live: true
+    // Off until the host says otherwise, so a widget does not subscribe to
+    // anything for the moment between being created and being told it is
+    // covered.
+    property bool live: false
     property var bar: null
 
     color: Theme.widgetSurface
