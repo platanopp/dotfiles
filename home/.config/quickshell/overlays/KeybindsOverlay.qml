@@ -33,48 +33,6 @@ PanelWindow {
         font.family: Theme.fontText
     }
 
-    // A key, drawn as a key -- the caps the launcher, the overview and the
-    // wallpaper picker put in their footers.
-    component KeyCap: Rectangle {
-        id: cap
-        property string key: ""
-        property int capHeight: 18
-        property int fontSize: 10
-        width: Math.max(cap.capHeight, capText.implicitWidth + 10)
-        height: cap.capHeight
-        radius: 5
-        color: Theme.surfaceContainer
-        border.width: 1
-        border.color: Theme.outline
-
-        Text {
-            id: capText
-            anchors.centerIn: parent
-            text: cap.key
-            color: Theme.textSecondary
-            font.pixelSize: cap.fontSize
-            font.family: Theme.fontMono
-        }
-    }
-
-    // A key and what it does, for the footer.
-    component KeyHint: Row {
-        id: hint
-        property string key: ""
-        property string label: ""
-        spacing: 6
-
-        KeyCap { anchors.verticalCenter: parent.verticalCenter; key: hint.key }
-
-        Text {
-            anchors.verticalCenter: parent.verticalCenter
-            text: hint.label
-            color: Theme.textMuted
-            font.pixelSize: 10
-            font.family: Theme.fontText
-        }
-    }
-
     // One bind's keys, as caps (see capsOf): "Super + Shift + R" is three
     // keys held together, joined by a small plus; "g g" is one key pressed
     // twice, two caps side by side; "or" joins two binds that do the same
@@ -1036,17 +994,17 @@ PanelWindow {
                 anchors.left: parent.left
                 anchors.leftMargin: 20
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 16
+                spacing: 14
 
                 KeyHint { key: "tab"; label: overlay.otherSection() === "yazi" ? "Yazi" : "Hyprland" }
-                KeyHint { key: "↑↓"; label: "Scroll"; visible: flick.interactive }
+                KeyHint { key: "↑ ↓"; label: "Scroll"; visible: flick.interactive }
             }
 
             Row {
                 anchors.right: parent.right
                 anchors.rightMargin: 20
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 16
+                spacing: 14
 
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
@@ -1054,7 +1012,7 @@ PanelWindow {
                     readonly property int total: overlay.totalOf(overlay.viewSection)
                     text: overlay.terms.length > 0 ? shown + " of " + total : total + " shortcuts"
                     color: Theme.textMuted
-                    font.pixelSize: 10
+                    font.pixelSize: 11
                     font.family: Theme.fontText
                     font.features: Theme.tabular
                 }

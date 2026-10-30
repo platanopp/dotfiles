@@ -45,41 +45,6 @@ PanelWindow {
     property var bar: null
     screen: bar.screen
 
-    // A key and what it does -- the launcher's footer, the same keycaps.
-    component KeyHint: Row {
-        id: hint
-        property string key: ""
-        property string label: ""
-        spacing: 6
-
-        Rectangle {
-            anchors.verticalCenter: parent.verticalCenter
-            width: Math.max(20, keyText.implicitWidth + 12)
-            height: 20
-            radius: Theme.radiusSmall
-            color: Theme.surface
-            border.width: 1
-            border.color: Theme.outline
-
-            Text {
-                id: keyText
-                anchors.centerIn: parent
-                text: hint.key
-                color: Theme.textSecondary
-                font.pixelSize: 10
-                font.family: Theme.fontMono
-            }
-        }
-
-        Text {
-            anchors.verticalCenter: parent.verticalCenter
-            text: hint.label
-            color: Theme.textMuted
-            font.pixelSize: 10
-            font.family: Theme.fontText
-        }
-    }
-
     readonly property bool onOpeningScreen: {
         if (!bar.monitor) return true
         if (Panels.overviewScreen === "") return bar.monitor.focused
@@ -1150,9 +1115,9 @@ PanelWindow {
 
             Row {
                 anchors.horizontalCenter: parent.horizontalCenter
-                spacing: 18
+                spacing: 14
 
-                KeyHint { key: "\u2190\u2192"; label: "Choose" }
+                KeyHint { key: "\u2190 \u2192"; label: "Choose" }
                 KeyHint { key: "\u21B5"; label: "Go" }
                 KeyHint { key: "del"; label: "Close" }
                 KeyHint { key: "n"; label: "New" }

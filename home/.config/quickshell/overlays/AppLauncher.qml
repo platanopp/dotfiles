@@ -121,41 +121,6 @@ PanelWindow {
         font.family: Theme.fontText
     }
 
-    // A key and what it does, for the footer.
-    component KeyHint: Row {
-        id: hint
-        property string key: ""
-        property string label: ""
-        spacing: 6
-
-        Rectangle {
-            anchors.verticalCenter: parent.verticalCenter
-            width: Math.max(18, keyText.implicitWidth + 10)
-            height: 18
-            radius: 5
-            color: Theme.surfaceContainer
-            border.width: 1
-            border.color: Theme.outline
-
-            Text {
-                id: keyText
-                anchors.centerIn: parent
-                text: hint.key
-                color: Theme.textSecondary
-                font.pixelSize: 10
-                font.family: Theme.fontMono
-            }
-        }
-
-        Text {
-            anchors.verticalCenter: parent.verticalCenter
-            text: hint.label
-            color: Theme.textMuted
-            font.pixelSize: 10
-            font.family: Theme.fontText
-        }
-    }
-
     // ── Type ─────────────────────────────────────────────────────────────
     //
     // Spotlight is a proportional-set panel and reads wrong in a monospace --
@@ -1091,9 +1056,9 @@ PanelWindow {
                 anchors.left: parent.left
                 anchors.leftMargin: 20
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 16
+                spacing: 14
 
-                KeyHint { key: "↑↓"; label: "Navigate" }
+                KeyHint { key: "↑ ↓"; label: "Navigate" }
                 KeyHint {
                     key: "↵"
                     label: overlay.hasResults && overlay.results[overlay.selected]
@@ -1105,13 +1070,13 @@ PanelWindow {
                 anchors.right: parent.right
                 anchors.rightMargin: 20
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 16
+                spacing: 14
 
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
                     text: overlay.results.length + (overlay.results.length === 1 ? " result" : " results")
                     color: Theme.textMuted
-                    font.pixelSize: 10
+                    font.pixelSize: 11
                     font.family: Theme.fontText
                 }
 

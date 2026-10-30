@@ -183,45 +183,6 @@ PanelWindow {
         picker.revealRequested(picker.selected)
     }
 
-    // ── Pieces ───────────────────────────────────────────────────────────
-
-    component KeyCap: Rectangle {
-        id: cap
-        property string key: ""
-        width: Math.max(18, capText.implicitWidth + 10)
-        height: 18
-        radius: 5
-        color: Theme.surfaceContainer
-        border.width: 1
-        border.color: Theme.outline
-
-        Text {
-            id: capText
-            anchors.centerIn: parent
-            text: cap.key
-            color: Theme.textSecondary
-            font.pixelSize: 10
-            font.family: Theme.fontMono
-        }
-    }
-
-    component KeyHint: Row {
-        id: hint
-        property string key: ""
-        property string label: ""
-        spacing: 6
-
-        KeyCap { anchors.verticalCenter: parent.verticalCenter; key: hint.key }
-
-        Text {
-            anchors.verticalCenter: parent.verticalCenter
-            text: hint.label
-            color: Theme.textMuted
-            font.pixelSize: 11
-            font.family: Theme.fontText
-        }
-    }
-
     // ── The desktop being edited ─────────────────────────────────────────
 
     // The dim over the windows. A click on it does nothing: the picker is

@@ -25,45 +25,6 @@ PanelWindow {
     // One copy per monitor, and only the one it was opened on shows. Focus
     // follows the mouse here, so matching against live focus would drag the
     // picker to whichever screen the pointer wandered onto.
-    // A key, drawn as a key -- the launcher's and the overview's.
-    component KeyCap: Rectangle {
-        id: cap
-        property string key: ""
-        width: Math.max(20, capText.implicitWidth + 12)
-        height: 20
-        radius: Theme.radiusSmall
-        color: Theme.surface
-        border.width: 1
-        border.color: Theme.outline
-
-        Text {
-            id: capText
-            anchors.centerIn: parent
-            text: cap.key
-            color: Theme.textSecondary
-            font.pixelSize: 10
-            font.family: Theme.fontMono
-        }
-    }
-
-    // A key and what it does.
-    component KeyHint: Row {
-        id: hint
-        property string key: ""
-        property string label: ""
-        spacing: 6
-
-        KeyCap { anchors.verticalCenter: parent.verticalCenter; key: hint.key }
-
-        Text {
-            anchors.verticalCenter: parent.verticalCenter
-            text: hint.label
-            color: Theme.textMuted
-            font.pixelSize: 10
-            font.family: Theme.fontText
-        }
-    }
-
     readonly property bool onOpeningScreen: {
         if (!bar.monitor) return true
         if (Panels.wallpapersScreen === "") return bar.monitor.focused
@@ -1240,9 +1201,9 @@ PanelWindow {
 
                 Row {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    spacing: 18
+                    spacing: 14
 
-                    KeyHint { key: "\u2190\u2192"; label: "Browse" }
+                    KeyHint { key: "\u2190 \u2192"; label: "Browse" }
                     KeyHint {
                         key: "\u21B5"
                         label: overlay.files[carousel.currentIndex] === overlay.current ? "In use" : "Apply"
@@ -1444,9 +1405,9 @@ PanelWindow {
 
                     Row {
                         anchors.horizontalCenter: parent.horizontalCenter
-                        spacing: 18
+                        spacing: 14
 
-                        KeyHint { key: "\u2190\u2191\u2192\u2193"; label: "Move" }
+                        KeyHint { key: "\u2190 \u2191 \u2192 \u2193"; label: "Move" }
                         KeyHint { key: "\u21B5"; label: "Apply" }
                         KeyHint { key: "esc"; label: "Back" }
                     }
