@@ -50,9 +50,10 @@ Singleton {
     readonly property color success: color2
 
     // Panel glass: the background at 90% so the compositor blur shows through.
-    // Glass belongs to the bar's pills and the panels that open out of them,
-    // and to nothing else: it is the shell's one signature surface, and on
-    // every layer at once it stopped marking anything. 0.9 rather than 0.8 so
+    // Glass belongs to the bar's pills, the panels that open out of them and
+    // the desktop widgets, which are those panels left on the desktop -- and
+    // to nothing else: it is the shell's one signature surface, and on every
+    // layer at once it stopped marking anything. 0.9 rather than 0.8 so
     // text on it keeps AA contrast over the brightest wallpaper.
     readonly property color glass: Qt.rgba(background.r, background.g, background.b, 0.9)
 
@@ -64,14 +65,6 @@ Singleton {
     // The dim behind those cards. Without blur it is what keeps the desktop
     // from competing with the card, so it is darker than the old tint was.
     readonly property color scrim: Qt.rgba(background.r, background.g, background.b, 0.6)
-
-    // The desktop widgets' card: the wallpaper's hue (the accent's, which
-    // Accent takes from it) at a dark value, so the widgets read as part of
-    // the picture they sit on and follow it when it changes. Opaque, like the
-    // overlays' cards, and dark enough that muted text on it keeps 4.5:1 for
-    // any hue. A grey wallpaper has no hue to give, and gets the plain surface.
-    readonly property color widgetSurface: accent.hsvSaturation < 0.05 ? surface
-        : Qt.hsva(accent.hsvHue, Math.min(0.55, accent.hsvSaturation * 1.1), 0.21, 1)
 
     // Shadow under a raised surface, and the white of a switch's knob.
     readonly property color shadow: "#000000"
