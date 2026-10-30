@@ -29,6 +29,10 @@ Singleton {
     // Where Settings -> About keeps the configuration's backup (a git
     // repository; see scripts/backup.py). "~" is this user's home.
     readonly property string backupRepo: adapter.backupRepo
+    // Where shell updates come from (Settings -> About -> Updates): the
+    // repository the shell is published in, and its branch.
+    readonly property string updateSource: adapter.updateSource
+    readonly property string updateBranch: adapter.updateBranch
     // A Wooting keyboard coloured from the wallpaper (scripts/keyboard_rgb.py),
     // and how bright, 10-100.
     readonly property bool keyboardRgb: adapter.keyboardRgb
@@ -82,6 +86,8 @@ Singleton {
             property bool lockAtBoot: true
             property string lockMonitor: "DP-2"
             property string backupRepo: "~/dotfiles"
+            property string updateSource: "https://github.com/platanopp/dotfiles.git"
+            property string updateBranch: "main"
             property bool keyboardRgb: true
             property int keyboardRgbBrightness: 100
             property bool keyboardRgbAnimate: true

@@ -5,7 +5,8 @@ import qs.config
 import qs.services
 import qs.settings
 
-// Settings -> About: what this machine is, and how current its backup is.
+// Settings -> About: what this machine is, whether its shell is the latest
+// published one, and how current its backup is.
 // The backup is ~/dotfiles, a copy of the live configuration that only
 // changes when it is synced and committed; the rows here do exactly that.
 // Pushing publishes it -- the repo is public -- so that button asks twice.
@@ -15,6 +16,7 @@ Column {
 
     readonly property var info: System.aboutInfo
     readonly property var backup: System.backupStatus
+    readonly property var update: System.updateStatus
 
     Component.onCompleted: System.refreshAbout()
 
@@ -128,6 +130,141 @@ Column {
                 }
             }
         }
+    }
+
+    // ── Updates ──────────────────────────────────────────────────────────
+    //
+    // The shell against its latest published version (scripts/
+    // shell_update.py), checked whenever this page opens. Behind it, the row
+    // offers the update -- asking twice, since it replaces the shell and
+    // restarts it -- and lists what changed. Whoever publishes the shell sees
+    // that instead: their copy differing means newer, and it goes out from
+    // Backup below.
+    SettingsGroup {
+        width: parent.width
+        title: "Updates"
+
+        SettingsRow {
+            id: updateRow
+            icon: "\u{F06B0}"
+            title: {
+                var u = page.update
+                if (System.updateBusy) return "Updating…"
+                if (u.state === "current") return "Up to date"
+                if (u.state === "behind") return "An update is available"
+                if (u.state === "ahead") return "You publish this shell"
+                if (u.state === "error") return "Could not check for updates"
+                return "Checking for updates…"
+            }
+            description: {
+                var u = page.update
+                var version = u.head ? u.head + (u.when ? " · " + u.when : "") : ""
+                if (u.state === "behind")
+                    return updateRow.armed
+                        ? "Replaces the shell and restarts it; your settings and widgets stay. Press again"
+                        : version + " · " + u.files + (u.files === 1 ? " file changes" : " files change")
+                if (u.state === "ahead")
+                    return "Yours is newer than " + u.source + "; it goes out from Backup"
+                if (u.state === "error") return u.error || ""
+                return version.length > 0 ? "Version " + version + " from " + u.source : ""
+            }
+
+            property bool armed: false
+
+            Timer {
+                id: disarmUpdate
+                interval: 5000
+                onTriggered: updateRow.armed = false
+            }
+
+            PillButton {
+                readonly property bool behind: page.update.state === "behind"
+                text: System.updateBusy || System.updateChecking ? "…"
+                    : !behind ? "Check"
+                    : updateRow.armed ? "Update now" : "Update"
+                emphasis: behind
+                available: !System.updateBusy && !System.updateChecking
+                onClicked: {
+                    if (!behind) {
+                        System.updateCmd("status")
+                        return
+                    }
+                    if (!updateRow.armed) {
+                        updateRow.armed = true
+                        disarmUpdate.restart()
+                        return
+                    }
+                    updateRow.armed = false
+                    System.updateCmd("update")
+                }
+            }
+        }
+
+        // What the update brings: the published commits that touched the
+        // shell since the version installed here, newest first.
+        SettingsRow {
+            visible: page.update.state === "behind" && (page.update.commits || []).length > 0
+            icon: "\u{F02DA}"
+            title: "What changes"
+            stacked: true
+
+            Column {
+                width: parent.width
+                spacing: 4
+
+                Repeater {
+                    model: page.update.commits || []
+
+                    RowLayout {
+                        required property var modelData
+                        width: parent.width
+                        spacing: 10
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: modelData.subject
+                            color: Theme.textSecondary
+                            font.pixelSize: 11
+                            font.family: Theme.fontText
+                            elide: Text.ElideRight
+                        }
+
+                        Text {
+                            text: modelData.when
+                            color: Theme.textMuted
+                            font.pixelSize: 10
+                            font.family: Theme.fontText
+                        }
+                    }
+                }
+
+                Text {
+                    visible: (page.update.more || 0) > 0
+                    text: "and " + page.update.more + " more"
+                    color: Theme.textMuted
+                    font.pixelSize: 10
+                    font.family: Theme.fontText
+                }
+            }
+        }
+    }
+
+    // What the last update did, when it did not restart the shell: a
+    // failure, or nothing left to change.
+    Text {
+        width: parent.width
+        visible: System.updateLast !== null && !(System.updateLast.ok && System.updateLast.files > 0)
+        text: {
+            var l = System.updateLast
+            if (!l) return ""
+            if (!l.ok) return "Could not update: " + l.error
+            return "Nothing to update"
+        }
+        color: System.updateLast && !System.updateLast.ok ? Theme.error : Theme.textMuted
+        font.pixelSize: 11
+        font.family: Theme.fontText
+        wrapMode: Text.WordWrap
+        horizontalAlignment: Text.AlignHCenter
     }
 
     // ── Backup ───────────────────────────────────────────────────────────

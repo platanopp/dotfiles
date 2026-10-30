@@ -18,3 +18,7 @@ home/.config/**/GPUCache/
 # Backups this repo's own tooling makes.
 *.bak
 .backup/
+
+# This user's, not the shell's: where their desktop widgets sit, on their
+# monitors. A new install starts with an empty desktop.
+home/.config/quickshell/desktop-widgets.json

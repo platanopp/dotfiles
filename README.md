@@ -7,6 +7,15 @@ git clone https://github.com/platanopp/dotfiles.git ~/dotfiles && cd ~/dotfiles 
 ```
 Run `./install.sh --dry-run` first if you want to see what it would touch.
 
+## Updating
+
+Settings → About → Updates checks this repository each time the page opens
+and, when there is a newer shell, lists what changed and installs it with
+**Update**. It replaces `~/.config/quickshell` only: your settings
+(`shell-settings.json`), your desktop widgets and files of your own stay, and
+the shell as it was is copied to `~/.local/share/dotfiles-backups/<timestamp>/`
+first. Hyprland, the terminal and the rest are left as you have them.
+
 ## Restoring
 
 `install.sh` moves anything it would overwrite into

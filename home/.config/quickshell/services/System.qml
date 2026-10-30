@@ -35,6 +35,7 @@ Singleton {
     function refreshAbout() {
         root.refreshInfo()
         root.backupCmd("status")
+        root.updateCmd("status")
     }
 
     // The facts alone, for the desktop's machine card: refreshAbout's backup
@@ -82,5 +83,59 @@ Singleton {
             }
         }
         onExited: root.backupBusy = false
+    }
+
+    // ── Updates: the shell, from where it is published ───────────────────
+    //
+    // scripts/shell_update.py compares ~/.config/quickshell with the latest
+    // published version (ShellSettings.updateSource) and, asked to, replaces
+    // it -- the shell only, keeping this user's settings and widget layout,
+    // with a copy of what was there. After an update the shell restarts:
+    // reloading file by file leaves widgets loaded by URL on their old code.
+    property var updateStatus: ({ state: "unknown" })
+    property bool updateChecking: false
+    property bool updateBusy: false
+    // The last update: { ok, error?, files?, saved? }
+    property var updateLast: null
+
+    // status | update
+    function updateCmd(action) {
+        if (updateProc.running) return
+        root.updateChecking = action === "status"
+        root.updateBusy = action === "update"
+        updateProc.action = action
+        updateProc.command = ["python3", Quickshell.env("HOME") + "/.config/quickshell/scripts/shell_update.py",
+                              action, ShellSettings.updateSource, ShellSettings.updateBranch,
+                              ShellSettings.backupRepo]
+        updateProc.running = true
+    }
+
+    Process {
+        id: updateProc
+        property string action: "status"
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var d
+                try { d = JSON.parse(text) } catch (e) { return }
+                if (updateProc.action === "status") {
+                    root.updateStatus = d
+                    return
+                }
+                root.updateLast = d
+                if (d.ok && d.files > 0) restartProc.running = true
+                else if (d.ok) root.updateStatus = Object.assign({}, root.updateStatus, { state: "current" })
+            }
+        }
+        onExited: {
+            root.updateChecking = false
+            root.updateBusy = false
+        }
+    }
+
+    Process {
+        id: restartProc
+        running: false
+        command: ["python3", Quickshell.env("HOME") + "/.config/quickshell/scripts/shell_update.py", "restart"]
     }
 }
