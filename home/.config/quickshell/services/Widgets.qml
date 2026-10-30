@@ -88,8 +88,9 @@ Singleton {
     }
 
     // Where a widget clicked (rather than dragged) in goes: the first gap it
-    // fits, searched from the top right -- the picker covers the left side,
-    // and a widget that landed under it would seem not to have arrived.
+    // fits, searched from the top right, above `areaH` -- the picker passes
+    // the top of its shelf, since a widget that landed under the shelf would
+    // seem not to have arrived.
     function freeSpot(screenName, w, h, areaW, areaH, top) {
         var margin = 24
         var gap = 16

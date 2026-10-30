@@ -35,7 +35,8 @@ WidgetCard {
         return band >= 0 && band < b.length ? b[band] : 0
     }
 
-    // The pill's two lines: the title, the artist beside it in grey.
+    // The pill's two lines: the title, the artist beside it in grey. Only
+    // while something plays; with nothing, the resting bars are the widget.
     RowLayout {
         anchors.left: parent.left
         anchors.right: parent.right
@@ -43,10 +44,11 @@ WidgetCard {
         anchors.margins: 18
         anchors.topMargin: 16
         spacing: 8
+        visible: root.anyPlaying
 
         Text {
             Layout.maximumWidth: parent.width * 0.6
-            text: root.anyPlaying && root.bar && root.bar.trackTitle.length > 0 ? root.bar.trackTitle : "Nothing playing"
+            text: root.bar ? root.bar.trackTitle : ""
             color: Theme.textPrimary
             font.pixelSize: 12
             font.bold: true
@@ -56,9 +58,8 @@ WidgetCard {
 
         Text {
             Layout.fillWidth: true
-            text: root.anyPlaying ? (root.bar ? root.bar.trackArtist : "")
-                                  : "Play something and the bars move with it."
-            color: root.anyPlaying ? Theme.textSecondary : Theme.textMuted
+            text: root.bar ? root.bar.trackArtist : ""
+            color: Theme.textSecondary
             font.pixelSize: 11
             font.family: Theme.fontText
             elide: Text.ElideRight

@@ -14,11 +14,12 @@ import qs.services
 // While it is up, this monitor's desktop is drawn here, over the windows
 // and a scrim -- the widgets live under every window (desktop/DesktopLayer),
 // where most of the time they cannot be seen, let alone grabbed. Each one can
-// be dragged to a new place or taken off with its minus; the panel on the
-// left holds every kind, to drag out onto the desktop or click to drop into
-// the first gap. "On desktop" lists what is placed, on every monitor.
+// be dragged to a new place or taken off with its minus. Every kind waits on
+// a shelf along the bottom, drawn as it will look and in its own shape, the
+// way the overview lines up workspaces: drag one up onto the desktop, or
+// click it to drop it into the first gap.
 //
-// Dragging happens inside this one surface: a widget carried out of the panel
+// Dragging happens inside this one surface: a widget carried off the shelf
 // never crosses into another window, which Wayland would not allow.
 PanelWindow {
     id: picker
@@ -54,13 +55,13 @@ PanelWindow {
             if (picker.open) {
                 unmapDelay.stop()
                 picker.query = ""
-                picker.tab = "add"
                 picker.category = ""
                 picker.selected = 0
                 picker.lastAdded = ""
                 picker.shown = true
             } else {
                 ghost.active = false
+                picker.movingPlaced = false
                 unmapDelay.restart()
             }
         }
@@ -94,8 +95,6 @@ PanelWindow {
 
     // ── Geometry ─────────────────────────────────────────────────────────
 
-    readonly property int panelWidth: 404
-    readonly property int panelMargin: 16
     // How near the edges a widget may go, and how far below the bar.
     readonly property int edge: 24
     readonly property int topEdge: (bar.stripHeight || 56) + 16
@@ -107,14 +106,38 @@ PanelWindow {
     function clampX(x, w) { return Math.max(picker.edge, Math.min(picker.width - picker.edge - w, x)) }
     function clampY(y, h) { return Math.max(picker.topEdge, Math.min(picker.height - picker.edge - h, y)) }
 
-    // ── What the panel shows ─────────────────────────────────────────────
+    // The shelf. Each kind is shown whole, scaled to one height, so the
+    // shelf reads as the widgets themselves in their own shapes -- the clock
+    // pill long and low, the analog clock round -- rather than as a grid of
+    // same-sized cards. The widest are held to `previewWidthMax`.
+    readonly property int shelfMargin: 24
+    readonly property int shelfHeight: 296
+    readonly property int shelfTop: picker.height - picker.shelfMargin - picker.shelfHeight
+    readonly property int previewHeight: 112
+    readonly property int previewWidthMax: 200
+    readonly property int tileGap: 10
+
+    function previewScale(s) { return Math.min(1, picker.previewHeight / s.h, picker.previewWidthMax / s.w) }
+    function tileWidth(s) { return Math.max(Math.round(s.w * picker.previewScale(s)), 84) + 24 }
+
+    // Every kind side by side, filter or not, so the shelf keeps its width
+    // while the categories change what is on it.
+    readonly property int stripWidth: Widgets.catalog.reduce((sum, s) => sum + picker.tileWidth(s), 0)
+                                      + (Widgets.catalog.length - 1) * picker.tileGap
+
+    // ── What the shelf shows ─────────────────────────────────────────────
 
     property string query: ""
-    property string tab: "add"          // "add" or "placed"
     property string category: ""        // "" for all
     property int selected: 0
     // The id of the widget added last, which springs in as it lands.
     property string lastAdded: ""
+    // A placed widget is being dragged: the shelf pales so the desktop
+    // under it shows where it can go.
+    property bool movingPlaced: false
+
+    readonly property var categoryList: [""].concat(Widgets.categories)
+    readonly property int categoryIndex: Math.max(0, picker.categoryList.indexOf(picker.category))
 
     readonly property var matches: {
         var words = picker.query.toLowerCase().split(/\s+/).filter(w => w.length > 0)
@@ -125,39 +148,39 @@ PanelWindow {
         })
     }
 
-    onMatchesChanged: picker.selected = Math.max(0, Math.min(picker.selected, picker.matches.length - 1))
+    onMatchesChanged: {
+        picker.selected = Math.max(0, Math.min(picker.selected, picker.matches.length - 1))
+        // After the shelf has its new tiles, not before.
+        Qt.callLater(() => picker.revealRequested(picker.selected))
+    }
 
     function addKind(kind) {
         var spec = Widgets.spec(kind)
         if (!spec) return
-        var spot = Widgets.freeSpot(picker.screenName, spec.w, spec.h, picker.width, picker.height, picker.topEdge)
+        // Only above the shelf: one dropped under it would seem not to
+        // have arrived.
+        var spot = Widgets.freeSpot(picker.screenName, spec.w, spec.h, picker.width, picker.shelfTop, picker.topEdge)
         picker.lastAdded = Widgets.add(kind, picker.screenName, spot.x, spot.y)
     }
 
-    // The panel's insides are loaded only while it is up, so they are told
-    // rather than reached into: scroll the card list to the selection.
+    function setCategory(c) {
+        picker.category = c
+        picker.selected = 0
+    }
+
+    function cycleCategory(step) {
+        var n = picker.categoryList.length
+        picker.setCategory(picker.categoryList[(picker.categoryIndex + step + n) % n])
+    }
+
+    // The shelf's insides are loaded only while it is up, so they are told
+    // rather than reached into: scroll the strip to the selection.
     signal revealRequested(int index)
 
     function moveSelection(step) {
-        if (picker.tab !== "add" || picker.matches.length === 0) return
+        if (picker.matches.length === 0) return
         picker.selected = Math.max(0, Math.min(picker.matches.length - 1, picker.selected + step))
         picker.revealRequested(picker.selected)
-    }
-
-    function nameOf(kind) {
-        var s = Widgets.spec(kind)
-        return s ? s.name : kind
-    }
-
-    function glyphOf(category) {
-        switch (category) {
-        case "Clock": return "\u{F0150}"
-        case "Calendar": return "\u{F00ED}"
-        case "Weather": return "\u{F0595}"
-        case "Media": return "\u{F0387}"
-        case "System": return "\u{F035B}"
-        }
-        return "\u{F0379}"
     }
 
     // ── Pieces ───────────────────────────────────────────────────────────
@@ -202,7 +225,8 @@ PanelWindow {
     // ── The desktop being edited ─────────────────────────────────────────
 
     // The dim over the windows. A click on it does nothing: the picker is
-    // closed with Done or Escape, never by a stray click beside a widget.
+    // closed with its close button or Escape, never by a stray click beside
+    // a widget.
     Rectangle {
         anchors.fill: parent
         color: Theme.scrim
@@ -310,13 +334,19 @@ PanelWindow {
                                 if (!placed.dragging && Math.abs(mouse.x - grab.from.x) + Math.abs(mouse.y - grab.from.y) < 6)
                                     return
                                 placed.dragging = true
+                                picker.movingPlaced = true
                                 placed.dragX = picker.clampX(p.x - grab.from.x, placed.width)
                                 placed.dragY = picker.clampY(p.y - grab.from.y, placed.height)
                             }
                             onReleased: {
+                                picker.movingPlaced = false
                                 if (!placed.dragging) return
                                 Widgets.move(placed.uid, picker.clampX(picker.snap(placed.dragX), placed.width),
                                              picker.clampY(picker.snap(placed.dragY), placed.height))
+                                placed.dragging = false
+                            }
+                            onCanceled: {
+                                picker.movingPlaced = false
                                 placed.dragging = false
                             }
                         }
@@ -363,18 +393,18 @@ PanelWindow {
         }
     }
 
-    // A widget being dragged out of the panel, at full size under the
-    // pointer. Over the panel it pales: let go there and nothing is added.
+    // A widget being dragged off the shelf, at full size under the pointer.
+    // Over the shelf it pales: let go there and nothing is added.
     Item {
         id: ghost
         property string kind: ""
         property bool active: false
-        property bool overPanel: false
+        property bool overShelf: false
         z: 10
         visible: ghost.active
         width: ghostHost.width
         height: ghostHost.height
-        opacity: ghost.overPanel ? 0.45 : 1
+        opacity: ghost.overShelf ? 0.45 : 1
         scale: ghost.active ? 1.03 : 0.9
 
         Behavior on opacity { NumberAnimation { duration: Theme.durShort } }
@@ -398,31 +428,34 @@ PanelWindow {
         function follow(p) {
             ghost.x = p.x - ghost.width / 2
             ghost.y = p.y - ghost.height / 2
-            ghost.overPanel = p.x < panel.x + panel.width + 8
+            ghost.overShelf = p.y > shelf.y - 8
         }
 
         function drop() {
             if (!ghost.active) return
             ghost.active = false
-            if (ghost.overPanel) return
+            if (ghost.overShelf) return
             picker.lastAdded = Widgets.add(ghost.kind, picker.screenName,
                 picker.clampX(picker.snap(ghost.x), ghost.width), picker.clampY(picker.snap(ghost.y), ghost.height))
         }
     }
 
-    // ── The panel ────────────────────────────────────────────────────────
-
+    // ── The shelf ────────────────────────────────────────────────────────
+    //
+    // Along the bottom, centred, as wide as the kinds need and the screen
+    // allows. It rises on the spring and leaves as a fade; while a widget is
+    // carried above it, it pales, so the desktop under it shows where that
+    // widget could land.
     Item {
-        id: panel
-        x: picker.open ? picker.panelMargin : picker.panelMargin - 24
-        y: picker.panelMargin
-        width: picker.panelWidth
-        height: picker.height - 2 * picker.panelMargin
-        opacity: picker.open ? 1 : 0
+        id: shelf
+        width: Math.min(picker.width - 2 * picker.shelfMargin, picker.stripWidth + 40)
+        height: picker.shelfHeight
+        x: Math.round((picker.width - width) / 2)
+        y: picker.open ? picker.shelfTop : picker.shelfTop + 32
+        opacity: !picker.open ? 0
+                 : picker.movingPlaced || (ghost.active && !ghost.overShelf) ? 0.35 : 1
 
-        // Arrives on the spring from the edge it is attached to; leaves as a
-        // plain fade.
-        Behavior on x { Elastic {} }
+        Behavior on y { Elastic {} }
         Behavior on opacity { NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic } }
 
         Rectangle {
@@ -445,364 +478,271 @@ PanelWindow {
             autoPaddingEnabled: true
         }
 
-        // Swallows clicks on the panel's own empty parts.
+        // Swallows clicks on the shelf's own empty parts.
         MouseArea { anchors.fill: parent }
 
         Loader {
             anchors.fill: parent
             active: picker.shown
-            sourceComponent: panelBody
+            sourceComponent: shelfBody
         }
     }
 
     Component {
-        id: panelBody
+        id: shelfBody
 
         Item {
-            // Header: what this is and how it is used.
+            // ── Top row: name, categories, search, close ─────────────────
             Item {
-                id: header
+                id: topRow
                 x: 20
-                y: 20
+                y: 18
                 width: parent.width - 40
-                height: 44
+                height: 36
 
-                Rectangle {
-                    id: badge
-                    width: 40
-                    height: 40
-                    radius: Theme.radiusMedium
-                    color: Theme.surfaceContainer
-
-                    IconGlyph {
-                        anchors.centerIn: parent
-                        text: "\u{F0573}"
-                        color: Theme.textPrimary
-                        size: Theme.iconLarge
-                    }
+                Text {
+                    id: title
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "Widgets"
+                    color: Theme.textPrimary
+                    font.pixelSize: 15
+                    font.weight: Font.Bold
+                    font.family: Theme.fontText
                 }
 
-                Column {
-                    anchors.left: badge.right
-                    anchors.leftMargin: 12
-                    anchors.right: closeButton.left
-                    anchors.rightMargin: 8
-                    anchors.verticalCenter: badge.verticalCenter
-                    spacing: 1
+                // The categories as one pill, the chosen one filled in the
+                // accent and the fill sliding to the next, as the tabs do
+                // elsewhere in the shell.
+                Rectangle {
+                    id: segments
+                    anchors.left: title.right
+                    anchors.leftMargin: 18
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: segRow.width + 8
+                    height: 36
+                    radius: height / 2
+                    color: Theme.surfaceContainer
 
-                    Text {
-                        text: "Widgets"
-                        color: Theme.textPrimary
-                        font.pixelSize: 17
-                        font.weight: Font.Bold
-                        font.family: Theme.fontText
+                    Rectangle {
+                        readonly property Item at: segRepeater.count > 0 ? segRepeater.itemAt(picker.categoryIndex) : null
+                        x: 4 + (at ? at.x : 0)
+                        y: 4
+                        width: at ? at.width : 0
+                        height: parent.height - 8
+                        radius: height / 2
+                        color: Theme.accent
+
+                        Behavior on x { Elastic { small: true } }
+                        Behavior on width { Elastic { small: true } }
                     }
 
-                    Text {
-                        width: parent.width
-                        text: picker.tab === "add" ? "Drag one onto the desktop, or click to add it."
-                                                   : "Drag them where you want; the minus takes one off."
-                        color: Theme.textSecondary
-                        font.pixelSize: 12
-                        font.family: Theme.fontText
-                        elide: Text.ElideRight
+                    Row {
+                        id: segRow
+                        x: 4
+                        y: 4
+
+                        Repeater {
+                            id: segRepeater
+                            model: picker.categoryList
+
+                            Item {
+                                id: seg
+                                required property var modelData
+                                readonly property bool chosen: picker.category === seg.modelData
+                                width: segText.implicitWidth + 28
+                                height: segments.height - 8
+
+                                Text {
+                                    id: segText
+                                    anchors.centerIn: parent
+                                    text: seg.modelData === "" ? "All" : seg.modelData
+                                    color: seg.chosen ? Theme.accentText : Theme.textSecondary
+                                    font.pixelSize: 12
+                                    font.weight: Font.DemiBold
+                                    font.family: Theme.fontText
+
+                                    Behavior on color { ColorAnimation { duration: Theme.durShort } }
+                                }
+
+                                StateLayer {
+                                    radius: height / 2
+                                    interactive: !seg.chosen
+                                    onTapped: {
+                                        picker.setCategory(seg.modelData)
+                                        search.forceActiveFocus()
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
                 IconButton {
                     id: closeButton
                     anchors.right: parent.right
-                    anchors.verticalCenter: badge.verticalCenter
+                    anchors.verticalCenter: parent.verticalCenter
                     icon: "\u{F0156}"
                     size: 30
                     glyphSize: Theme.iconSmall
                     onTapped: picker.close()
                 }
-            }
-
-            // Search.
-            Rectangle {
-                id: searchBox
-                x: 20
-                anchors.top: header.bottom
-                anchors.topMargin: 18
-                width: parent.width - 40
-                height: 44
-                radius: Theme.radiusMedium
-                color: Theme.surfaceContainer
-
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.leftMargin: 14
-                    anchors.rightMargin: 10
-                    spacing: 10
-
-                    IconGlyph {
-                        text: "\u{F0349}"
-                        color: search.text.length > 0 ? Theme.accent : Theme.textMuted
-                        size: Theme.iconMedium
-
-                        Behavior on color { ColorAnimation { duration: Theme.durShort } }
-                    }
-
-                    TextInput {
-                        id: search
-                        Layout.fillWidth: true
-                        verticalAlignment: TextInput.AlignVCenter
-                        color: Theme.textPrimary
-                        font.pixelSize: 14
-                        font.family: Theme.fontText
-                        selectByMouse: true
-                        selectionColor: Theme.alpha(Theme.accent, 0.35)
-                        selectedTextColor: Theme.textPrimary
-                        cursorDelegate: Component { AccentCaret {} }
-                        clip: true
-                        focus: true
-
-                        Component.onCompleted: search.forceActiveFocus()
-
-                        text: picker.query
-                        onTextChanged: {
-                            picker.query = text
-                            if (text.length > 0) picker.tab = "add"
-                        }
-
-                        Keys.onEscapePressed: {
-                            if (search.text.length > 0) picker.query = ""
-                            else picker.close()
-                        }
-                        Keys.onLeftPressed: event => {
-                            if (search.text.length > 0) { event.accepted = false; return }
-                            picker.moveSelection(-1)
-                        }
-                        Keys.onRightPressed: event => {
-                            if (search.text.length > 0) { event.accepted = false; return }
-                            picker.moveSelection(1)
-                        }
-                        Keys.onUpPressed: picker.moveSelection(-2)
-                        Keys.onDownPressed: picker.moveSelection(2)
-                        Keys.onTabPressed: picker.tab = picker.tab === "add" ? "placed" : "add"
-                        Keys.onBacktabPressed: picker.tab = picker.tab === "add" ? "placed" : "add"
-                        onAccepted: if (picker.tab === "add" && picker.matches.length > 0)
-                                        picker.addKind(picker.matches[picker.selected].kind)
-
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            visible: search.text.length === 0
-                            text: "Search widgets"
-                            color: Theme.textMuted
-                            font.pixelSize: 14
-                            font.family: Theme.fontText
-                        }
-                    }
-                }
-            }
-
-            // The two tabs: one pill, the chosen half filled in the accent,
-            // the fill sliding between them.
-            Rectangle {
-                id: tabs
-                x: 20
-                anchors.top: searchBox.bottom
-                anchors.topMargin: 14
-                width: parent.width - 40
-                height: 36
-                radius: height / 2
-                color: Theme.surfaceContainer
 
                 Rectangle {
-                    x: 4 + (picker.tab === "placed" ? (tabs.width - 8) / 2 : 0)
-                    y: 4
-                    width: (tabs.width - 8) / 2
-                    height: parent.height - 8
+                    id: searchBox
+                    anchors.right: closeButton.left
+                    anchors.rightMargin: 10
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Math.min(260, closeButton.x - segments.x - segments.width - 28)
+                    height: 36
                     radius: height / 2
-                    color: Theme.accent
+                    color: Theme.surfaceContainer
 
-                    Behavior on x { Elastic { small: true } }
-                }
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 14
+                        anchors.rightMargin: 14
+                        spacing: 8
 
-                Row {
-                    x: 4
-                    y: 4
+                        IconGlyph {
+                            text: "\u{F0349}"
+                            color: search.text.length > 0 ? Theme.accent : Theme.textMuted
+                            size: Theme.iconSmall
 
-                    Repeater {
-                        model: [
-                            { id: "add", label: "Add", glyph: "\u{F0415}" },
-                            { id: "placed", label: "On desktop", glyph: "\u{F0379}" }
-                        ]
+                            Behavior on color { ColorAnimation { duration: Theme.durShort } }
+                        }
 
-                        Item {
-                            id: tabItem
-                            required property var modelData
-                            readonly property bool chosen: picker.tab === tabItem.modelData.id
-                            width: (tabs.width - 8) / 2
-                            height: tabs.height - 8
+                        TextInput {
+                            id: search
+                            Layout.fillWidth: true
+                            verticalAlignment: TextInput.AlignVCenter
+                            color: Theme.textPrimary
+                            font.pixelSize: 13
+                            font.family: Theme.fontText
+                            selectByMouse: true
+                            selectionColor: Theme.alpha(Theme.accent, 0.35)
+                            selectedTextColor: Theme.textPrimary
+                            cursorDelegate: Component { AccentCaret {} }
+                            clip: true
+                            focus: true
 
-                            Row {
-                                anchors.centerIn: parent
-                                spacing: 6
+                            Component.onCompleted: search.forceActiveFocus()
 
-                                IconGlyph {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: tabItem.modelData.glyph
-                                    color: tabItem.chosen ? Theme.accentText : Theme.textSecondary
-                                    size: Theme.iconSmall
-                                }
+                            text: picker.query
+                            onTextChanged: picker.query = text
 
-                                Text {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: tabItem.modelData.label
-                                          + (tabItem.modelData.id === "placed" && Widgets.placed.length > 0
-                                             ? "  " + Widgets.placed.length : "")
-                                    color: tabItem.chosen ? Theme.accentText : Theme.textSecondary
-                                    font.pixelSize: 12
-                                    font.weight: Font.DemiBold
-                                    font.family: Theme.fontText
-                                    font.features: Theme.tabular
-                                }
+                            Keys.onEscapePressed: {
+                                if (search.text.length > 0) picker.query = ""
+                                else picker.close()
                             }
+                            // Left and right walk the shelf while there is no
+                            // text to move through; up and down always do.
+                            Keys.onLeftPressed: event => {
+                                if (search.text.length > 0) { event.accepted = false; return }
+                                picker.moveSelection(-1)
+                            }
+                            Keys.onRightPressed: event => {
+                                if (search.text.length > 0) { event.accepted = false; return }
+                                picker.moveSelection(1)
+                            }
+                            Keys.onUpPressed: picker.moveSelection(-1)
+                            Keys.onDownPressed: picker.moveSelection(1)
+                            Keys.onTabPressed: picker.cycleCategory(1)
+                            Keys.onBacktabPressed: picker.cycleCategory(-1)
+                            onAccepted: if (picker.matches.length > 0)
+                                            picker.addKind(picker.matches[picker.selected].kind)
 
-                            StateLayer {
-                                radius: height / 2
-                                interactive: !tabItem.chosen
-                                onTapped: {
-                                    picker.tab = tabItem.modelData.id
-                                    search.forceActiveFocus()
-                                }
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                visible: search.text.length === 0
+                                text: "Search"
+                                color: Theme.textMuted
+                                font.pixelSize: 13
+                                font.family: Theme.fontText
                             }
                         }
                     }
                 }
             }
 
-            // Categories, for the Add tab.
-            Flow {
-                id: chips
-                visible: picker.tab === "add"
+            // ── The kinds, side by side ──────────────────────────────────
+            Flickable {
+                id: strip
                 x: 20
-                anchors.top: tabs.bottom
+                anchors.top: topRow.bottom
                 anchors.topMargin: 14
                 width: parent.width - 40
-                spacing: 6
-
-                Repeater {
-                    model: [""].concat(Widgets.categories)
-
-                    Rectangle {
-                        id: chip
-                        required property var modelData
-                        readonly property bool chosen: picker.category === chip.modelData
-                        width: chipText.implicitWidth + 24
-                        height: 30
-                        radius: height / 2
-                        color: chip.chosen ? Theme.accent : Theme.surfaceContainer
-
-                        Behavior on color { ColorAnimation { duration: Theme.durShort } }
-
-                        Text {
-                            id: chipText
-                            anchors.centerIn: parent
-                            text: chip.modelData === "" ? "All" : chip.modelData
-                            color: chip.chosen ? Theme.accentText : Theme.textSecondary
-                            font.pixelSize: 12
-                            font.weight: Font.DemiBold
-                            font.family: Theme.fontText
-                        }
-
-                        StateLayer {
-                            interactive: !chip.chosen
-                            onTapped: {
-                                picker.category = chip.modelData
-                                search.forceActiveFocus()
-                            }
-                        }
-                    }
-                }
-            }
-
-            // ── Add: every kind, as it will look ─────────────────────────
-            Flickable {
-                id: cards
-                visible: picker.tab === "add"
-                x: 20
-                anchors.top: chips.bottom
-                anchors.topMargin: 16
-                anchors.bottom: footer.top
-                anchors.bottomMargin: 8
-                width: parent.width - 40
-                contentHeight: cardGrid.height + 8
+                height: picker.previewHeight + 62
+                contentWidth: tileRow.width
+                contentHeight: height
                 clip: true
-                // Dragging a card carries the widget out; the list moves by
+                // Dragging a tile carries the widget out; the strip moves by
                 // the wheel (below) and by the keyboard selection instead.
                 interactive: false
 
                 Connections {
                     target: picker
-                    function onRevealRequested(index) { cards.reveal(index) }
+                    function onRevealRequested(index) { strip.reveal(index) }
                 }
 
                 function reveal(index) {
-                    var item = cardRepeater.itemAt(index)
+                    var item = tileRepeater.itemAt(index)
                     if (!item) return
-                    var top = item.y, bottom = item.y + item.height
-                    var to = cards.contentY
-                    if (top < cards.contentY) to = top
-                    else if (bottom > cards.contentY + cards.height) to = bottom - cards.height
-                    scrollTo.to = Math.max(0, Math.min(to, cards.contentHeight - cards.height))
+                    var to = strip.contentX
+                    if (item.x < strip.contentX) to = item.x
+                    else if (item.x + item.width > strip.contentX + strip.width) to = item.x + item.width - strip.width
+                    scrollTo.to = Math.max(0, Math.min(to, strip.contentWidth - strip.width))
                     scrollTo.restart()
                 }
 
                 NumberAnimation {
                     id: scrollTo
-                    target: cards
-                    property: "contentY"
+                    target: strip
+                    property: "contentX"
                     duration: Theme.durMedium
                     easing.type: Easing.OutCubic
                 }
 
-                Grid {
-                    id: cardGrid
-                    columns: 2
-                    columnSpacing: 12
-                    rowSpacing: 12
+                Row {
+                    id: tileRow
+                    spacing: picker.tileGap
 
                     Repeater {
-                        id: cardRepeater
+                        id: tileRepeater
                         model: picker.matches
 
                         Rectangle {
-                            id: kindCard
+                            id: tile
                             required property var modelData
                             required property int index
-                            readonly property bool current: picker.selected === kindCard.index
-                            readonly property int placedCount: Widgets.countOf(kindCard.modelData.kind)
-                            width: (cards.width - 12) / 2
-                            height: 206
+                            readonly property bool current: picker.selected === tile.index
+                            readonly property int placedCount: Widgets.countOf(tile.modelData.kind)
+                            width: picker.tileWidth(tile.modelData)
+                            height: strip.height
                             radius: Theme.radiusLarge
-                            color: kindCard.current || cardMouse.containsMouse ? Theme.surfaceContainerHigh
-                                                                              : Theme.surfaceContainer
-                            // The keyboard's place, drawn as a ring in the accent:
-                            // the one outline here, because it is the focus.
-                            border.width: kindCard.current ? 2 : 0
+                            color: tile.current || tileMouse.containsMouse ? Theme.surfaceContainerHigh
+                                                                           : Theme.surfaceContainer
+                            // The keyboard's place, drawn as a ring in the
+                            // accent: the one outline here, because it is the
+                            // focus.
+                            border.width: tile.current ? 2 : 0
                             border.color: Theme.accent
 
                             Behavior on color { ColorAnimation { duration: Theme.durShort } }
 
-                            // The real widget, scaled down to fit.
+                            // The real widget, scaled to the shelf's height.
                             Item {
                                 id: previewBox
-                                x: 10
-                                y: 10
-                                width: parent.width - 20
-                                height: 112
+                                x: 12
+                                y: 12
+                                width: parent.width - 24
+                                height: picker.previewHeight
 
                                 WidgetHost {
-                                    id: preview
                                     anchors.centerIn: parent
-                                    kind: kindCard.modelData.kind
+                                    kind: tile.modelData.kind
                                     bar: picker.bar
                                     live: picker.open
-                                    scale: Math.min(previewBox.width / preview.width, previewBox.height / preview.height, 1)
+                                    scale: picker.previewScale(tile.modelData)
                                 }
                             }
 
@@ -810,70 +750,64 @@ PanelWindow {
                                 anchors.left: parent.left
                                 anchors.right: parent.right
                                 anchors.top: previewBox.bottom
-                                anchors.margins: 12
+                                anchors.margins: 10
                                 anchors.topMargin: 10
-                                spacing: 3
+                                spacing: 2
 
                                 Text {
                                     width: parent.width
-                                    text: kindCard.modelData.name
+                                    horizontalAlignment: Text.AlignHCenter
+                                    text: tile.modelData.name
                                     color: Theme.textPrimary
-                                    font.pixelSize: 13
+                                    font.pixelSize: 12
                                     font.weight: Font.DemiBold
                                     font.family: Theme.fontText
                                     elide: Text.ElideRight
                                 }
 
+                                // How many are out already, so a second one
+                                // is a choice; empty, the line keeps the
+                                // tiles the same height.
                                 Text {
                                     width: parent.width
-                                    text: kindCard.modelData.description
-                                    color: Theme.textSecondary
-                                    font.pixelSize: 11
-                                    font.family: Theme.fontText
-                                    wrapMode: Text.WordWrap
-                                    maximumLineCount: 2
-                                    elide: Text.ElideRight
-                                }
-
-                                Text {
-                                    visible: kindCard.placedCount > 0
-                                    text: kindCard.placedCount === 1 ? "1 on the desktop"
-                                                                     : kindCard.placedCount + " on the desktop"
+                                    horizontalAlignment: Text.AlignHCenter
+                                    text: tile.placedCount > 0 ? tile.placedCount + " placed" : " "
                                     color: Theme.textMuted
-                                    font.pixelSize: 11
+                                    font.pixelSize: 10
                                     font.family: Theme.fontText
                                     font.features: Theme.tabular
                                 }
                             }
 
                             MouseArea {
-                                id: cardMouse
+                                id: tileMouse
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 preventStealing: true
                                 cursorShape: ghost.active ? Qt.ClosedHandCursor : Qt.PointingHandCursor
                                 property point from: Qt.point(0, 0)
 
-                                onPressed: mouse => cardMouse.from = Qt.point(mouse.x, mouse.y)
+                                onPressed: mouse => tileMouse.from = Qt.point(mouse.x, mouse.y)
                                 onPositionChanged: mouse => {
                                     // Hover steers the selection only when the
                                     // pointer really moves, so a still pointer
-                                    // under scrolling cards leaves the keys' pick.
+                                    // under a scrolling strip leaves the keys'
+                                    // pick.
                                     if (!pressed) {
-                                        picker.selected = kindCard.index
+                                        picker.selected = tile.index
                                         return
                                     }
-                                    var p = cardMouse.mapToItem(picker.contentItem, mouse.x, mouse.y)
+                                    var p = tileMouse.mapToItem(picker.contentItem, mouse.x, mouse.y)
                                     if (!ghost.active) {
-                                        if (Math.abs(mouse.x - cardMouse.from.x) + Math.abs(mouse.y - cardMouse.from.y) < 6) return
-                                        ghost.kind = kindCard.modelData.kind
+                                        if (Math.abs(mouse.x - tileMouse.from.x) + Math.abs(mouse.y - tileMouse.from.y) < 6) return
+                                        ghost.kind = tile.modelData.kind
                                         ghost.active = true
                                     }
                                     ghost.follow(p)
                                 }
                                 onReleased: {
                                     if (ghost.active) ghost.drop()
-                                    else picker.addKind(kindCard.modelData.kind)
+                                    else picker.addKind(tile.modelData.kind)
                                     search.forceActiveFocus()
                                 }
                                 onCanceled: ghost.active = false
@@ -884,193 +818,68 @@ PanelWindow {
 
                 Text {
                     visible: picker.matches.length === 0
-                    width: cards.width
-                    topPadding: 24
+                    width: strip.width
+                    anchors.verticalCenter: parent.verticalCenter
                     horizontalAlignment: Text.AlignHCenter
-                    text: "No widget matches “" + picker.query + "”. Try a category instead."
+                    text: "No widget matches “" + picker.query + "”."
                     color: Theme.textMuted
                     font.pixelSize: 12
                     font.family: Theme.fontText
-                    wrapMode: Text.WordWrap
+                    elide: Text.ElideRight
                 }
             }
 
-            // ── On desktop: what is placed, on every monitor ─────────────
-            Flickable {
-                id: placedList
-                visible: picker.tab === "placed"
-                x: 20
-                anchors.top: tabs.bottom
-                anchors.topMargin: 16
-                anchors.bottom: footer.top
-                anchors.bottomMargin: 8
-                width: parent.width - 40
-                contentHeight: placedColumn.height
-                clip: true
-                interactive: false
-
-                Column {
-                    id: placedColumn
-                    width: parent.width
-                    spacing: 6
-
-                    Repeater {
-                        model: Widgets.placed
-
-                        Rectangle {
-                            id: placedRow
-                            required property var modelData
-                            readonly property var spec: Widgets.spec(placedRow.modelData.kind)
-                            visible: placedRow.spec !== null
-                            width: placedColumn.width
-                            height: 52
-                            radius: Theme.radiusMedium
-                            color: Theme.surfaceContainer
-
-                            IconGlyph {
-                                id: rowGlyph
-                                anchors.left: parent.left
-                                anchors.leftMargin: 16
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: picker.glyphOf(placedRow.spec ? placedRow.spec.category : "")
-                                color: Theme.textSecondary
-                                size: Theme.iconMedium
-                            }
-
-                            Column {
-                                anchors.left: rowGlyph.right
-                                anchors.leftMargin: 14
-                                anchors.right: rowRemove.left
-                                anchors.rightMargin: 8
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: 1
-
-                                Text {
-                                    width: parent.width
-                                    text: placedRow.spec ? placedRow.spec.name : ""
-                                    color: Theme.textPrimary
-                                    font.pixelSize: 13
-                                    font.weight: Font.DemiBold
-                                    font.family: Theme.fontText
-                                    elide: Text.ElideRight
-                                }
-
-                                Text {
-                                    width: parent.width
-                                    text: (placedRow.spec ? placedRow.spec.category : "") + "  ·  "
-                                          + (placedRow.modelData.screen === picker.screenName ? "This screen"
-                                                                                              : placedRow.modelData.screen)
-                                    color: Theme.textMuted
-                                    font.pixelSize: 11
-                                    font.family: Theme.fontText
-                                    elide: Text.ElideRight
-                                }
-                            }
-
-                            IconButton {
-                                id: rowRemove
-                                anchors.right: parent.right
-                                anchors.rightMargin: 10
-                                anchors.verticalCenter: parent.verticalCenter
-                                icon: "\u{F0374}"
-                                size: 32
-                                glyphSize: Theme.iconSmall
-                                onTapped: Widgets.remove(placedRow.modelData.id)
-                            }
-                        }
-                    }
-
-                    Text {
-                        visible: Widgets.placed.length === 0
-                        width: parent.width
-                        topPadding: 24
-                        horizontalAlignment: Text.AlignHCenter
-                        text: "Nothing on the desktop yet. Add one from the Add tab."
-                        color: Theme.textMuted
-                        font.pixelSize: 12
-                        font.family: Theme.fontText
-                        wrapMode: Text.WordWrap
-                    }
-                }
-            }
-
-            // The wheel moves either list a fixed step a notch, as in the
-            // launcher; neither Flickable takes the pointer itself.
+            // The wheel moves the strip sideways a fixed step a notch, as the
+            // launcher's list moves down; the strip does not take the pointer
+            // itself.
             MouseArea {
-                anchors.fill: picker.tab === "add" ? cards : placedList
+                anchors.fill: strip
                 acceptedButtons: Qt.NoButton
                 onWheel: wheel => {
-                    var list = picker.tab === "add" ? cards : placedList
-                    if (wheel.angleDelta.y === 0) return
-                    var max = Math.max(0, list.contentHeight - list.height)
-                    wheelScroll.target = list
-                    var from = wheelScroll.running ? wheelScroll.to : list.contentY
-                    wheelScroll.to = Math.max(0, Math.min(max, from - wheel.angleDelta.y / 120 * 120))
+                    var d = wheel.angleDelta.y !== 0 ? wheel.angleDelta.y : wheel.angleDelta.x
+                    if (d === 0) return
+                    var max = Math.max(0, strip.contentWidth - strip.width)
+                    var from = wheelScroll.running ? wheelScroll.to : strip.contentX
+                    wheelScroll.to = Math.max(0, Math.min(max, from - d / 120 * 240))
                     wheelScroll.restart()
                 }
             }
 
             NumberAnimation {
                 id: wheelScroll
-                property: "contentY"
+                target: strip
+                property: "contentX"
                 duration: Theme.durMedium
                 easing.type: Easing.OutCubic
             }
 
-            // Keys, and Done.
+            // ── Keys, and how it is used ─────────────────────────────────
             Item {
                 id: footer
                 x: 20
                 width: parent.width - 40
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: 16
-                height: 40
+                height: 24
 
                 Row {
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 14
 
+                    KeyHint { key: "← →"; label: "Choose"; visible: picker.matches.length > 0 }
+                    KeyHint { key: "↵"; label: "Add"; visible: picker.matches.length > 0 }
+                    KeyHint { key: "tab"; label: "Category" }
                     KeyHint { key: "esc"; label: picker.query.length > 0 ? "Clear" : "Close" }
-                    KeyHint { key: "tab"; label: picker.tab === "add" ? "On desktop" : "Add" }
-                    KeyHint { key: "↵"; label: "Add"; visible: picker.tab === "add" && picker.matches.length > 0 }
                 }
 
-                // Done, in the text colour like the shell's other primary
-                // buttons; the accent stays on what is chosen.
-                Rectangle {
+                Text {
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
-                    width: doneRow.implicitWidth + 32
-                    height: 36
-                    radius: height / 2
-                    color: Theme.textPrimary
-
-                    Row {
-                        id: doneRow
-                        anchors.centerIn: parent
-                        spacing: 6
-
-                        IconGlyph {
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: "\u{F012C}"
-                            color: Theme.inkOn(Theme.textPrimary)
-                            size: Theme.iconSmall
-                        }
-
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: "Done"
-                            color: Theme.inkOn(Theme.textPrimary)
-                            font.pixelSize: 13
-                            font.weight: Font.DemiBold
-                            font.family: Theme.fontText
-                        }
-                    }
-
-                    StateLayer {
-                        tint: Theme.inkOn(Theme.textPrimary)
-                        onTapped: picker.close()
-                    }
+                    visible: picker.matches.length > 0
+                    text: "Drag one up onto the desktop, or click it to add it"
+                    color: Theme.textMuted
+                    font.pixelSize: 11
+                    font.family: Theme.fontText
                 }
             }
         }
