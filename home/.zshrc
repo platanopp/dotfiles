@@ -55,7 +55,7 @@ ZSH_AUTOSUGGEST_STRATEGY=(history completion)
 eval "$(starship init zsh)"
 fastfetch
 export PATH=$PATH:~/.spicetify
-export PATH=/home/gone/.local/bin:$PATH
+export PATH=$HOME/.local/bin:$PATH
 
 # devkitPro (3DS homebrew toolchain): DEVKITARM is how its own Makefiles find
 # the ARM11 compiler, by full path -- not appended to PATH, so it can't
@@ -64,5 +64,5 @@ export DEVKITPRO=/opt/devkitpro
 export DEVKITARM=/opt/devkitpro/devkitARM
 
 # Ghidra (REA's decompiler backend for reverse engineering).
-export GHIDRA_INSTALL_DIR=/home/gone/Projects/tools/ghidra_12.1.4_PUBLIC
+export GHIDRA_INSTALL_DIR=$HOME/Projects/tools/ghidra_12.1.4_PUBLIC
 export PATH=$PATH:/opt/devkitpro/tools/bin

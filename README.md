@@ -21,3 +21,10 @@ first. Hyprland, the terminal and the rest are left as you have them.
 `install.sh` moves anything it would overwrite into
 `~/.local/share/dotfiles-backups/<timestamp>/`, keeping the original paths, so
 undoing a run is copying that tree back over `$HOME`.
+
+## Paths into your home
+
+A few configs name files by their absolute path (GTK bookmarks, qt6ct,
+hyprpaper, qBittorrent, spicetify). The repo keeps `@HOME@` in those places and
+`install.sh` writes your own home in, so copy them with it rather than by hand.
+`sync.sh` puts `@HOME@` back when it copies a live config in.

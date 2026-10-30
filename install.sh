@@ -111,6 +111,9 @@ install_packages() {
 install_config() {
     say "Configuration"
     local moved=0 placed=0
+    # $HOME as a sed replacement: the characters sed would read as its own.
+    local home_sed
+    home_sed="$(printf '%s' "$HOME" | sed 's/[\\&|]/\\&/g')"
 
     while IFS= read -r line; do
         line="${line%%#*}"
@@ -138,6 +141,10 @@ install_config() {
         else
             mkdir -p "$(dirname "$dst")"
             cp -a "$src" "$dst"
+            # Paths into the home folder are kept as @HOME@ in the repo
+            # (see sync.sh); this user's home goes in their place.
+            grep -rlIZF -- '@HOME@' "$dst" 2>/dev/null \
+                | xargs -0r sed -i "s|@HOME@|${home_sed}|g"
         fi
         placed=$((placed + 1))
     done < "$repo/manifest.txt"

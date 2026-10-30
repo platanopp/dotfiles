@@ -29,7 +29,6 @@ and may point somewhere else entirely.
 """
 
 import datetime
-import filecmp
 import json
 import os
 import re
@@ -124,17 +123,33 @@ def ignored(paths):
     return {line[len(IN_REPO) + 1:] for line in r.stdout.splitlines()}
 
 
+# What the repository keeps wherever a path into the publisher's home folder
+# was (its sync.sh puts it there). Spelled in two pieces: whole, it would be
+# filled in here too, by install.sh and by this very updater.
+HOME_TOKEN = ("@" + "HOME@").encode()
+
+
+def published(rel):
+    """A published file as it reads on this machine: this user's home put
+    back where the repository keeps HOME_TOKEN."""
+    with open(os.path.join(CACHE, IN_REPO, rel), "rb") as f:
+        return f.read().replace(HOME_TOKEN, HOME.encode())
+
+
+def live(rel):
+    with open(os.path.join(LIVE, rel), "rb") as f:
+        return f.read()
+
+
 def compare(base):
     """(changed or new upstream, removed upstream since BASE)
 
     A file only this shell has is deleted only if the published shell had it
     at BASE and has since dropped it. Anything else there is the user's own,
     and stays -- with no BASE to tell the two apart, all of it stays."""
-    published = os.path.join(CACHE, IN_REPO)
-    up = files_under(published)
+    up = files_under(os.path.join(CACHE, IN_REPO))
     here = files_under(LIVE)
-    changed = sorted(p for p in up if p not in here
-                     or not filecmp.cmp(os.path.join(published, p), os.path.join(LIVE, p), shallow=False))
+    changed = sorted(p for p in up if p not in here or published(p) != live(p))
     extra = here - up
     if not base or not extra:
         return changed, []
@@ -170,11 +185,11 @@ def baseline(backup_repo):
     Looked up in the published history listed once, not commit by commit: the
     cache is a partial clone, and asking it for a commit it lacks makes git go
     and fetch it -- a round trip to GitHub for every local commit there is."""
-    published = set(git("rev-list", "HEAD").stdout.split())
+    history = set(git("rev-list", "HEAD").stdout.split())
     try:
         with open(STATE) as f:
             c = json.load(f).get("commit", "")
-        if c in published:
+        if c in history:
             return c
     except (OSError, ValueError):
         pass
@@ -183,7 +198,7 @@ def baseline(backup_repo):
         r = subprocess.run(["git", "rev-list", "--max-count=300", "HEAD"], cwd=repo, env=GIT_ENV,
                            capture_output=True, text=True)
         for c in r.stdout.split():
-            if c in published:
+            if c in history:
                 return c
     return ""
 
@@ -251,13 +266,15 @@ def update(source, branch, backup_repo):
     shutil.copytree(LIVE, saved, symlinks=True,
                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "logs"))
 
-    published = os.path.join(CACHE, IN_REPO)
     for rel in changed:
         dst = os.path.join(LIVE, rel)
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         # Written beside and renamed over, so the running shell never reads a
-        # half-copied file when it reloads.
-        shutil.copy2(os.path.join(published, rel), dst + ".update-tmp")
+        # half-copied file when it reloads. The mode comes along: the scripts
+        # are run as programs.
+        with open(dst + ".update-tmp", "wb") as f:
+            f.write(published(rel))
+        shutil.copymode(os.path.join(CACHE, IN_REPO, rel), dst + ".update-tmp")
         os.replace(dst + ".update-tmp", dst)
     for rel in gone:
         os.remove(os.path.join(LIVE, rel))
