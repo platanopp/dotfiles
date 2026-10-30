@@ -18,6 +18,31 @@ hl.env("GTK_THEME", "Adwaita-dark")
 hl.env("XCURSOR_SIZE", "24")
 hl.env("HYPRCURSOR_SIZE", "24")
 
+-- ── XWayland's primary monitor ───────────────────────────────────────
+--
+-- X programs do not see the monitors as they are here. XWayland lays them
+-- out side by side at y=0, in the order Hyprland added them: the Xiaomi at
+-- +0+0 and the Samsung to its right at +2560+0, where on the desk it is on
+-- the left with the bottoms level (`DISPLAY=:0 xrandr --listmonitors`).
+-- That is Hyprland's doing and has no setting; it translates each window's
+-- position monitor by monitor, so most of them land where they should.
+--
+-- What it does not translate is which monitor counts as the main one, and
+-- none did: no primary was set, so whatever asks for it -- Wine, for
+-- Proton games; Steam and other X programs sizing a new window -- got the
+-- first one listed, the Xiaomi, and its 2560x1440 on a Samsung workspace.
+-- The Samsung is where the games are played, so it is the primary.
+--
+-- Set at login, retried until XWayland knows the output, and again when a
+-- monitor is added: the Samsung coming back is a new output to XWayland, and
+-- a primary goes with the output it was set on.
+local function setXPrimary()
+    hl.exec_cmd("sh -c 'for i in 1 2 3 4 5 6 7 8 9 10; do "
+        .. "xrandr --output DP-2 --primary 2>/dev/null && exit; sleep 0.5; done'")
+end
+
+hl.on("monitor.added", setXPrimary)
+
 hl.on("hyprland.start", function()
     -- Un solo arranque para toda la sesion grafica.
     --
@@ -44,6 +69,8 @@ hl.on("hyprland.start", function()
     -- thread -- neighbours landed a frame apart and the gaps between the
     -- pills shook by up to 12px mid-animation.
     hl.exec_cmd("quickshell")
+    -- Before Steam, which reads the monitors when it starts.
+    setXPrimary()
     -- Chat and the game client.
     hl.exec_cmd("discord")
     hl.exec_cmd("steam")
@@ -475,10 +502,53 @@ local function pinToastToCorner(win)
     end, { timeout = 10, type = "repeat" })
 end
 
+-- ── Floating windows bigger than their monitor ──────────────────────
+--
+-- A floating window that still opens too big for its monitor, or outside
+-- it, is brought in: shrunk to the monitor's free area (the bar's space
+-- off, 13px in like the windows) and centred there. The case it was written
+-- for: an X dialog asking for 2400x1300 opened at 0,0 -- the Xiaomi's
+-- corner -- while it belonged to a Samsung workspace, and ran off both.
+--
+-- Checked when the window maps and once more a moment later, for the X
+-- programs (Steam among them) that resize themselves just after. Windows
+-- that already fit are not touched. Left out: Proton games (steam_app_*),
+-- which render at the size they chose whatever their window is resized to
+-- -- the primary monitor above is what gives them the right one; Steam's
+-- toasts, placed above; and the nameless surfaces of X drags.
+local function fitToMonitor(sel)
+    local w = hl.get_window(sel)
+    if not w or not w.mapped or not w.floating or w.fullscreen ~= 0 or w.pinned then return end
+    local mon = w.monitor
+    if not mon then return end
+    local r = mon.reserved
+    local left, top = mon.x + r.left, mon.y + r.top
+    local right, bottom = mon.x + mon.width - r.right, mon.y + mon.height - r.bottom
+    if w.at.x >= left and w.at.y >= top
+        and w.at.x + w.size.x <= right and w.at.y + w.size.y <= bottom then
+        return
+    end
+    local width = math.min(w.size.x, right - left - 26)
+    local height = math.min(w.size.y, bottom - top - 26)
+    if width ~= w.size.x or height ~= w.size.y then
+        hl.dispatch(hl.dsp.window.resize({ x = width, y = height, window = sel }))
+    end
+    hl.dispatch(hl.dsp.window.move({
+        x = left + math.floor((right - left - width) / 2),
+        y = top + math.floor((bottom - top - height) / 2),
+        window = sel,
+    }))
+end
+
 hl.on("window.open", function(win)
     if win.class == "steam" and win.title:find("^notificationtoasts") then
         pinToastToCorner(win)
+        return
     end
+    if not win.floating or win.class == "" or win.class:find("^steam_app") then return end
+    local sel = "address:" .. win.address
+    fitToMonitor(sel)
+    hl.timer(function() fitToMonitor(sel) end, { timeout = 300, type = "oneshot" })
 end)
 
 hl.window_rule({
