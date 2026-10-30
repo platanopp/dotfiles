@@ -33,8 +33,14 @@ Singleton {
     property var backupLast: null
 
     function refreshAbout() {
-        if (!aboutInfoProc.running) aboutInfoProc.running = true
+        root.refreshInfo()
         root.backupCmd("status")
+    }
+
+    // The facts alone, for the desktop's machine card: refreshAbout's backup
+    // status also syncs the dotfiles, which a widget has no business doing.
+    function refreshInfo() {
+        if (!aboutInfoProc.running) aboutInfoProc.running = true
     }
 
     // status | init | backup | push | github

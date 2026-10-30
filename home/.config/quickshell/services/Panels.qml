@@ -213,14 +213,42 @@ Singleton {
         function close(): void { root.overviewOpen = false }
     }
 
-    // The launcher, the overview, the wallpaper picker and the shortcut
-    // sheet put Hyprland in its "shell-modal" submap while one is up (hyprland.lua), where Super+drag and the
+    // The widget picker (Super+D): the desktop widgets, put on, moved and
+    // taken off. Pinned to the screen it was opened on, like the others, and
+    // that screen's widgets are the ones it edits.
+    property bool widgetsOpen: false
+    property string widgetsScreen: ""
+
+    onWidgetsOpenChanged: {
+        root.syncSubmap()
+        if (!root.widgetsOpen) return
+        var monitor = Hyprland.focusedMonitor
+        root.widgetsScreen = monitor ? monitor.name : ""
+    }
+
+    function toggleWidgets() {
+        if (!root.widgetsOpen) {
+            root.launcherOpen = false
+            root.overviewOpen = false
+        }
+        root.widgetsOpen = !root.widgetsOpen
+    }
+
+    IpcHandler {
+        target: "widgets"
+        function toggle(): void { root.toggleWidgets() }
+        function open(): void { if (!root.widgetsOpen) root.toggleWidgets() }
+        function close(): void { root.widgetsOpen = false }
+    }
+
+    // The launcher, the overview, the wallpaper picker, the widget picker
+    // and the shortcut sheet put Hyprland in its "shell-modal" submap while one is up (hyprland.lua), where Super+drag and the
     // other binds do nothing -- they reached the windows behind the overlay.
     // Set again on every change of either: Super+Tab or Super+Space drop
     // the submap themselves, and one may be opening as the other closes.
     // Reset once as the shell starts, in case one died with it set.
     readonly property bool modalOpen: root.overviewOpen || root.launcherOpen || root.wallpapersOpen
-                                      || root.keybindsOpen
+                                      || root.keybindsOpen || root.widgetsOpen
 
     // One call, with where things ended up, a moment after they settle --
     // not one per change: two changes close together (the launcher closing

@@ -3,7 +3,8 @@
 the system for whoever is logged in -- nothing about it is written in.
 The backup the page also shows is scripts/backup.py's.
 
-Prints JSON: os, kernel, host, cpu, gpu, memory, hyprland, quickshell, uptime.
+Prints JSON: os, kernel, host, cpu, gpu, memory, hyprland, quickshell, uptime,
+user, packages, shell.
 """
 
 import json
@@ -45,7 +46,14 @@ def info():
     except json.JSONDecodeError:
         pass
     qs = run("qs", "--version").stdout.strip().split("\n")[0]
+    # For the desktop's machine card, what fastfetch used to show beside
+    # the rest: who, how many packages, and which shell.
+    pkgs = run("pacman", "-Qq").stdout.count("\n")
+    shell = os.path.basename(os.environ.get("SHELL", ""))
     return {
+        "user": os.environ.get("USER", ""),
+        "packages": pkgs,
+        "shell": shell,
         "os": first_line("/etc/os-release", r'PRETTY_NAME=(.*)') or platform.system(),
         "kernel": platform.release(),
         "host": platform.node(),

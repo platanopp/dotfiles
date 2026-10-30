@@ -44,20 +44,13 @@ hl.on("hyprland.start", function()
     -- thread -- neighbours landed a frame apart and the gaps between the
     -- pills shook by up to 12px mid-animation.
     hl.exec_cmd("quickshell")
-    -- The terminal that's always up, classed so the widget rules below can
-    -- park it on workspace 11, HDMI's first, at the reference layout's position. It already
-    -- shows fastfetch on its own -- that's .zshrc, not this -- so no -e here.
-    hl.exec_cmd("kitty --class widget-sysinfo")
     -- Chat and the game client.
     hl.exec_cmd("discord")
     hl.exec_cmd("steam")
     hl.exec_cmd("hyprpaper")
-    -- The other two desktop widgets: ordinary floating windows, not shell
-    -- overlays, so they can be dragged, resized or closed like anything
-    -- else. Size and position come from the window rules further down.
-    hl.exec_cmd("kitty --class widget-clock -e tty-clock -c -C 7")
-    hl.exec_cmd("kitty --class widget-cava -e cava")
-    hl.exec_cmd("kitty --class widget-btop -e btop")
+    -- The desktop widgets are the shell's own now (Super + D), on a layer
+    -- under the windows; the four kitty windows that stood in for them --
+    -- fastfetch, tty-clock, cava, btop on workspace 11 -- are gone.
     -- Panels off after fifteen idle minutes and a lock at twenty; rules in
     -- hypridle.conf next door. Its output goes to a log rather than nowhere:
     -- when the timeout does not fire, what it says about inhibits is the only
@@ -263,9 +256,14 @@ hl.define_submap("shell-modal", function()
         hl.dispatch(hl.dsp.submap("reset"))
         hl.dispatch(hl.dsp.global("quickshell:keybinds"))
     end)
+    hl.bind(mainMod .. " + D", function()
+        hl.dispatch(hl.dsp.submap("reset"))
+        hl.dispatch(hl.dsp.global("quickshell:widgets"))
+    end)
 end)
 hl.bind(mainMod .. " + F", hl.dsp.global("quickshell:keybinds"))
 hl.bind(mainMod .. " + W", hl.dsp.global("quickshell:wallpapers"))
+hl.bind(mainMod .. " + D", hl.dsp.global("quickshell:widgets"), { description = "Desktop widgets" })
 hl.bind(mainMod .. " + O", hl.dsp.global("quickshell:settings"))
 hl.bind(mainMod .. " + ALT + Z", hl.dsp.global("quickshell:micmute"))
 hl.bind(mainMod .. " + P", hl.dsp.window.pseudo())
@@ -352,13 +350,6 @@ hl.window_rule({
     center = true,
 })
 
-hl.window_rule({
-    name  = "kitty-float",
-    match = { class = "^kitty$" },
-    float = true,
-    size  = "901 478",
-    center = true,
-})
 hl.layer_rule({
     name  = "quickshell-xray",
     -- ".*": rules match the whole namespace, and "quickshell" alone matched
@@ -397,48 +388,25 @@ hl.window_rule({
 
 -- ── Desktop widgets ───────────────────────────────────────────────────
 --
--- Ordinary floating windows (see the exec_cmd calls above), not pinned or
--- stuck to the desktop -- `silent` only keeps opening them from dragging
--- focus to workspace 11 (HDMI's first), the same way Discord and Steam did.
--- `size`/`move` are pinned here too: with other windows already tiled there, a
--- freshly floated window otherwise keeps the tile-sized geometry it had
--- just before `float = true` applied, ignoring kitty's own initial size.
--- Positions match the reference layout (terminal top-left, clock top-right,
--- audio bar bottom-right), scaled up from that screenshot to this monitor;
--- btop fills the free slot under the terminal, same width.
--- The two at the top are offset by 56px (the quickshell bar's reserved
--- area, `hyprctl monitors -j`'s reserved[1]) so they don't open under it.
-hl.window_rule({
-    name      = "widget-sysinfo-float",
-    match     = { class = "^widget-sysinfo$" },
-    float     = true,
-    size      = "1100 626",
-    move      = "68 140",
-    workspace = "11 silent",
+-- Drawn by the shell on its own layers: "quickshell:desktop" under the
+-- windows (one per monitor, unmapped when empty or under a fullscreen
+-- window) and "quickshell:widgets", the picker, over everything. Neither is
+-- blurred -- the widgets' cards are opaque, and the picker dims with its own
+-- scrim, like the other overlays -- and both animate themselves.
+hl.layer_rule({
+    name    = "quickshell-desktop",
+    match   = { namespace = "^quickshell:desktop$" },
+    blur    = false,
+    no_anim = true,
 })
-hl.window_rule({
-    name      = "widget-clock-float",
-    match     = { class = "^widget-clock$" },
-    float     = true,
-    size      = "936 473",
-    move      = "1522 148",
-    workspace = "11 silent",
-})
-hl.window_rule({
-    name      = "widget-cava-float",
-    match     = { class = "^widget-cava$" },
-    float     = true,
-    size      = "808 392",
-    move      = "1646 723",
-    workspace = "11 silent",
-})
-hl.window_rule({
-    name      = "widget-btop-float",
-    match     = { class = "^widget-btop$" },
-    float     = true,
-    size      = "1100 574",
-    move      = "68 806",
-    workspace = "11 silent",
+
+hl.layer_rule({
+    name         = "quickshell-widgets",
+    match        = { namespace = "^quickshell:widgets$" },
+    blur         = false,
+    ignore_alpha = 0.02,
+    xray         = false,
+    no_anim      = true,
 })
 
 -- ── Steam's notification toasts ─────────────────────────────────────

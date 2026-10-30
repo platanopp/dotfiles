@@ -11,6 +11,7 @@ import QtQuick.Layouts
 import qs.bar
 import qs.components
 import qs.config
+import qs.desktop
 import qs.lock
 import qs.overlays
 import qs.services
@@ -24,8 +25,8 @@ Scope {
     // their own -- the IPC targets, the keyboard's colours following the
     // wallpaper -- has to be running before that.
     readonly property var services: [Accent, AppImages, Audio, Bluetooth, Clock, Display, Hypr, KeyboardRgb,
-                                     Keybinds, Network, Panels, Power, Profile, Recorder, System, Tablet,
-                                     Wallpaper]
+                                     Keybinds, Network, Panels, Power, Profile, Recorder, Stats, System, Tablet,
+                                     Wallpaper, Widgets]
 
     Variants {
         model: Quickshell.screens
@@ -342,11 +343,18 @@ Scope {
                 bar: bar
             }
 
+            // The desktop widgets, under every window.
+            DesktopLayer {
+                bar: bar
+            }
             KeybindsOverlay {
                 bar: bar
             }
 
             WallpaperOverlay {
+                bar: bar
+            }
+            WidgetPicker {
                 bar: bar
             }
 
@@ -431,6 +439,12 @@ Scope {
         onPressed: Panels.toggleWallpapers()
     }
 
+    GlobalShortcut {
+        appid: "quickshell"
+        name: "widgets"
+        description: "Put widgets on the desktop, move them, take them off"
+        onPressed: Panels.toggleWidgets()
+    }
     GlobalShortcut {
         appid: "quickshell"
         name: "launcher"

@@ -65,6 +65,14 @@ Singleton {
     // from competing with the card, so it is darker than the old tint was.
     readonly property color scrim: Qt.rgba(background.r, background.g, background.b, 0.6)
 
+    // The desktop widgets' card: the wallpaper's hue (the accent's, which
+    // Accent takes from it) at a dark value, so the widgets read as part of
+    // the picture they sit on and follow it when it changes. Opaque, like the
+    // overlays' cards, and dark enough that muted text on it keeps 4.5:1 for
+    // any hue. A grey wallpaper has no hue to give, and gets the plain surface.
+    readonly property color widgetSurface: accent.hsvSaturation < 0.05 ? surface
+        : Qt.hsva(accent.hsvHue, Math.min(0.55, accent.hsvSaturation * 1.1), 0.21, 1)
+
     // Shadow under a raised surface, and the white of a switch's knob.
     readonly property color shadow: "#000000"
     readonly property color knob: "#ffffff"
