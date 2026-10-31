@@ -6,7 +6,7 @@ XIAOMI_MODE in idle-screens.sh. This only reads them and rewrites the numbers
 in place, so the files keep their comments and can still be edited by hand.
 
   get                      JSON {screensOff, lock, xiaomiMode}, seconds
-  set-screens-off SECONDS  the listener that runs idle-screens.sh
+  set-screens-off SECONDS  the listeners that run idle-screens.sh
   set-lock SECONDS         the listener that runs loginctl lock-session
   set-xiaomi-mode MODE     ddc-off | cover
 
@@ -66,12 +66,17 @@ def timeout_of(text, marker):
 
 
 def set_timeout(marker, seconds):
+    # Every listener running it: the screens go off by two at the same
+    # timeout, one for while the session is unlocked and one for behind the
+    # lock. From the last, so the earlier matches keep their offsets.
     text = read(CONF)
-    m = find(text, marker)
-    if not m:
+    blocks = [m for m in BLOCK.finditer(text) if marker in m.group(0)]
+    if not blocks:
         sys.exit(f"no listener running {marker!r} in {CONF}")
-    block = TIMEOUT.sub(lambda t: t.group(1) + str(int(seconds)), m.group(0), count=1)
-    write(CONF, text[:m.start()] + block + text[m.end():])
+    for m in reversed(blocks):
+        block = TIMEOUT.sub(lambda t: t.group(1) + str(int(seconds)), m.group(0), count=1)
+        text = text[:m.start()] + block + text[m.end():]
+    write(CONF, text)
     restart_hypridle()
 
 
