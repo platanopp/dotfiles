@@ -1,9 +1,12 @@
-hl.monitor({
+-- Any monitor without a rule of its own. Kept as a table: putting the
+-- monitors in order for X (below) uses it again to bring one back on.
+local anyMonitor = {
     output   = "",
     mode     = "preferred",
     position = "auto",
     scale    = "auto",
-})
+}
+hl.monitor(anyMonitor)
 
 local terminal = "kitty"
 -- Thunar, themed after the shell (~/.config/gtk-3.0/gtk.css). Yazi is still
@@ -18,30 +21,152 @@ hl.env("GTK_THEME", "Adwaita-dark")
 hl.env("XCURSOR_SIZE", "24")
 hl.env("HYPRCURSOR_SIZE", "24")
 
--- ── XWayland's primary monitor ───────────────────────────────────────
+-- ── The monitors as X programs see them ──────────────────────────────
 --
 -- X programs do not see the monitors as they are here. XWayland lays them
--- out side by side at y=0, in the order Hyprland added them: the Xiaomi at
--- +0+0 and the Samsung to its right at +2560+0, where on the desk it is on
--- the left with the bottoms level (`DISPLAY=:0 xrandr --listmonitors`).
--- That is Hyprland's doing and has no setting; it translates each window's
--- position monitor by monitor, so most of them land where they should.
+-- out side by side at y=0, in the order Hyprland added them
+-- (`DISPLAY=:0 xrandr --listmonitors`). That is Hyprland's doing and has no
+-- setting; it translates each window's position monitor by monitor, so a
+-- window inside one monitor lands where it should. A monitor set higher or
+-- lower than its neighbour (here the Samsung, 360 px lower) is lost to X;
+-- that much is harmless.
 --
--- What it does not translate is which monitor counts as the main one, and
--- none did: no primary was set, so whatever asks for it -- Wine, for
--- Proton games; Steam and other X programs sizing a new window -- got the
--- first one listed, the Xiaomi, and its 2560x1440 on a Samsung workspace.
--- The Samsung is where the games are played, so it is the primary.
+-- The order is not. It is the order the monitors were found in, and one that
+-- drops its link and comes back -- here the Xiaomi, powered off over DDC for
+-- idle -- is found again last. So X's left and right had nothing to do with
+-- the desk, and changed under running programs: the Xiaomi at +0+0 at login,
+-- where on the desk it is on the right, then swapped with the Samsung at
+-- every idle, 27 times in one day. Anything that read the layout before a
+-- swap and placed a window after it (Steam, read once at login; a game
+-- started before the panels went off) placed it by a map no longer true.
 --
--- Set at login, retried until XWayland knows the output, and again when a
--- monitor is added: the Samsung coming back is a new output to XWayland, and
--- a primary goes with the output it was set on.
-local function setXPrimary()
-    hl.exec_cmd("sh -c 'for i in 1 2 3 4 5 6 7 8 9 10; do "
-        .. "xrandr --output DP-2 --primary 2>/dev/null && exit; sleep 0.5; done'")
+-- So the order is put right: left to right as the monitors stand, and of
+-- two at the same left edge, the higher first. When it is wrong -- at login,
+-- or when a monitor comes back -- the monitors out of place are turned off
+-- and back on one at a time, which lines them up at the end. A second or two
+-- of black on those, at login behind the lock. Nothing here names a monitor,
+-- so it holds for any set of them.
+--
+-- And which monitor counts as the main one is not translated either: with
+-- no primary set, whatever asks for it -- Wine, for Proton games; Steam and
+-- other X programs sizing a new window -- got the first one listed. The
+-- primary is the fastest monitor, the one games are played on (here the
+-- Samsung, 240 Hz to the Xiaomi's 120); of two as fast, the one further
+-- left. Set at login, retried until XWayland knows the output, and again
+-- when a monitor is added: a monitor coming back is a new output to
+-- XWayland, and a primary goes with the output it was set on.
+
+-- The monitors in the order the desk has them. Mirrors are not outputs of
+-- their own to X.
+local function deskOrder()
+    local mons = {}
+    for _, m in ipairs(hl.get_monitors()) do
+        if not m.is_mirror then table.insert(mons, m) end
+    end
+    table.sort(mons, function(a, b)
+        if a.x ~= b.x then return a.x < b.x end
+        if a.y ~= b.y then return a.y < b.y end
+        return a.name < b.name
+    end)
+    return mons
 end
 
-hl.on("monitor.added", setXPrimary)
+local function setXPrimary()
+    local primary
+    for _, m in ipairs(deskOrder()) do
+        if not primary or m.refresh_rate > primary.refresh_rate + 0.5 then
+            primary = m
+        end
+    end
+    -- It goes into a shell command: a plain output name or nothing.
+    if not primary or not primary.name:match("^[%w%-_.]+$") then return end
+    hl.exec_cmd("sh -c 'for i in 1 2 3 4 5 6 7 8 9 10; do "
+        .. "xrandr --output " .. primary.name .. " --primary 2>/dev/null && exit; sleep 0.5; done'")
+end
+
+-- The monitor rules, with the layout picked in Settings; set where they are
+-- written, near the end of the file. Run again to bring a monitor back on.
+local applyMonitorRules
+
+-- The monitors to turn off and on so that Hyprland's list -- the order they
+-- were added in, which is the order XWayland lays them out in -- is in desk
+-- order. Kept: the longest run from the left already in order. Everything
+-- after it goes, to come back in turn at the end of the list.
+local function xOutOfPlace()
+    local listed = {}
+    for i, m in ipairs(hl.get_monitors()) do listed[m.name] = i end
+    local want = deskOrder()
+    local last = 0
+    for i, m in ipairs(want) do
+        if listed[m.name] < last then
+            local out = {}
+            for j = i, #want do table.insert(out, want[j].name) end
+            return out
+        end
+        last = listed[m.name]
+    end
+    return {}
+end
+
+local xOrdering = false
+local afterXOrder = {}
+
+local function runAfterXOrder()
+    local waiting = afterXOrder
+    afterXOrder = {}
+    for _, fn in ipairs(waiting) do fn() end
+end
+
+-- Puts the monitors in desk order, then runs `after`. A monitor coming back
+-- on is itself a monitor being added, which lands here again while
+-- `xOrdering` is set and leaves it alone; so does login, when a monitor
+-- being added may have started the reordering already, and Steam waits for
+-- it to end.
+local function orderXMonitors(after)
+    if after then table.insert(afterXOrder, after) end
+    if xOrdering then return end
+    local out = xOutOfPlace()
+    if #out == 0 then
+        runAfterXOrder()
+        return
+    end
+    xOrdering = true
+    for _, name in ipairs(out) do
+        hl.monitor({ output = name, disabled = true })
+    end
+    -- Back on one at a time, so each is added in its turn. A monitor gets
+    -- the last rule that matches it, and only a rule of the same name undoes
+    -- the one that turned it off: the catch-all's settings go in under its
+    -- name, and the file's own rules back on top of that -- then the
+    -- monitors still waiting are turned off again.
+    local function bringBack(i)
+        local rule = {}
+        for k, v in pairs(anyMonitor) do rule[k] = v end
+        rule.output = out[i]
+        hl.monitor(rule)
+        applyMonitorRules()
+        for j = i + 1, #out do
+            hl.monitor({ output = out[j], disabled = true })
+        end
+        if i < #out then
+            hl.timer(function() bringBack(i + 1) end, { timeout = 500, type = "oneshot" })
+            return
+        end
+        -- Time for XWayland to hear of the outputs again before anything
+        -- reads the layout.
+        hl.timer(function()
+            xOrdering = false
+            setXPrimary()
+            runAfterXOrder()
+        end, { timeout = 1500, type = "oneshot" })
+    end
+    hl.timer(function() bringBack(1) end, { timeout = 500, type = "oneshot" })
+end
+
+hl.on("monitor.added", function()
+    setXPrimary()
+    orderXMonitors()
+end)
 
 hl.on("hyprland.start", function()
     -- Un solo arranque para toda la sesion grafica.
@@ -69,11 +194,13 @@ hl.on("hyprland.start", function()
     -- thread -- neighbours landed a frame apart and the gaps between the
     -- pills shook by up to 12px mid-animation.
     hl.exec_cmd("quickshell")
-    -- Before Steam, which reads the monitors when it starts.
+    -- Before Steam, which reads the monitors when it starts: the primary,
+    -- and the monitors in desk order (see "The monitors as X programs see
+    -- them").
     setXPrimary()
     -- Chat and the game client.
     hl.exec_cmd("discord")
-    hl.exec_cmd("steam")
+    orderXMonitors(function() hl.exec_cmd("steam") end)
     hl.exec_cmd("hyprpaper")
     -- The desktop widgets are the shell's own now (Super + D), on a layer
     -- under the windows; the four kitty windows that stood in for them --
@@ -789,30 +916,33 @@ hl.config({
 })
 
 -- After the catch-all monitor rule at the top of the file, so these win for
--- the two outputs actually attached.
-hl.monitor({
-    output = "DP-2",
-    disabled = false,
-    mode = "1920x1080@239.76Hz",
-    position = "-1920x360",
-    scale = 1,
-    cm = "srgb",
-})
-hl.monitor({
-    output = "HDMI-A-1",
-    disabled = false,
-    mode = "2560x1440@120.00Hz",
-    position = "0x0",
-    scale = 1,
-    cm = "srgb",
-})
+-- the two outputs actually attached. A function, because putting the
+-- monitors in order for X (near the top) turns monitors off and needs them
+-- back on as they were.
+applyMonitorRules = function()
+    hl.monitor({
+        output = "DP-2",
+        disabled = false,
+        mode = "1920x1080@239.76Hz",
+        position = "-1920x360",
+        scale = 1,
+        cm = "srgb",
+    })
+    hl.monitor({
+        output = "HDMI-A-1",
+        disabled = false,
+        mode = "2560x1440@120.00Hz",
+        position = "0x0",
+        scale = 1,
+        cm = "srgb",
+    })
 
--- The layout picked in the shell's Settings (Displays page) -- mode, position
--- and scale per monitor -- written to monitors.lua by display_control.py.
--- Run after the rules above, so it wins: at login, and at every config
--- reload, which used to put the monitors back where this file had them. The
--- two rules above stay as the defaults for a machine with nothing saved yet.
-do
+    -- The layout picked in the shell's Settings (Displays page) -- mode,
+    -- position and scale per monitor -- written to monitors.lua by
+    -- display_control.py. Run after the rules above, so it wins: at login,
+    -- and at every config reload, which used to put the monitors back where
+    -- this file had them. The two rules above stay as the defaults for a
+    -- machine with nothing saved yet.
     local path = os.getenv("HOME") .. "/.config/hypr/monitors.lua"
     local f = io.open(path, "r")
     if f then
@@ -820,6 +950,8 @@ do
         dofile(path)
     end
 end
+
+applyMonitorRules()
 
 -- Each monitor's block of ten (see `workspaceBlocks` by the binds), pinned
 -- so a workspace opens on its own monitor whichever one asked for it.
