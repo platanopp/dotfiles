@@ -17,7 +17,8 @@ import qs.services
 // be dragged to a new place or taken off with its minus. Every kind waits on
 // a shelf along the bottom, drawn as it will look and in its own shape, the
 // way the overview lines up workspaces: drag one up onto the desktop, or
-// click it to drop it into the first gap.
+// click it to drop it into the first gap. A placed one is made bigger or
+// smaller by the handle at its bottom-right corner.
 //
 // Dragging happens inside this one surface: a widget carried off the shelf
 // never crosses into another window, which Wayland would not allow.
@@ -105,6 +106,14 @@ PanelWindow {
     function snap(v) { return Math.round(v / picker.grid) * picker.grid }
     function clampX(x, w) { return Math.max(picker.edge, Math.min(picker.width - picker.edge - w, x)) }
     function clampY(y, h) { return Math.max(picker.topEdge, Math.min(picker.height - picker.edge - h, y)) }
+
+    // A size for a widget at x, y that keeps it inside the edges: it grows
+    // from its top-left corner, which stays where it is.
+    function fitSize(spec, x, y, want) {
+        var most = Math.min(Widgets.maxSize, (picker.width - picker.edge - x) / spec.w,
+                            (picker.height - picker.edge - y) / spec.h)
+        return Math.max(Widgets.minSize, Math.min(most, want))
+    }
 
     // The shelf. Each kind is shown whole, scaled to one height, so the
     // shelf reads as the widgets themselves in their own shapes -- the clock
@@ -234,6 +243,14 @@ PanelWindow {
                         // Lands with a spring when it is the one just added;
                         // the rest are simply there when the picker opens.
                         property bool arrived: picker.lastAdded !== placed.uid
+                        // Being resized: drawn at liveSize, saved on release.
+                        property bool resizing: false
+                        property real liveSize: 1
+                        // The round clock's corner badges sit on its rim, at
+                        // 45 degrees, wherever that is at its size; the rest
+                        // hang just off their corners.
+                        readonly property real badgeInset: placed.kind === "clock-analog"
+                            ? Math.round(placed.width * 0.1464 - 13) : -8
 
                         width: host.width
                         height: host.height
@@ -261,7 +278,8 @@ PanelWindow {
 
                         RectangularShadow {
                             anchors.fill: host
-                            radius: host.kind === "clock-analog" || host.kind === "clock-pill" ? height / 2 : Theme.radiusXLarge
+                            radius: host.kind === "clock-analog" || host.kind === "clock-pill" ? height / 2
+                                                                                                : Theme.radiusXLarge * host.size
                             blur: 28
                             offset.y: 10
                             color: Theme.alpha(Theme.shadow, 0.5)
@@ -273,6 +291,7 @@ PanelWindow {
                         WidgetHost {
                             id: host
                             kind: placed.kind
+                            size: placed.resizing ? placed.liveSize : model.ws
                             bar: picker.bar
                             live: picker.open
                         }
@@ -314,13 +333,13 @@ PanelWindow {
 
                         // Takes it off the desktop.
                         Rectangle {
-                            x: placed.kind === "clock-analog" ? 14 : -8
-                            y: placed.kind === "clock-analog" ? 14 : -8
+                            x: placed.badgeInset
+                            y: placed.badgeInset
                             width: 26
                             height: 26
                             radius: height / 2
                             color: removeState.hovered ? Theme.error : Theme.textPrimary
-                            opacity: placed.dragging ? 0 : 1
+                            opacity: placed.dragging || placed.resizing ? 0 : 1
 
                             Behavior on color { ColorAnimation { duration: Theme.durShort } }
                             Behavior on opacity { NumberAnimation { duration: Theme.durShort } }
@@ -346,6 +365,103 @@ PanelWindow {
                                 id: removeLater
                                 interval: Theme.durMedium
                                 onTriggered: Widgets.remove(placed.uid)
+                            }
+                        }
+
+                        // Makes it bigger or smaller: dragged out or in along
+                        // the diagonal, the whole widget scaled from its
+                        // top-left corner, which stays put. A double click
+                        // puts it back to the size its kind is made for.
+                        Rectangle {
+                            id: sizeHandle
+                            x: placed.width - 26 - placed.badgeInset
+                            y: placed.height - 26 - placed.badgeInset
+                            width: 26
+                            height: 26
+                            radius: height / 2
+                            color: sizeMouse.containsMouse || placed.resizing ? Theme.accent : Theme.textPrimary
+                            opacity: placed.dragging ? 0 : 1
+
+                            Behavior on color { ColorAnimation { duration: Theme.durShort } }
+                            Behavior on opacity { NumberAnimation { duration: Theme.durShort } }
+
+                            IconGlyph {
+                                anchors.centerIn: parent
+                                text: "\u{F045D}"
+                                color: Theme.inkOn(sizeHandle.color)
+                                size: Theme.iconSmall
+                            }
+
+                            MouseArea {
+                                id: sizeMouse
+                                anchors.fill: parent
+                                anchors.margins: -4
+                                hoverEnabled: true
+                                preventStealing: true
+                                cursorShape: Qt.SizeFDiagCursor
+                                property point from: Qt.point(0, 0)
+                                property real startSize: 1
+
+                                onPressed: mouse => {
+                                    sizeMouse.from = sizeMouse.mapToItem(desk, mouse.x, mouse.y)
+                                    sizeMouse.startSize = model.ws
+                                    placed.liveSize = model.ws
+                                    placed.resizing = true
+                                }
+                                onPositionChanged: mouse => {
+                                    if (!placed.resizing) return
+                                    var p = sizeMouse.mapToItem(desk, mouse.x, mouse.y)
+                                    var s = host.spec
+                                    // The pointer's travel as a share of the
+                                    // kind's own width and height, averaged:
+                                    // straight out along either edge works,
+                                    // and so does the diagonal.
+                                    var want = sizeMouse.startSize
+                                        + ((p.x - sizeMouse.from.x) / s.w + (p.y - sizeMouse.from.y) / s.h) / 2
+                                    placed.liveSize = picker.fitSize(s, placed.x, placed.y, want)
+                                }
+                                // Saved only if it changed: a click on the handle,
+                                // or the first of a double click, writes nothing.
+                                onReleased: {
+                                    if (!placed.resizing) return
+                                    if (Math.abs(placed.liveSize - model.ws) > 0.001)
+                                        Widgets.resize(placed.uid, placed.liveSize)
+                                    placed.resizing = false
+                                }
+                                onCanceled: placed.resizing = false
+                                // On the second press, before its release, which
+                                // saves liveSize: set that, and start any drag
+                                // still to come from here.
+                                onDoubleClicked: mouse => {
+                                    sizeMouse.from = sizeMouse.mapToItem(desk, mouse.x, mouse.y)
+                                    sizeMouse.startSize = picker.fitSize(host.spec, placed.x, placed.y, 1)
+                                    placed.liveSize = sizeMouse.startSize
+                                }
+                            }
+                        }
+
+                        // The size while it changes, beside the handle.
+                        Rectangle {
+                            anchors.right: sizeHandle.left
+                            anchors.rightMargin: 8
+                            anchors.verticalCenter: sizeHandle.verticalCenter
+                            width: sizeText.implicitWidth + 20
+                            height: 26
+                            radius: height / 2
+                            color: Theme.surface
+                            opacity: placed.resizing ? 1 : 0
+
+                            Behavior on opacity { NumberAnimation { duration: Theme.durShort } }
+
+                            Text {
+                                id: sizeText
+                                anchors.centerIn: parent
+                                text: Math.round(placed.liveSize * 20) * 5 + "%"
+                                color: Theme.textPrimary
+                                font.pixelSize: 12
+                                font.weight: Font.DemiBold
+                                font.family: Theme.fontText
+                                font.features: Theme.tabular
                             }
                         }
                     }

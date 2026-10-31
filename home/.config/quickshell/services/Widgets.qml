@@ -20,9 +20,10 @@ Singleton {
 
     // ── The kinds ────────────────────────────────────────────────────────
     //
-    // `file` is the component under desktop/widgets/. Sizes are fixed per
-    // kind: each is laid out for its size, and a widget that stretched would
-    // only be the same thing with more empty space in it.
+    // `file` is the component under desktop/widgets/. Each kind is laid out
+    // for its own w and h, and a widget that stretched would only be the same
+    // thing with more empty space in it -- so a widget is made bigger or
+    // smaller whole, scaled as one (its `size`, below), and keeps its layout.
     readonly property var categories: ["Clock", "Calendar", "Weather", "Media", "System"]
 
     readonly property var catalog: [
@@ -58,9 +59,18 @@ Singleton {
 
     // ── The layout ───────────────────────────────────────────────────────
 
-    // [{ id, kind, screen, x, y }]; x and y in the monitor's own logical
-    // pixels, from its top-left corner.
+    // [{ id, kind, screen, x, y, size }]; x and y in the monitor's own
+    // logical pixels, from its top-left corner. `size` scales the kind's w and
+    // h; widgets placed before there was one have none, and are drawn at 1.
     readonly property var placed: adapter.widgets
+
+    // How small and how big a widget can be made. The smallest text in any
+    // of them is 10px, 8px at the low end; at the high end the covers and the
+    // avatar, loaded at 512 and 128 px, are still drawn from enough pixels.
+    readonly property real minSize: 0.8
+    readonly property real maxSize: 2
+
+    function sizeOf(w) { return w && w.size > 0 ? w.size : 1 }
 
     function onScreen(screenName) {
         return root.placed.filter(w => w.screen === screenName && root.spec(w.kind) !== null)
@@ -74,13 +84,20 @@ Singleton {
     function add(kind, screenName, x, y) {
         var id = "w" + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36)
         adapter.widgets = root.placed.concat([{ id: id, kind: kind, screen: screenName,
-                                                x: Math.round(x), y: Math.round(y) }])
+                                                x: Math.round(x), y: Math.round(y), size: 1 }])
         return id
     }
 
     function move(id, x, y) {
         adapter.widgets = root.placed.map(w => w.id === id
-            ? { id: w.id, kind: w.kind, screen: w.screen, x: Math.round(x), y: Math.round(y) } : w)
+            ? Object.assign({}, w, { x: Math.round(x), y: Math.round(y) }) : w)
+    }
+
+    // In twentieths, so the sizes a widget can have are a short list and two
+    // made "the same size" by hand are.
+    function resize(id, size) {
+        var s = Math.round(Math.max(root.minSize, Math.min(root.maxSize, size)) * 20) / 20
+        adapter.widgets = root.placed.map(w => w.id === id ? Object.assign({}, w, { size: s }) : w)
     }
 
     function remove(id) {
@@ -96,7 +113,8 @@ Singleton {
         var gap = 16
         var others = root.onScreen(screenName).map(o => {
             var s = root.spec(o.kind)
-            return { x: o.x, y: o.y, w: s.w, h: s.h }
+            var k = root.sizeOf(o)
+            return { x: o.x, y: o.y, w: s.w * k, h: s.h * k }
         })
         function clear(x, y) {
             for (var i = 0; i < others.length; i++) {

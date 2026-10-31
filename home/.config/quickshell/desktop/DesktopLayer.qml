@@ -62,8 +62,8 @@ PanelWindow {
             readonly property var spec: Widgets.spec(modelData.kind)
             x: modelData.x
             y: modelData.y
-            width: spec ? spec.w : 0
-            height: spec ? spec.h : 0
+            width: spec ? Math.round(spec.w * Widgets.sizeOf(modelData)) : 0
+            height: spec ? Math.round(spec.h * Widgets.sizeOf(modelData)) : 0
         }
     }
 
@@ -81,6 +81,7 @@ PanelWindow {
                 x: Math.max(0, Math.min(model.wx, area.width - width))
                 y: Math.max(0, Math.min(model.wy, area.height - height))
                 kind: model.kind
+                size: model.ws
                 bar: desk.bar
                 // A hidden window keeps its items, so this has to say so
                 // itself: nothing redraws or listens while covered, under a

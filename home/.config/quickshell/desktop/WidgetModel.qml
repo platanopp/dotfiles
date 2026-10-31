@@ -5,8 +5,8 @@ import qs.services
 // id. A Repeater over the plain array rebuilt every widget whenever any one
 // moved -- the covers reloaded, the spectrum dropped to nothing and came
 // back -- where this only touches the rows that changed: moved widgets get
-// new wx and wy (not x and y, which every delegate already has), gone ones
-// are removed, new ones appended.
+// new wx and wy (not x and y, which every delegate already has), resized ones
+// a new ws, gone ones are removed, new ones appended.
 ListModel {
     id: model
 
@@ -26,11 +26,13 @@ ListModel {
             }
             if (row.wx !== w.x) model.setProperty(r, "wx", w.x)
             if (row.wy !== w.y) model.setProperty(r, "wy", w.y)
+            var size = Widgets.sizeOf(w)
+            if (row.ws !== size) model.setProperty(r, "ws", size)
             delete byId[row.uid]
         }
         for (var j = 0; j < want.length; j++) {
             var n = want[j]
-            if (byId[n.id]) model.append({ uid: n.id, kind: n.kind, wx: n.x, wy: n.y })
+            if (byId[n.id]) model.append({ uid: n.id, kind: n.kind, wx: n.x, wy: n.y, ws: Widgets.sizeOf(n) })
         }
     }
 
