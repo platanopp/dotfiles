@@ -10,11 +10,13 @@
     "keyboardRgbProfile": 0,
     "lockAtBoot": true,
     "lockMonitor": "DP-2",
-    "recordAudio": "system",
+    "recordAudio": "none",
     "recordCodec": "h264",
     "recordCursor": true,
     "recordFolder": "",
     "recordFps": 60,
     "recordQuality": "very_high",
-    "recordResolution": "1080"
+    "recordResolution": "1080",
+    "updateBranch": "main",
+    "updateSource": "https://github.com/platanopp/dotfiles.git"
 }
