@@ -29,6 +29,14 @@ Singleton {
         fade.to = root.picked
         fade.restart()
         accentFile.setText(root.picked.toString() + "\n")
+        kittyColorsProc.command = ["sh", "-c", "matugen color hex \"$1\" -m dark >/dev/null 2>&1 && pkill -USR1 -x kitty", "_", root.picked.toString()]
+        kittyColorsProc.running = true
+    }
+
+    // Kitty's palette from the same accent: matugen writes ~/.cache/matugen/kitty-colors.conf
+    // (kitty.conf includes it) and SIGUSR1 makes every open kitty re-read its config.
+    Process {
+        id: kittyColorsProc
     }
 
     // For the terminal: ~/.zshrc reads it into the prompt's colours, and an
