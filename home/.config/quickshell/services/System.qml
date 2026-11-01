@@ -146,6 +146,8 @@ Singleton {
                 try { d = JSON.parse(text) } catch (e) { return }
                 if (updateProc.action === "status") {
                     root.updateStatus = d
+                    // First check on this machine: what is published now counts as seen.
+                    if (root.updateSeenHead === "") root.markUpdateSeen()
                     return
                 }
                 root.updateLast = d
