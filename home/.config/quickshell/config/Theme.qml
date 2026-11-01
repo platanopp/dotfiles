@@ -93,7 +93,9 @@ Singleton {
         return Math.max(r.width, r.height) / 100
     }
 
-    // Bar pills. Padding between a pill's contents and its edges, the same on every pill.
+    // Bar pills: the glass's height, and the padding between a pill's contents and its edges,
+    // the same on every pill.
+    readonly property int pillHeight: 36
     // Each pill's window is 24px wider than its glass (12px inset each side); the
     // workspace pill draws its glass directly.
     readonly property int pillPaddingH: 16

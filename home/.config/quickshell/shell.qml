@@ -48,10 +48,11 @@ Scope {
                 right: true
             }
 
-	    // The strip is as tall as the pill at the gap, and that is what Hyprland reserves, so a
-	    // bigger top gap moves the windows too. The window runs 16px deeper for the pill's shadow;
+	    // The strip is as tall as the pill at the gap, and that is what Hyprland reserves: its own
+	    // gap then sets the windows as far under the pill as the pill is from the screen's edge, and
+	    // a bigger top gap moves both. The window runs 16px deeper for the pill's shadow;
 	    // reserved space and input stay on the strip.
-	    readonly property int stripHeight: Hypr.gapTop + leftPill.implicitHeight + 3
+	    readonly property int stripHeight: Hypr.gapTop + leftPill.implicitHeight
 	    implicitHeight: stripHeight + 16
 	    exclusionMode: ExclusionMode.Normal
 	    exclusiveZone: stripHeight
@@ -223,7 +224,7 @@ Scope {
                 anchors.leftMargin: Hypr.gapLeft
                 anchors.topMargin: Hypr.gapTop
                 implicitWidth: leftRow.implicitWidth + Theme.pillPaddingH * 2
-                implicitHeight: 40
+                implicitHeight: Theme.pillHeight
 
                 // Glass and shadow as every pill draws them (a hidden layered rectangle
                 // through MultiEffect): a shadow item under plain translucency showed

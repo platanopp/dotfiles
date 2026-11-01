@@ -171,13 +171,15 @@ PanelWindow {
         maxWindowHeight: settingsItem.screen.height
         targetWidth: settingsItem.settingsOpen ? settingsItem.settingsWidth
                    : settingsItem.panelOpen || settingsItem.notifOpen ? 372
-                   : compactRow.implicitWidth + 24 + Theme.pillPaddingH * 2
+                   // The 30px buttons already hold their glyphs ~6px in, so the pill pads that much
+                   // less and the glyphs sit 16px from its ends like the other pills' icons.
+                   : compactRow.implicitWidth + 24 + (Theme.pillPaddingH - 6) * 2
         targetHeight: settingsItem.settingsOpen ? settingsItem.settingsHeight
             : settingsItem.panelOpen ? Math.min(panelColumn.implicitHeight + 56,
                                                 settingsItem.screen.height - 48)
             : settingsItem.notifOpen ? Math.min(notifCentre.wantedHeight + 56,
                                                 settingsItem.screen.height - 48)
-            : 64
+            : Theme.pillHeight + 24
     }
 
     implicitWidth: stage.windowWidth
@@ -192,14 +194,11 @@ PanelWindow {
         visible: !bar.barHidden
         anchors.fill: stage
         anchors.margins: 12
-        // Settings is laid out at full size from the first frame and uncovered as
-        // the glass grows, so clip it here.
-        clip: settingsItem.settingsOpen || settingsLoader.visible
 
     Rectangle {
         id: panelGlass
         anchors.fill: parent
-        radius: settingsItem.settingsOpen ? 28 : settingsItem.panelOpen || settingsItem.notifOpen ? 26 : 20
+        radius: settingsItem.settingsOpen ? 28 : settingsItem.panelOpen || settingsItem.notifOpen ? 26 : Theme.pillHeight / 2
         color: Theme.glass
         visible: false
         layer.enabled: true
@@ -424,26 +423,34 @@ PanelWindow {
         return "up " + m + "m"
     }
 
-    Loader {
-        id: settingsLoader
-        anchors.top: parent.top
-        anchors.right: parent.right
-        width: settingsItem.settingsWidth - 24
-        height: settingsItem.settingsHeight - 24
-        active: settingsItem.settingsOpen || settingsFade.running
-        opacity: settingsItem.settingsOpen ? 1 : 0
-        visible: opacity > 0
+    // Settings is laid out at full size from the first frame and uncovered as the glass grows, so
+    // it is clipped to the box. Not the box itself: that clip cut the glass's shadow down to dark
+    // wedges at the four corners.
+    Item {
+        anchors.fill: parent
+        clip: settingsItem.settingsOpen || settingsLoader.visible
 
-        Behavior on opacity {
-            NumberAnimation { id: settingsFade; duration: 260; easing.type: Easing.OutCubic }
-        }
+        Loader {
+            id: settingsLoader
+            anchors.top: parent.top
+            anchors.right: parent.right
+            width: settingsItem.settingsWidth - 24
+            height: settingsItem.settingsHeight - 24
+            active: settingsItem.settingsOpen || settingsFade.running
+            opacity: settingsItem.settingsOpen ? 1 : 0
+            visible: opacity > 0
 
-        sourceComponent: SettingsView {
-            page: settingsItem.settingsPage
-            hostName: contentArea.hostName
-            onPageChanged: settingsItem.settingsPage = page
-            onBackRequested: settingsItem.settingsOpen = false
-            onCloseRequested: settingsItem.panelOpen = false
+            Behavior on opacity {
+                NumberAnimation { id: settingsFade; duration: 260; easing.type: Easing.OutCubic }
+            }
+
+            sourceComponent: SettingsView {
+                page: settingsItem.settingsPage
+                hostName: contentArea.hostName
+                onPageChanged: settingsItem.settingsPage = page
+                onBackRequested: settingsItem.settingsOpen = false
+                onCloseRequested: settingsItem.panelOpen = false
+            }
         }
     }
 

@@ -257,8 +257,9 @@ PanelWindow {
         minWindowHeight: 620
         targetWidth: statusItem.expandedPanel !== "" ? 324 : statusItem.compactWidth
         // Follows the content (a fixed 524 left empty space under short lists). Chrome is the 12px
-        // inset, the 40px row and the flickable's margins; past the cap the list scrolls.
-        targetHeight: statusItem.expandedPanel !== "" ? Math.min(expandedColumn.implicitHeight + 84, 620) : 64
+        // inset, the pill-high row and the flickable's margins; past the cap the list scrolls.
+        targetHeight: statusItem.expandedPanel !== ""
+            ? Math.min(expandedColumn.implicitHeight + 44 + Theme.pillHeight, 620) : Theme.pillHeight + 24
     }
 
     implicitWidth: stage.windowWidth
@@ -276,13 +277,13 @@ PanelWindow {
     Rectangle {
         id: statusGlass
         anchors.fill: parent
-        radius: statusItem.expandedPanel !== "" ? 26 : 20
+        radius: statusItem.expandedPanel !== "" ? 26 : Theme.pillHeight / 2
         color: Theme.glass
         visible: false
         layer.enabled: true
 
         Behavior on radius {
-            NumberAnimation { duration: 200 }
+            NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic }
         }
     }
 
@@ -302,7 +303,7 @@ PanelWindow {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        height: 40
+        height: Theme.pillHeight
 
         RowLayout {
             id: compactRow

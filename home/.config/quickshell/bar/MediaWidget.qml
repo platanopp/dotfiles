@@ -166,8 +166,8 @@ PanelWindow {
         else player.loopState = MprisLoopState.None
     }
 
-    // The compact pill's inside: its 64px box less the 12px inset each side.
-    readonly property int compactInner: 40
+    // The compact pill's inside: its box less the 12px inset each side.
+    readonly property int compactInner: Theme.pillHeight
     // How long the pill's cover and title wait after the panel closes before
     // fading back in (see compactArt).
     readonly property int compactDelay: 130
@@ -187,7 +187,7 @@ PanelWindow {
         anchors.left: parent.left
         targetWidth: mediaWidgetItem.panelOpen ? 396
                    : mediaWidgetRow.implicitWidth + 24 + 74 + Theme.pillPaddingH
-        targetHeight: mediaWidgetItem.panelOpen ? Math.min(mediaContentColumn.implicitHeight + 60, 640) : 64
+        targetHeight: mediaWidgetItem.panelOpen ? Math.min(mediaContentColumn.implicitHeight + 60, 640) : Theme.pillHeight + 24
         // Sized once for the open panel and never resized: shrinking to the pill's height left one
         // blank frame. Input stays on the box (stageMask).
         minWindowWidth: 396

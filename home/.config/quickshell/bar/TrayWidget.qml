@@ -71,11 +71,13 @@ PanelWindow {
         anchors.top: parent.top
         anchors.right: parent.right
         targetWidth: trayRow.implicitWidth + 24 + Theme.pillPaddingH * 2
-        targetHeight: 64
+        targetHeight: Theme.pillHeight + 24
     }
 
     implicitWidth: stage.windowWidth
-    implicitHeight: stage.windowHeight
+    // 4px under the box, so the shadow fades out 16px below the glass as under the workspace pill
+    // instead of being cut at 12. Input stays on the box (the Region above).
+    implicitHeight: stage.collapsed ? stage.windowHeight : stage.windowHeight + 4
 
     readonly property real visualWidth: stage.width
 

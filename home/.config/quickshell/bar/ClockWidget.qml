@@ -101,7 +101,7 @@ PanelWindow {
         evenWidth: true
         targetWidth: clockItem.panelOpen ? clockItem.panelWidth
                    : compactRow.implicitWidth + 24 + clockItem.compactPaddingH * 2
-        targetHeight: clockItem.panelOpen ? panelColumn.implicitHeight + 56 : 64
+        targetHeight: clockItem.panelOpen ? panelColumn.implicitHeight + 56 : Theme.pillHeight + 24
         // Off while the date folds in or out: revealDate animates that, and a second
         // animation made the pill stutter.
         animateWidth: !revealAnim.running
@@ -214,7 +214,7 @@ PanelWindow {
         Rectangle {
             id: panelGlass
             anchors.fill: parent
-            radius: clockItem.panelOpen ? 26 : 20
+            radius: clockItem.panelOpen ? 26 : Theme.pillHeight / 2
 
             Behavior on radius {
                 NumberAnimation { duration: 200 }

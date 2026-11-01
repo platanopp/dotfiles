@@ -38,7 +38,7 @@ PanelWindow {
     }
     // Under the pills by the gap they keep between each other, right edge in
     // line; 12 is the content inset.
-    margins.top: Hypr.gapTop + 40 + 10 - 12
+    margins.top: Hypr.gapTop + Theme.pillHeight + 10 - 12
     margins.right: Hypr.gapRight - 12
 
     // Only the focused monitor draws the stack, or every monitor would show the same notification.

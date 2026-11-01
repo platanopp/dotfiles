@@ -451,7 +451,7 @@ hl.layer_rule({
     name         = "quickshell-desktop",
     match        = { namespace = "^quickshell:desktop$" },
     blur         = true,
-    ignore_alpha = 0.3,
+    ignore_alpha = 0.55,
     no_anim      = true,
 })
 
@@ -556,8 +556,9 @@ hl.layer_rule({
     match = { namespace = "^quickshell:bar-blur$" },
     blur  = true,
     -- Blur covers the whole rectangular surface, so pixels below this alpha stay unblurred, or the
-    -- transparent margin around each rounded widget would blur as a square.
-    ignore_alpha = 0.3,
+    -- transparent margin around each rounded widget would blur as a square. Above the shadows'
+    -- 0.5 and below the glass's 0.9: at 0.3 a blurred band showed under every pill.
+    ignore_alpha = 0.55,
     -- No compositor animation: the shell animates the pills itself, and Hyprland
     -- easing them a beat behind made a shrinking pill jump over its neighbour. They
     -- are never mapped or unmapped in use.
