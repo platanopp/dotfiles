@@ -80,10 +80,6 @@ Item {
         return { x: bestX <= map.snap ? snapX : x, y: bestY <= map.snap ? snapY : y }
     }
 
-    function shortName(desc) {
-        return (desc || "").replace(/ (Electric Company|Corporation|Technologies|Technology|Inc\.?|Co\.?,? ?Ltd\.?)/g, "")
-    }
-
     Repeater {
         model: map.monitors
 
@@ -155,7 +151,7 @@ Item {
                 Text {
                     width: parent.width
                     horizontalAlignment: Text.AlignHCenter
-                    text: map.shortName(plate.modelData.description) || plate.modelData.name
+                    text: Display.shortName(plate.modelData)
                     color: plate.ink
                     font.pixelSize: 11
                     font.bold: true

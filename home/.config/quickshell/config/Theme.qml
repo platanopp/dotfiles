@@ -126,10 +126,6 @@ Singleton {
     readonly property real hoverOpacity: 0.08
     readonly property real pressOpacity: 0.14
 
-    function luminance(c) {
-        return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b
-    }
-
     // WCAG 2 relative luminance and contrast ratio, for picking ink and
     // checking the accent's legibility.
     function relLuminance(c) {

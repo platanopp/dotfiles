@@ -40,6 +40,13 @@ Singleton {
 
     function refreshHypr() { root.hyprCmd(["get"]) }
 
+    // A stand-in until the first answer, so pages can bind before it arrives.
+    function option(key) { return root.hyprOptions[key] || ({ value: 0, overridden: false }) }
+    function optionValue(key, fallback) {
+        var o = root.hyprOptions[key]
+        return o && o.value !== null && o.value !== undefined ? o.value : fallback
+    }
+
     // Shown at once, confirmed or undone by the refresh that follows.
     function setHypr(key, value) {
         var o = root.hyprOptions[key]

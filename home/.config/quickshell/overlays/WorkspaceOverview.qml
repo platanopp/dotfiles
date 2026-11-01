@@ -302,11 +302,9 @@ PanelWindow {
         return fresh
     }
 
-    // "Samsung Odyssey G40B" for "Samsung Electric Company Odyssey G40B".
     function monitorLabel(monitor) {
         var o = monitor ? monitor.lastIpcObject : null
-        var d = o && o.description ? o.description : (monitor ? monitor.name : "")
-        return d.replace(/ (Electric Company|Corporation|Technologies|Technology|Inc\.?|Co\.?,? ?Ltd\.?)/g, "")
+        return Display.shortName(o && o.description ? o : monitor)
     }
 
     function iconFor(cls) {

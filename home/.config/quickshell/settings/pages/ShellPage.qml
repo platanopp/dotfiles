@@ -12,11 +12,6 @@ Column {
 
     readonly property var monitors: Display.displayState.monitors || []
 
-    function shortName(m) {
-        return (m.description || m.name)
-            .replace(/ (Electric Company|Corporation|Technologies|Technology|Inc\.?|Co\.?,? ?Ltd\.?)/g, "")
-    }
-
     Component.onCompleted: Display.refreshDisplay()
 
     SettingsGroup {
@@ -84,7 +79,7 @@ Column {
             title: "Password field on"
 
             Segmented {
-                options: page.monitors.map(m => ({ value: m.name, label: page.shortName(m) }))
+                options: page.monitors.map(m => ({ value: m.name, label: Display.shortName(m) }))
                 value: ShellSettings.lockMonitor
                 onPicked: v => ShellSettings.set("lockMonitor", v)
             }

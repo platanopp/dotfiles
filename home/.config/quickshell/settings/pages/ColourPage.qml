@@ -17,11 +17,6 @@ Column {
     readonly property var colour: Display.displayState.colour
         || ({ temperature: 6000, brightness: 100, gamma: 1.0 })
 
-    function shortName(m) {
-        return (m.description || m.name)
-            .replace(/ (Electric Company|Corporation|Technologies|Technology|Inc\.?|Co\.?,? ?Ltd\.?)/g, "")
-    }
-
     // Warm to cool, with white where the neutral 6000 K falls on the track.
     Gradient {
         id: warmCool
@@ -45,7 +40,7 @@ Column {
                 stacked: true
                 icon: "\u{F0301}"
                 tint: page.tint
-                title: page.shortName(vib.modelData)
+                title: Display.shortName(vib.modelData)
                 value: vibSlider.format(vibSlider.shown)
 
                 SettingsSlider {

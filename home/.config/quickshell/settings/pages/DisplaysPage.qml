@@ -25,12 +25,6 @@ Column {
         return ms.length > 0 ? ms[0] : null
     }
 
-    function shortName(m) {
-        if (!m) return ""
-        return (m.description || m.name)
-            .replace(/ (Electric Company|Corporation|Technologies|Technology|Inc\.?|Co\.?,? ?Ltd\.?)/g, "")
-    }
-
     function hzLabel(hz) {
         return (Math.abs(hz - Math.round(hz)) < 0.05 ? Math.round(hz) : hz.toFixed(2)) + " Hz"
     }
@@ -172,7 +166,7 @@ Column {
     SettingsGroup {
         width: parent.width
         visible: page.mon !== null
-        title: page.mon ? page.shortName(page.mon) : ""
+        title: Display.shortName(page.mon)
         tint: page.tint
 
         SelectRow {

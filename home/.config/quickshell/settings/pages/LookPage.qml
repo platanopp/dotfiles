@@ -15,12 +15,6 @@ Column {
 
     readonly property color tint: Theme.accent
 
-    function opt(key) { return Hypr.hyprOptions[key] || ({ value: 0, overridden: false }) }
-    function val(key, fallback) {
-        var o = Hypr.hyprOptions[key]
-        return o && o.value !== null && o.value !== undefined ? o.value : fallback
-    }
-
     // Preview
     Rectangle {
         id: preview
@@ -41,7 +35,7 @@ Column {
         readonly property real round: roundSlider.shown * preview.k
         readonly property real focusedAlpha: activeSlider.shown
         readonly property real otherAlpha: inactiveSlider.shown
-        readonly property string layout: page.val("layout", "dwindle")
+        readonly property string layout: Hypr.optionValue("layout", "dwindle")
 
         ClippingRectangle {
             id: mock
@@ -89,7 +83,7 @@ Column {
 
                     RectangularShadow {
                         anchors.fill: parent
-                        visible: page.val("shadow", true)
+                        visible: Hypr.optionValue("shadow", true)
                         radius: preview.round
                         blur: 14
                         offset.y: 3
@@ -126,7 +120,7 @@ Column {
                         Rectangle {
                             anchors.fill: parent
                             radius: parent.radius
-                            visible: !win.focused && page.val("dim_inactive", false)
+                            visible: !win.focused && Hypr.optionValue("dim_inactive", false)
                             color: Theme.alpha(Theme.shadow, 0.35)
                         }
                     }
@@ -147,7 +141,7 @@ Column {
             tint: page.tint
             title: "Between windows"
             value: Math.round(gapInSlider.shown) + " px"
-            resettable: page.opt("gaps_in").overridden
+            resettable: Hypr.option("gaps_in").overridden
             onReset: Hypr.resetHypr("gaps_in")
 
             SettingsSlider {
@@ -155,7 +149,7 @@ Column {
                 width: parent.width
                 tint: page.tint
                 from: 0; to: 40; step: 1
-                value: page.val("gaps_in", 0)
+                value: Hypr.optionValue("gaps_in", 0)
                 format: v => Math.round(v) + " px"
                 onMoved: v => Hypr.setHypr("gaps_in", Math.round(v))
             }
@@ -167,7 +161,7 @@ Column {
             tint: page.tint
             title: "Sides and bottom"
             value: Math.round(gapOutSlider.shown) + " px"
-            resettable: page.opt("gaps_out").overridden
+            resettable: Hypr.option("gaps_out").overridden
             onReset: Hypr.resetHypr("gaps_out")
 
             SettingsSlider {
@@ -175,7 +169,7 @@ Column {
                 width: parent.width
                 tint: page.tint
                 from: 0; to: 80; step: 1
-                value: page.val("gaps_out", 0)
+                value: Hypr.optionValue("gaps_out", 0)
                 format: v => Math.round(v) + " px"
                 onMoved: v => Hypr.setHypr("gaps_out", Math.round(v))
             }
@@ -188,7 +182,7 @@ Column {
             tint: page.tint
             title: "Top"
             value: Math.round(gapTopSlider.shown) + " px"
-            resettable: page.opt("gaps_top").overridden
+            resettable: Hypr.option("gaps_top").overridden
             onReset: Hypr.resetHypr("gaps_top")
 
             SettingsSlider {
@@ -196,14 +190,14 @@ Column {
                 width: parent.width
                 tint: page.tint
                 from: 0; to: 80; step: 1
-                value: page.val("gaps_top", 0)
+                value: Hypr.optionValue("gaps_top", 0)
                 format: v => Math.round(v) + " px"
                 onMoved: v => Hypr.setHypr("gaps_top", Math.round(v))
             }
         }
 
         SettingsRow {
-            visible: page.val("gaps_top", 0) !== page.val("gaps_out", 0)
+            visible: Hypr.optionValue("gaps_top", 0) !== Hypr.optionValue("gaps_out", 0)
             icon: "\u{F0337}"
             tint: page.tint
             title: "Same on every edge"
@@ -220,7 +214,7 @@ Column {
             tint: page.tint
             title: "Border"
             value: Math.round(borderSlider.shown) + " px"
-            resettable: page.opt("border_size").overridden
+            resettable: Hypr.option("border_size").overridden
             onReset: Hypr.resetHypr("border_size")
 
             SettingsSlider {
@@ -228,7 +222,7 @@ Column {
                 width: parent.width
                 tint: page.tint
                 from: 0; to: 8; step: 1
-                value: page.val("border_size", 0)
+                value: Hypr.optionValue("border_size", 0)
                 format: v => Math.round(v) + " px"
                 onMoved: v => Hypr.setHypr("border_size", Math.round(v))
             }
@@ -247,7 +241,7 @@ Column {
             tint: page.tint
             title: "Corner rounding"
             value: Math.round(roundSlider.shown) + " px"
-            resettable: page.opt("rounding").overridden
+            resettable: Hypr.option("rounding").overridden
             onReset: Hypr.resetHypr("rounding")
 
             SettingsSlider {
@@ -255,7 +249,7 @@ Column {
                 width: parent.width
                 tint: page.tint
                 from: 0; to: 40; step: 1
-                value: page.val("rounding", 0)
+                value: Hypr.optionValue("rounding", 0)
                 format: v => Math.round(v) + " px"
                 onMoved: v => Hypr.setHypr("rounding", Math.round(v))
             }
@@ -265,7 +259,7 @@ Column {
             icon: "\u{F0A1D}"
             tint: page.tint
             title: "Layout"
-            resettable: page.opt("layout").overridden
+            resettable: Hypr.option("layout").overridden
             onReset: Hypr.resetHypr("layout")
 
             Segmented {
@@ -275,7 +269,7 @@ Column {
                     { value: "master", label: "Master" },
                     { value: "scrolling", label: "Scrolling" }
                 ]
-                value: page.val("layout", "dwindle")
+                value: Hypr.optionValue("layout", "dwindle")
                 onPicked: v => Hypr.setHypr("layout", v)
             }
         }
@@ -293,7 +287,7 @@ Column {
             tint: page.tint
             title: "Focused window"
             value: Math.round(activeSlider.shown * 100) + "%"
-            resettable: page.opt("active_opacity").overridden
+            resettable: Hypr.option("active_opacity").overridden
             onReset: Hypr.resetHypr("active_opacity")
 
             SettingsSlider {
@@ -301,7 +295,7 @@ Column {
                 width: parent.width
                 tint: page.tint
                 from: 0.4; to: 1.0; step: 0.01
-                value: page.val("active_opacity", 1)
+                value: Hypr.optionValue("active_opacity", 1)
                 format: v => Math.round(v * 100) + "%"
                 onMoved: v => Hypr.setHypr("active_opacity", v.toFixed(2))
             }
@@ -313,7 +307,7 @@ Column {
             tint: page.tint
             title: "Other windows"
             value: Math.round(inactiveSlider.shown * 100) + "%"
-            resettable: page.opt("inactive_opacity").overridden
+            resettable: Hypr.option("inactive_opacity").overridden
             onReset: Hypr.resetHypr("inactive_opacity")
 
             SettingsSlider {
@@ -321,7 +315,7 @@ Column {
                 width: parent.width
                 tint: page.tint
                 from: 0.2; to: 1.0; step: 0.01
-                value: page.val("inactive_opacity", 1)
+                value: Hypr.optionValue("inactive_opacity", 1)
                 format: v => Math.round(v * 100) + "%"
                 onMoved: v => Hypr.setHypr("inactive_opacity", v.toFixed(2))
             }
@@ -331,12 +325,12 @@ Column {
             icon: "\u{F00DD}"
             tint: page.tint
             title: "Dim other windows"
-            resettable: page.opt("dim_inactive").overridden
+            resettable: Hypr.option("dim_inactive").overridden
             onReset: Hypr.resetHypr("dim_inactive")
 
             SettingsSwitch {
                 tint: page.tint
-                checked: page.val("dim_inactive", false)
+                checked: Hypr.optionValue("dim_inactive", false)
                 onToggled: c => Hypr.setHypr("dim_inactive", c)
             }
         }
@@ -352,24 +346,24 @@ Column {
             icon: "\u{F00B5}"
             tint: page.tint
             title: "Blur"
-            resettable: page.opt("blur").overridden
+            resettable: Hypr.option("blur").overridden
             onReset: Hypr.resetHypr("blur")
 
             SettingsSwitch {
                 tint: page.tint
-                checked: page.val("blur", true)
+                checked: Hypr.optionValue("blur", true)
                 onToggled: c => Hypr.setHypr("blur", c)
             }
         }
 
         SettingsRow {
             stacked: true
-            visible: page.val("blur", true)
+            visible: Hypr.optionValue("blur", true)
             icon: "\u{F00B5}"
             tint: page.tint
             title: "Blur size"
             value: Math.round(blurSizeSlider.shown)
-            resettable: page.opt("blur_size").overridden
+            resettable: Hypr.option("blur_size").overridden
             onReset: Hypr.resetHypr("blur_size")
 
             SettingsSlider {
@@ -377,19 +371,19 @@ Column {
                 width: parent.width
                 tint: page.tint
                 from: 1; to: 16; step: 1
-                value: page.val("blur_size", 5)
+                value: Hypr.optionValue("blur_size", 5)
                 onMoved: v => Hypr.setHypr("blur_size", Math.round(v))
             }
         }
 
         SettingsRow {
             stacked: true
-            visible: page.val("blur", true)
+            visible: Hypr.optionValue("blur", true)
             icon: "\u{F00B5}"
             tint: page.tint
             title: "Blur passes"
             value: Math.round(blurPassSlider.shown)
-            resettable: page.opt("blur_passes").overridden
+            resettable: Hypr.option("blur_passes").overridden
             onReset: Hypr.resetHypr("blur_passes")
 
             SettingsSlider {
@@ -397,7 +391,7 @@ Column {
                 width: parent.width
                 tint: page.tint
                 from: 1; to: 6; step: 1
-                value: page.val("blur_passes", 3)
+                value: Hypr.optionValue("blur_passes", 3)
                 onMoved: v => Hypr.setHypr("blur_passes", Math.round(v))
             }
         }
@@ -406,12 +400,12 @@ Column {
             icon: "\u{F0637}"
             tint: page.tint
             title: "Shadows"
-            resettable: page.opt("shadow").overridden
+            resettable: Hypr.option("shadow").overridden
             onReset: Hypr.resetHypr("shadow")
 
             SettingsSwitch {
                 tint: page.tint
-                checked: page.val("shadow", true)
+                checked: Hypr.optionValue("shadow", true)
                 onToggled: c => Hypr.setHypr("shadow", c)
             }
         }
@@ -420,12 +414,12 @@ Column {
             icon: "\u{F093A}"
             tint: page.tint
             title: "Animations"
-            resettable: page.opt("animations").overridden
+            resettable: Hypr.option("animations").overridden
             onReset: Hypr.resetHypr("animations")
 
             SettingsSwitch {
                 tint: page.tint
-                checked: page.val("animations", true)
+                checked: Hypr.optionValue("animations", true)
                 onToggled: c => Hypr.setHypr("animations", c)
             }
         }

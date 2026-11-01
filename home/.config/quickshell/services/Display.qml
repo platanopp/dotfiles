@@ -40,6 +40,13 @@ Singleton {
 
     function refreshDisplay()                  { displayCmd(["list"]) }
 
+    // "Samsung Odyssey G40B" for "Samsung Electric Company Odyssey G40B".
+    function shortName(m) {
+        if (!m) return ""
+        return String(m.description || m.name || "")
+            .replace(/ (Electric Company|Corporation|Technologies|Technology|Inc\.?|Co\.?,? ?Ltd\.?)/g, "")
+    }
+
     // Plays back what Settings chose (mode, position, scale, vibrance, colour filter),
     // since none of it survives on its own. At shell start and whenever a monitor is
     // plugged back in; answers with the whole state.
