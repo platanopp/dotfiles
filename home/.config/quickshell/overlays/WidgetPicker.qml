@@ -148,12 +148,20 @@ PanelWindow {
         Qt.callLater(() => picker.revealRequested(picker.selected))
     }
 
+    // Named as the one just added before it is: its copy here is made inside add(), and one
+    // that learned it was new only afterwards stayed hidden until the picker closed.
+    function place(kind, x, y) {
+        var id = Widgets.newId()
+        picker.lastAdded = id
+        Widgets.add(kind, picker.screenName, x, y, id)
+    }
+
     function addKind(kind) {
         var spec = Widgets.spec(kind)
         if (!spec) return
         // Only above the shelf: one dropped under it would seem not to have arrived.
         var spot = Widgets.freeSpot(picker.screenName, spec.w, spec.h, picker.width, picker.shelfTop, picker.topEdge)
-        picker.lastAdded = Widgets.add(kind, picker.screenName, spot.x, spot.y)
+        picker.place(kind, spot.x, spot.y)
     }
 
     function setCategory(c) {
@@ -486,8 +494,8 @@ PanelWindow {
             if (!ghost.active) return
             ghost.active = false
             if (ghost.overShelf) return
-            picker.lastAdded = Widgets.add(ghost.kind, picker.screenName,
-                picker.clampX(picker.snap(ghost.x), ghost.width), picker.clampY(picker.snap(ghost.y), ghost.height))
+            picker.place(ghost.kind, picker.clampX(picker.snap(ghost.x), ghost.width),
+                         picker.clampY(picker.snap(ghost.y), ghost.height))
         }
     }
 

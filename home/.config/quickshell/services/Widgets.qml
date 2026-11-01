@@ -64,9 +64,13 @@ Singleton {
         return root.placed.filter(w => w.kind === kind).length
     }
 
-    // Returns the new widget's id, for the picker to animate it in.
-    function add(kind, screenName, x, y) {
-        var id = "w" + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36)
+    function newId() {
+        return "w" + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36)
+    }
+
+    // `id` is for a caller that has to know it before the widget exists (the picker's spring-in).
+    function add(kind, screenName, x, y, id) {
+        id = id || root.newId()
         adapter.widgets = root.placed.concat([{ id: id, kind: kind, screen: screenName,
                                                 x: Math.round(x), y: Math.round(y), size: 1 }])
         return id
