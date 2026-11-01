@@ -412,7 +412,7 @@ PanelWindow {
             // Keyboard layout as a keycap the size of the icons beside it;
             // a tap switches it, like Super+Ctrl+Space.
             PillButtonArea {
-                visible: KeyLayout.code !== ""
+                visible: KeyLayout.multiple && KeyLayout.code !== ""
                 onTapped: KeyLayout.switchNext()
 
                 Rectangle {

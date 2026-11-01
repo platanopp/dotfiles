@@ -12,6 +12,8 @@ Singleton {
 
     // xkb's description, e.g. "English (intl., with AltGr dead keys)".
     property string name: ""
+    // More than one layout set up; with one, nothing to show or switch.
+    property bool multiple: false
     readonly property bool english: name.indexOf("English") === 0
     readonly property string code: name === "" ? "" : english ? "US"
                                  : name.indexOf("Spanish") === 0 ? "LA" : name.slice(0, 2).toUpperCase()
@@ -49,7 +51,9 @@ Singleton {
                 } catch (e) {
                     return
                 }
-                if (!kb || kb.active_keymap === root.name) return
+                if (!kb) return
+                root.multiple = kb.layout.indexOf(",") >= 0
+                if (kb.active_keymap === root.name) return
                 var first = root.name === ""
                 root.name = kb.active_keymap
                 if (!first) root.switched()
