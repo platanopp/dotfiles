@@ -216,18 +216,22 @@ PanelWindow {
                        windows: wins, isNew: false })
         }
         // Each monitor's run ends in its own new card: the number after its highest, or its lowest
-        // free one once 10 is taken; none when all ten are used.
+        // free one once 10 is taken; none when all ten are used. With workspaces numbered across
+        // monitors, a new card skips any id another monitor uses, and monitors sharing a block get
+        // keys of their own.
         var cards = []
+        var used = {}
+        for (var u = 0; u < out.length; u++) used[out[u].id] = true
+        var group = 0
         for (var j = 0; j < out.length; j++) {
             cards.push(out[j])
             if (j + 1 < out.length && out[j + 1].monitor === out[j].monitor) continue
             var base = Math.floor((out[j].id - 1) / 10) * 10
-            var used = {}
-            for (var u = j; u >= 0 && out[u].monitor === out[j].monitor; u--) used[out[u].id] = true
-            var next = overview.slotOf(out[j].id) < 10 ? out[j].id + 1 : -1
+            var next = overview.slotOf(out[j].id) < 10 && !used[out[j].id + 1] ? out[j].id + 1 : -1
             for (var s = 1; next < 0 && s <= 10; s++) if (!used[base + s]) next = base + s
+            group++
             if (next < 0) continue
-            cards.push({ key: -100 - base / 10, id: next, name: String(overview.slotOf(next)), geom: out[j].geom,
+            cards.push({ key: -100 - base / 10 - 20 * group, id: next, name: String(overview.slotOf(next)), geom: out[j].geom,
                          monitor: out[j].monitor, monitorLabel: "", viewed: false, active: false,
                          windows: [], isNew: true })
         }
