@@ -305,6 +305,8 @@ hl.bind(mainMod .. " + V", hl.dsp.window.float({ action = "toggle" }))
 -- shell.qml), locking included: the lock surface is the shell's own.
 hl.bind(mainMod .. " + L", hl.dsp.global("quickshell:lock"))
 hl.bind(mainMod .. " + space", hl.dsp.global("quickshell:launcher"))
+-- Every keyboard to its next layout; does nothing with only one in kb_layout.
+hl.bind(mainMod .. " + CTRL + space", hl.dsp.exec_cmd("hyprctl switchxkblayout all next"))
 hl.bind(mainMod .. " + Tab", hl.dsp.global("quickshell:overview"))
 hl.bind(mainMod .. " + SHIFT + R", hl.dsp.global("quickshell:record"))
 
