@@ -257,6 +257,8 @@ PanelWindow {
 
                         Component.onCompleted: if (!placed.arrived) arriveTimer.start()
 
+                        HoverHandler { id: placedHover }
+
                         Timer {
                             id: arriveTimer
                             interval: 16
@@ -279,6 +281,7 @@ PanelWindow {
                             id: host
                             kind: placed.kind
                             size: placed.resizing ? placed.liveSize : model.ws
+                            glass: glassSlider.shown
                             bar: picker.bar
                             live: picker.open
                         }
@@ -419,6 +422,63 @@ PanelWindow {
                                     sizeMouse.startSize = picker.fitSize(host.spec, placed.x, placed.y, 1)
                                     placed.liveSize = sizeMouse.startSize
                                 }
+                            }
+                        }
+
+                        // How see-through its glass is, this widget's alone:
+                        // a pill across its bottom edge while the pointer is
+                        // on it. Previewed while dragging, saved on release;
+                        // a double click goes back to the default.
+                        Rectangle {
+                            id: glassPill
+                            readonly property bool wanted: (placedHover.hovered || pillHover.hovered || glassSlider.dragging)
+                                                           && !placed.dragging && !placed.resizing
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            y: placed.height - height / 2
+                            width: Math.min(180, Math.max(120, placed.width - 80))
+                            height: 30
+                            radius: height / 2
+                            color: Theme.surface
+                            border.width: 1
+                            border.color: Qt.rgba(1, 1, 1, 0.08)
+                            opacity: glassPill.wanted ? 1 : 0
+                            scale: glassPill.wanted ? 1 : 0.92
+                            visible: opacity > 0
+
+                            Behavior on opacity { NumberAnimation { duration: Theme.durShort; easing.type: Easing.OutCubic } }
+                            Behavior on scale { NumberAnimation { duration: Theme.durShort; easing.type: Easing.OutCubic } }
+
+                            HoverHandler { id: pillHover }
+
+                            SettingsSlider {
+                                id: glassSlider
+                                compact: true
+                                anchors.left: parent.left
+                                anchors.leftMargin: 12
+                                anchors.right: glassText.left
+                                anchors.rightMargin: 10
+                                anchors.verticalCenter: parent.verticalCenter
+                                from: Widgets.minGlass
+                                to: Widgets.maxGlass
+                                step: 0.05
+                                neutral: Widgets.defaultGlass
+                                value: model.wg
+                                onMoved: v => Widgets.setGlass(placed.uid, v)
+                            }
+
+                            Text {
+                                id: glassText
+                                anchors.right: parent.right
+                                anchors.rightMargin: 12
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 32
+                                horizontalAlignment: Text.AlignRight
+                                text: Math.round(glassSlider.shown * 100) + "%"
+                                color: Theme.textPrimary
+                                font.pixelSize: 11
+                                font.weight: Font.DemiBold
+                                font.family: Theme.fontText
+                                font.features: Theme.tabular
                             }
                         }
 

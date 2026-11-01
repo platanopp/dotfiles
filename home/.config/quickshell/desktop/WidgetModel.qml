@@ -3,7 +3,7 @@ import qs.services
 
 // One monitor's widgets as a ListModel kept in step with Widgets.placed by id,
 // touching only rows that changed: a Repeater over the array rebuilt every widget on
-// any move. Moves set wx/wy, resizes ws.
+// any move. Moves set wx/wy, resizes ws, glass changes wg.
 ListModel {
     id: model
 
@@ -25,11 +25,14 @@ ListModel {
             if (row.wy !== w.y) model.setProperty(r, "wy", w.y)
             var size = Widgets.sizeOf(w)
             if (row.ws !== size) model.setProperty(r, "ws", size)
+            var glass = Widgets.glassOf(w)
+            if (row.wg !== glass) model.setProperty(r, "wg", glass)
             delete byId[row.uid]
         }
         for (var j = 0; j < want.length; j++) {
             var n = want[j]
-            if (byId[n.id]) model.append({ uid: n.id, kind: n.kind, wx: n.x, wy: n.y, ws: Widgets.sizeOf(n) })
+            if (byId[n.id]) model.append({ uid: n.id, kind: n.kind, wx: n.x, wy: n.y, ws: Widgets.sizeOf(n),
+                                       wg: Widgets.glassOf(n) })
         }
     }
 

@@ -45,8 +45,9 @@ Singleton {
         return null
     }
 
-    // [{ id, kind, screen, x, y, size }]: x and y in the monitor's logical pixels from its
-    // top-left. `size` scales the kind's w and h; older widgets without one draw at 1.
+    // [{ id, kind, screen, x, y, size, glass }]: x and y in the monitor's logical pixels from its
+    // top-left. `size` scales the kind's w and h; older widgets without one draw at 1. `glass` is
+    // the card's own glass opacity; without one it uses the shell's.
     readonly property var placed: adapter.widgets
 
     // How small and big a widget can get: the smallest text is 10px (8px at the low end), and
@@ -55,6 +56,20 @@ Singleton {
     readonly property real maxSize: 2
 
     function sizeOf(w) { return w && w.size > 0 ? w.size : 1 }
+
+    // The alpha of a widget's glass, each its own. Floor 0.35: the desktop
+    // layer rule only blurs pixels at alpha 0.3 or more (ignore_alpha in
+    // hyprland.lua), and under it the card would turn clear, not frosted.
+    readonly property real minGlass: 0.35
+    readonly property real maxGlass: 1
+    readonly property real defaultGlass: 0.9
+
+    function glassOf(w) { return w && w.glass > 0 ? w.glass : root.defaultGlass }
+
+    function setGlass(id, a) {
+        var g = Math.round(Math.max(root.minGlass, Math.min(root.maxGlass, a)) * 20) / 20
+        adapter.widgets = root.placed.map(w => w.id === id ? Object.assign({}, w, { glass: g }) : w)
+    }
 
     function onScreen(screenName) {
         return root.placed.filter(w => w.screen === screenName && root.spec(w.kind) !== null)

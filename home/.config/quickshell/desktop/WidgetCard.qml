@@ -12,8 +12,11 @@ Rectangle {
     // before it knows it is covered.
     property bool live: false
     property var bar: null
+    // Set per widget by the host (Widgets.glassOf); only the glass fades,
+    // never what is drawn on it.
+    property real glassAlpha: Theme.glass.a
 
-    color: Theme.glass
+    color: Qt.rgba(Theme.glass.r, Theme.glass.g, Theme.glass.b, card.glassAlpha)
     radius: Theme.radiusXLarge
 
     // Under the card, like the panels' shadow; a RectangularShadow is
