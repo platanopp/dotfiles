@@ -187,12 +187,13 @@ hl.on("hyprland.start", function()
     -- would be desktop on screen with no lock over it. Behind the lock they
     -- can take as long as they like.
     --
-    -- On Qt's basic render loop (its own pick here), which draws every window
-    -- in one pass: the pills are separate surfaces that move together, and
-    -- the threaded loop (QSG_RENDER_LOOP=threaded, animations at the
-    -- monitor's refresh instead of 60 fps) presents each window on its own
-    -- thread -- neighbours landed a frame apart and the gaps between the
-    -- pills shook by up to 12px mid-animation.
+    -- On Qt's basic render loop, which draws every window in one pass (set
+    -- by the shell itself, a pragma at the top of shell.qml; Qt used to pick
+    -- it here on its own): the pills are separate surfaces that move
+    -- together, and the threaded loop (QSG_RENDER_LOOP=threaded, animations
+    -- at the monitor's refresh instead of 60 fps) presents each window on
+    -- its own thread -- neighbours landed a frame apart and the gaps between
+    -- the pills shook by up to 12px mid-animation.
     hl.exec_cmd("quickshell")
     -- Before Steam, which reads the monitors when it starts: the primary,
     -- and the monitors in desk order (see "The monitors as X programs see

@@ -1,4 +1,13 @@
 //@ pragma UseQApplication
+//@ pragma Env QSG_RENDER_LOOP=basic
+
+// The basic render loop: every window drawn in one pass. Qt used to pick it
+// here by itself and no longer does (seen on Qt 6.12, 2026-11-01): the
+// threaded one runs a thread per window (17 of them), and the pills,
+// separate surfaces moving together, land a frame apart (see hyprland.lua,
+// where the shell starts).
+// Set here rather than where it starts so the restart after an update
+// (scripts/shell_update.py) gets it too.
 
 import Quickshell
 import Quickshell.Io

@@ -75,23 +75,22 @@ WidgetCard {
         Repeater {
             model: root.count
 
+            // Drawn at the helper's own rate (~43 a second), which already
+            // smooths each band, rising fast and falling slow. A Behavior
+            // easing every bar between its frames never settled -- a new
+            // frame came every 23 ms for a 70 ms ease -- so the whole desktop
+            // layer redrew at the monitor's rate for as long as music played.
             Rectangle {
                 required property int index
                 readonly property real level: root.level(index)
-                // Not readonly: the Behavior smooths between the helper's frames.
-                property real len: 2 + level * 80
 
                 anchors.bottom: parent.bottom
                 width: 3
-                height: len
+                height: 2 + level * 80
                 radius: 1.5
                 // At rest the bars are the track colour: the album's colour is
                 // for the music, and with none playing they mark nothing.
                 color: root.listening ? Theme.alpha(AlbumColors.accent, 0.35 + level * 0.6) : Theme.track
-
-                Behavior on len {
-                    NumberAnimation { duration: 70; easing.type: Easing.OutQuad }
-                }
             }
         }
     }
