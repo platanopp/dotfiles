@@ -31,14 +31,31 @@ Singleton {
     function unsubscribe() { if (root.subscribers > 0) root.subscribers-- }
 
     // Collapse rather than freeze on the last frame when nobody is watching.
-    onActiveChanged: if (!root.active) root.bands = root.emptyBands()
+    onActiveChanged: {
+        if (root.active) {
+            linger.stop()
+        } else {
+            root.bands = root.emptyBands()
+            linger.restart()
+        }
+    }
+
+    // The helper outlives its last watcher by a few seconds: a watcher that
+    // looks away for a moment -- the desktop's visualizer while the overview
+    // is up -- would otherwise quit it and start it again, Python and numpy
+    // and the audio capture, every time. Its frames are dropped meanwhile.
+    Timer {
+        id: linger
+        interval: 10000
+    }
 
     Process {
-        running: root.active
+        running: root.active || linger.running
         command: ["python3", Quickshell.shellPath("scripts/spectrum.py")]
 
         stdout: SplitParser {
             onRead: function(data) {
+                if (!root.active) return
                 var parts = data.trim().split(" ")
                 if (parts.length !== root.bandCount) return
                 var out = []

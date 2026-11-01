@@ -9,10 +9,11 @@ import qs.components
 import qs.config
 import qs.services
 
-// The workspace overview (Super+Tab), on the screen it was opened on.
+// The workspace overview (Super+Tab), on every screen at once.
 //
-// The windows of the workspace on screen leave their places and spread out,
-// side by side and none over another, so each can be seen whole and picked.
+// On each, the windows of the workspace it shows leave their places and
+// spread out, side by side and none over another, so each can be seen whole
+// and picked.
 // Across the top runs a strip with a picture of every workspace -- the
 // wallpaper and its windows where they sit -- grouped by monitor, each with
 // its own block of ten numbered 1-10 the way Super+N counts them
@@ -24,8 +25,11 @@ import qs.services
 //   drag a window onto a        move it there and close; the workspace on
 //   workspace in the strip      screen stays. Onto a monitor's New, a new
 //                               workspace is made for it and gone to
+//   drag it onto another        the same, into the workspace that screen
+//   screen                      shows, or into one of that screen's strip
 //   click a workspace           go there; its × removes it (asks first when
 //                               it has windows)
+//   (the keys, on the screen under the pointer)
 //   arrows / Tab, Enter         choose a window, go to it
 //   Ctrl + ← →                  show the workspace before or after, here,
 //                               without closing
@@ -38,11 +42,19 @@ import qs.services
 //   Esc, or Super+Tab           close
 //
 // Same house pattern as the launcher: mapped only while up, exclusive
-// keyboard while up, pinned to the screen it opened on. The keyboard grab is
-// held while the windows fly home (changing it while the surface is up
-// drops it for two frames -- see AppLauncher), and let go at once when the
-// overview closes to go to another workspace, so the window gone to gets
-// the keyboard.
+// keyboard while up -- on every screen, and Hyprland hands it to the one
+// under the pointer. With it on the screen opened on alone, the others got
+// no pointer at all: nothing there could be hovered or clicked (Hyprland
+// 0.57). The keyboard grab is held while the windows fly home (changing it
+// while the surface is up drops it for two frames -- see AppLauncher), and
+// let go at once when the overview closes to go to another workspace, so
+// the window gone to gets the keyboard.
+//
+// A window carried off its screen: the press was on this surface, so the
+// pointer stays this surface's until the button is let go (Wayland's
+// implicit grab), with places past its edges. Where it is in the layout is
+// shared (Panels.overviewDrag), and the screen under it draws a copy of the
+// window -- the two halves meet at the edge -- and says where it would land.
 //
 // Cheap while it is not up: nothing is captured, the models are empty and
 // their views destroyed. While up, each window is captured when its view is
@@ -57,20 +69,23 @@ PanelWindow {
     property var bar: null
     screen: bar.screen
 
-    readonly property bool onOpeningScreen: {
+    // The screen it was opened on, where the selection starts.
+    readonly property bool home: {
         if (!bar.monitor) return true
         if (Panels.overviewScreen === "") return bar.monitor.focused
         return bar.monitor.name === Panels.overviewScreen
     }
 
-    readonly property bool open: Panels.overviewOpen && overview.onOpeningScreen
+    readonly property string screenName: bar.monitor ? bar.monitor.name : ""
+
+    readonly property bool open: Panels.overviewOpen
 
     // Mapped from opening until the windows are home (see AppLauncher's
     // `shown` for why this is not `open || timer.running`).
     property bool shown: false
     // Closing to go to another workspace: hidden at once, keyboard let go at
-    // once.
-    property bool leaving: false
+    // once -- on every screen.
+    readonly property bool leaving: Panels.overviewLeaving
     // Set while everything comes in, so the windows leave from where they
     // are on screen and the strip does not animate its sizes while it fills.
     property bool opening: false
@@ -95,6 +110,7 @@ PanelWindow {
             overview.tileList = []
             overview.goingTiles = []
             overview.slots = ({})
+            overview.arrivals = ({})
             overview.selectedKey = ""
             // Whatever was waiting for the windows to land: focusing the
             // one picked, now that the keyboard is free to go to it.
@@ -115,7 +131,7 @@ PanelWindow {
                 unmapDelay.stop()
                 closeAfterMove.stop()
                 overview.followAddress = ""
-                overview.leaving = false
+                overview.chosenKey = ""
                 overview.pending = null
                 overview.confirmId = -2
                 overview.dropKey = overview.noCard
@@ -125,10 +141,9 @@ PanelWindow {
                 overview.opening = true
                 openingDone.restart()
                 overview.shown = true
-                roundingProc.running = true
                 overview.refresh()
                 overview.rebuild()
-                overview.selectedKey = overview.mostRecent()
+                overview.selectedKey = overview.firstKey()
                 // Once more when the refresh has answered: the first build
                 // used what Quickshell last knew, which misses a window
                 // opened since.
@@ -156,22 +171,8 @@ PanelWindow {
     }
 
     // Hyprland's corner rounding, so a window leaves and lands with the
-    // corners it has on screen. Asked on every opening -- it is a setting
-    // (Settings -> Look) -- with the last answer kept meanwhile.
-    property int windowRounding: Theme.radiusXLarge
-
-    Process {
-        id: roundingProc
-        command: ["hyprctl", "getoption", "decoration:rounding", "-j"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    var v = JSON.parse(text).int
-                    if (typeof v === "number" && v >= 0) overview.windowRounding = v
-                } catch (e) {}
-            }
-        }
-    }
+    // corners it has on screen (asked once per opening, for every screen).
+    readonly property int windowRounding: Panels.overviewRounding >= 0 ? Panels.overviewRounding : Theme.radiusXLarge
 
     // ── What is where ────────────────────────────────────────────────────
 
@@ -185,8 +186,11 @@ PanelWindow {
     }
 
     // Quickshell fills in where windows are only on request; asked on
-    // opening and again after anything moves.
+    // opening and again after anything moves. By one screen's overview for
+    // all of them: the answers are shared, and every screen asking sent the
+    // same three requests once per screen.
     function refresh() {
+        if (!overview.home) return
         Hyprland.refreshWorkspaces()
         Hyprland.refreshToplevels()
         Hyprland.refreshMonitors()
@@ -215,6 +219,9 @@ PanelWindow {
     property var goingTiles: []
     // Where each tile sits while spread out, by address.
     property var slots: ({})
+    // Windows let go here from another screen, by address: where they were
+    // let go, for their tiles to start from when they turn up.
+    property var arrivals: ({})
     property int revision: 0
     property bool several: false
 
@@ -452,7 +459,7 @@ PanelWindow {
         overview.revision++
 
         if (!tmap[overview.selectedKey] || tilesGoing.indexOf(overview.selectedKey) !== -1)
-            overview.selectedKey = overview.mostRecent()
+            overview.selectedKey = overview.firstKey()
         if (overview.confirmId > -2 && !cmap[overview.confirmId]) overview.confirmId = -2
     }
 
@@ -650,6 +657,13 @@ PanelWindow {
         return best ? best.key : ""
     }
 
+    // Where the selection starts: on the window last used on the screen it
+    // was opened on, and nowhere on the others until a window is pointed at
+    // or a key pressed there.
+    function firstKey() {
+        return overview.home ? overview.mostRecent() : ""
+    }
+
     // The nearest window in a direction, by where they sit spread out:
     // straight ahead counts more than off to the side.
     function step(dx, dy) {
@@ -706,16 +720,67 @@ PanelWindow {
         return overview.noCard
     }
 
+    // Whether a point (in this window's coordinates) is on this screen.
+    function inside(p) {
+        return p.x >= 0 && p.y >= 0 && p.x < overview.width && p.y < overview.height
+    }
+
+    // Off this screen, the screen under the pointer says where it would land.
     function dragMoved(p) {
-        overview.dropKey = overview.cardKeyAt(p)
+        var g = overview.geometryOf(bar.monitor)
+        Panels.overviewDragAt = Qt.point(g.x + p.x, g.y + p.y)
+        overview.dropKey = overview.inside(p) ? overview.cardKeyAt(p) : overview.noCard
+    }
+
+    function endDrag() {
+        Panels.overviewDrag = null
+        Panels.overviewDropAt = null
+    }
+
+    // A floating window let go over another screen's windows lands where it
+    // was let go -- the point of it that was held under the pointer, kept on
+    // that screen -- and over the windows there. A tiled one goes where that
+    // screen's layout puts it.
+    function placeOn(name, tile) {
+        if (!tile.d.floating) return ""
+        var mon = Hyprland.monitors.values.filter(function(m) { return m.name === name })[0]
+        if (!mon) return ""
+        var g = overview.geometryOf(mon)
+        var w = tile.d.home.width, h = tile.d.home.height
+        var p = Panels.overviewDragAt
+        var x = Math.round(Math.max(g.x, Math.min(g.x + g.w - w, p.x - tile.grabFx * w)))
+        var y = Math.round(Math.max(g.y, Math.min(g.y + g.h - h, p.y - tile.grabFy * h)))
+        var win = "window = 'address:0x" + tile.d.address + "'"
+        return "hl.dispatch(hl.dsp.window.move({ x = " + x + ", y = " + y + ", " + win + " })); "
+             + "hl.dispatch(hl.dsp.window.alter_zorder({ mode = 'top', " + win + " }))"
     }
 
     // Let go over a workspace other than this one: the window goes there and
-    // the tile into its picture. Anywhere else, the tile goes back.
+    // the tile into its picture. On another screen, into the workspace it
+    // shows, or the one under it in its strip; that screen draws the landing.
+    // Anywhere else, the tile goes back.
     function dropped(tile) {
         var key = overview.dropKey
+        var at = Panels.overviewDropAt
+        var away = !overview.inside(tile.pointer)
         overview.dropKey = overview.noCard
         overview.draggingKey = ""
+        if (away) {
+            if (at && tile.d && at.screen !== overview.screenName && at.id > 0 && at.id !== overview.viewedId()) {
+                // Before the drag ends, so that screen knows to keep its copy.
+                Panels.overviewDropped = { address: tile.d.address, screen: at.screen, key: at.key }
+                var place = at.key === overview.noCard ? overview.placeOn(at.screen, tile) : ""
+                overview.endDrag()
+                tile.handOff()
+                overview.moveWindow(tile.d.address, at.id, place)
+                overview.afterMove(tile.d.address, at.isNew)
+            } else {
+                overview.endDrag()
+                tile.settle()
+            }
+            return
+        }
+        overview.endDrag()
         var card = overview.cardData[key]
         if (card && tile.d && overview.goingCards.indexOf(key) === -1 && card.id !== overview.viewedId()) {
             tile.sendInto(overview.thumbs[key] ? overview.thumbs[key].picture : null, card.geom)
@@ -723,6 +788,51 @@ PanelWindow {
             overview.afterMove(tile.d.address, card.isNew)
         } else {
             tile.settle()
+        }
+    }
+
+    // ── A window carried here from another screen ───────────────────────
+
+    readonly property var visitor: {
+        var d = Panels.overviewDrag
+        return d && d.from !== overview.screenName && overview.shown ? d : null
+    }
+    // The pointer, in this window's coordinates.
+    readonly property point visitorAt: {
+        // Nothing to follow: nothing read, so nothing runs as the monitors
+        // are refreshed.
+        if (!overview.visitor) return Qt.point(-1, -1)
+        var g = overview.geometryOf(bar.monitor)
+        return Qt.point(Panels.overviewDragAt.x - g.x, Panels.overviewDragAt.y - g.y)
+    }
+    readonly property bool hosting: overview.visitor !== null && overview.spread && overview.inside(overview.visitorAt)
+
+    // The card under it, lit as for a window of this screen's, and said: a
+    // workspace in the strip, or else the one this screen shows. Only when
+    // it changes, as every screen reads it.
+    function aimVisitor() {
+        var at = Panels.overviewDropAt
+        if (!overview.hosting) {
+            if (overview.draggingKey === "") overview.dropKey = overview.noCard
+            if (at && at.screen === overview.screenName) Panels.overviewDropAt = null
+            return
+        }
+        var key = overview.cardKeyAt(overview.visitorAt)
+        overview.dropKey = key
+        var card = overview.cardData[key]
+        var id = card ? card.id : overview.viewedId()
+        var scale = ghost.scaleNow
+        if (at && at.screen === overview.screenName && at.key === key && at.id === id && at.scale === scale) return
+        Panels.overviewDropAt = { screen: overview.screenName, key: key, id: id,
+                                  isNew: !!(card && card.isNew), scale: scale }
+    }
+
+    Connections {
+        target: Panels
+        enabled: overview.shown
+        function onOverviewDroppedChanged() {
+            var d = Panels.overviewDropped
+            if (d && d.screen === overview.screenName) ghost.land(d.key)
         }
     }
 
@@ -779,7 +889,7 @@ PanelWindow {
     // Closes at once and does `what` a moment later, once the keyboard has
     // been let go -- or focus would be asked to move into the grab.
     function leaveThen(what) {
-        overview.leaving = true
+        Panels.overviewLeaving = true
         overview.pending = what
         overview.close()
         actTimer.restart()
@@ -821,12 +931,20 @@ PanelWindow {
         overview.leaveThen(function() { overview.run("hl.dispatch(hl.dsp.focus({ workspace = " + id + " }))") })
     }
 
+    // Focused and raised over the others: focusing alone left a floating
+    // window under the one it was behind. It lands on top on the way home
+    // too, as it will be.
+    property string chosenKey: ""
+
     function chooseWindow(key) {
         var t = overview.tileData[key]
         if (!t) return
         overview.selectedKey = key
+        overview.chosenKey = key
         overview.dismissThen(function() {
-            overview.run("hl.dispatch(hl.dsp.focus({ window = 'address:0x" + t.address + "' }))")
+            var w = "window = 'address:0x" + t.address + "'"
+            overview.run("hl.dispatch(hl.dsp.focus({ " + w + " })); "
+                         + "hl.dispatch(hl.dsp.window.alter_zorder({ mode = 'top', " + w + " }))")
         })
     }
 
@@ -843,10 +961,12 @@ PanelWindow {
         overview.run("hl.get_monitor(" + overview.luaString(name) + "):set_workspace({ workspace = " + next.id + " })")
     }
 
-    // Without following it: the workspace on screen stays.
-    function moveWindow(address, id) {
+    // Without following it: the workspace on screen stays. `then`, Lua run
+    // right after, in the same call.
+    function moveWindow(address, id, then) {
         overview.run("hl.dispatch(hl.dsp.window.move({ workspace = " + id
-                     + ", follow = false, window = 'address:0x" + address + "' }))")
+                     + ", follow = false, window = 'address:0x" + address + "' }))"
+                     + (then ? "; " + then : ""))
     }
 
     function closeWindow(address) {
@@ -1467,6 +1587,27 @@ PanelWindow {
             }
         }
 
+        // Where a window carried over from another screen goes if let go
+        // here: into the workspace this screen shows. Outlined like a card
+        // in the strip under a dragged window.
+        Rectangle {
+            x: overview.area.x - 24
+            y: overview.area.y - 24
+            width: overview.area.width + 48
+            height: overview.area.height + 48
+            radius: Theme.radiusXLarge
+            color: Theme.alpha(Theme.accent, 0.06)
+            border.width: 2
+            border.color: Theme.accent
+            readonly property bool aimed: overview.hosting && overview.dropKey === overview.noCard
+            opacity: aimed ? 1 : 0
+            scale: aimed ? 1 : 0.98
+            visible: opacity > 0
+
+            Behavior on opacity { NumberAnimation { duration: Theme.durShort; easing.type: Easing.OutQuad } }
+            Behavior on scale { Elastic { small: true } }
+        }
+
         // ── The windows ──────────────────────────────────────────────────
         //
         // Over the strip, so one dragged up there passes over it.
@@ -1524,7 +1665,14 @@ PanelWindow {
                         var w = it.picture.width * tile.d.home.width / c.geom.w
                         return Math.max(0.04, Math.min(tile.carryScale, w / Math.max(1, tile.slot.width)))
                     }
-                    property real carry: tile.dragging ? (overview.dropKey !== overview.noCard ? tile.miniScale : tile.carryScale) : 1
+                    // Over another screen, the size that screen draws it at,
+                    // so the two halves meet at the edge.
+                    readonly property real remoteScale: {
+                        var at = Panels.overviewDropAt
+                        return tile.dragging && at && at.screen !== overview.screenName && at.scale > 0 ? at.scale : 0
+                    }
+                    property real carry: tile.dragging ? (overview.dropKey !== overview.noCard ? tile.miniScale
+                                                          : tile.remoteScale > 0 ? tile.remoteScale : tile.carryScale) : 1
                     Behavior on carry { NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic } }
 
                     readonly property rect goal: {
@@ -1597,12 +1745,32 @@ PanelWindow {
                         tile.dragging = true
                         overview.draggingKey = tile.key
                         overview.selectedKey = tile.key
+                        Panels.overviewDropped = null
+                        Panels.overviewDropAt = null
+                        // Where it is first, or the other screens would read
+                        // where the last drag ended.
+                        var g = overview.geometryOf(bar.monitor)
+                        Panels.overviewDragAt = Qt.point(g.x + p.x, g.y + p.y)
+                        Panels.overviewDrag = { address: tile.d.address, toplevel: tile.d.toplevel, cls: tile.d.cls,
+                                                from: overview.screenName, w: tile.slot.width, h: tile.slot.height,
+                                                homeW: tile.d.home.width, homeH: tile.d.home.height,
+                                                fx: tile.grabFx, fy: tile.grabFy }
                     }
 
                     // Back to its place.
                     function settle() {
                         tile.animate = true
                         tile.dragging = false
+                    }
+
+                    // Let go on another screen, which draws it landing: the
+                    // part of it still on this one fades where it is.
+                    function handOff() {
+                        tile.sendTo = Qt.rect(tile.x, tile.y, tile.width, tile.height)
+                        tile.dragging = false
+                        tile.animate = true
+                        sentAnim.restart()
+                        sendGuard.restart()
                     }
 
                     // Into a workspace's picture in the strip, fading as it
@@ -1625,7 +1793,7 @@ PanelWindow {
                         sendGuard.restart()
                     }
 
-                    z: tile.dragging ? 1000 : (tile.d ? tile.d.order : 0)
+                    z: tile.dragging ? 1000 : overview.chosenKey === tile.key ? 999 : (tile.d ? tile.d.order : 0)
                     opacity: tile.appear * tile.presence * (1 - tile.sent)
 
                     // Fades out over the flight home, late, so the window
@@ -1646,6 +1814,21 @@ PanelWindow {
                     Component.onCompleted: {
                         overview.tileItems[tile.key] = tile
                         tile.capturedSize = tile.sizeKey
+                        // Let go here from another screen: from where it was
+                        // let go, already whole, to its place.
+                        var from = overview.arrivals[tile.key]
+                        if (from) {
+                            delete overview.arrivals[tile.key]
+                            tile.animate = false
+                            tile.launched = true
+                            tile.popIn = false
+                            tile.moveTo(from)
+                            tile.appear = 1
+                            tile.animate = true
+                            tile.moveTo(tile.goal)
+                            if (ghost.held && ghost.held.address === tile.key) ghost.handOver()
+                            return
+                        }
                         tile.animate = false
                         tile.launched = !overview.opening
                         tile.popIn = !overview.opening
@@ -1815,6 +1998,7 @@ PanelWindow {
                             if (!tile.dragging) return
                             overview.dropKey = overview.noCard
                             overview.draggingKey = ""
+                            overview.endDrag()
                             tile.settle()
                         }
                         onClicked: if (!grab.moved) overview.chooseWindow(tile.key)
@@ -1873,6 +2057,172 @@ PanelWindow {
                                 elide: Text.ElideRight
                             }
                         }
+                    }
+                }
+            }
+
+            // A window carried over from another screen: the part of it past
+            // that screen's edge, drawn here where the pointer is, at the
+            // size that screen draws the rest. Let go here, it flies into the
+            // picture it was let go over, or fades where it is while the
+            // window turns up among this screen's.
+            Item {
+                id: ghost
+
+                // What is carried; kept after the drop, for the landing.
+                property var held: null
+                property bool landing: false
+                property real fade: 0
+
+                readonly property real carryScale: ghost.held ? Math.min(1, 320 / Math.max(1, ghost.held.w)) : 1
+                readonly property real miniScale: {
+                    var it = overview.thumbs[overview.dropKey]
+                    var c = overview.cardData[overview.dropKey]
+                    if (!ghost.held || !it || !c) return ghost.carryScale
+                    var w = it.picture.width * ghost.held.homeW / c.geom.w
+                    return Math.max(0.04, Math.min(ghost.carryScale, w / Math.max(1, ghost.held.w)))
+                }
+                readonly property real scaleNow: overview.dropKey !== overview.noCard ? ghost.miniScale : ghost.carryScale
+                property real carry: ghost.scaleNow
+                Behavior on carry { NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutCubic } }
+                onCarryChanged: ghost.follow()
+
+                z: 2000
+                visible: ghost.held !== null && (overview.hosting || ghost.landing)
+                opacity: 1 - ghost.fade
+
+                // Here rather than on the overview, so nothing calls into it
+                // before it is made or after it is gone.
+                Connections {
+                    target: overview
+                    function onVisitorChanged() {
+                        if (overview.visitor) ghost.take(overview.visitor)
+                        else ghost.release()
+                        overview.aimVisitor()
+                    }
+                    function onVisitorAtChanged() {
+                        overview.aimVisitor()
+                        ghost.follow()
+                    }
+                    function onHostingChanged() { overview.aimVisitor() }
+                }
+
+                function take(d) {
+                    landAnim.stop()
+                    handOverAnim.stop()
+                    arrivalGuard.stop()
+                    ghost.landing = false
+                    ghost.fade = 0
+                    ghost.held = d
+                    ghost.follow()
+                }
+
+                // The drag is over: gone, unless it was let go here.
+                function release() {
+                    if (!ghost.landing) ghost.held = null
+                }
+
+                function follow() {
+                    if (!ghost.held || ghost.landing) return
+                    var w = ghost.held.w * ghost.carry, h = ghost.held.h * ghost.carry
+                    ghost.x = overview.visitorAt.x - ghost.held.fx * w
+                    ghost.y = overview.visitorAt.y - ghost.held.fy * h
+                    ghost.width = w
+                    ghost.height = h
+                }
+
+                function land(key) {
+                    if (!ghost.held || !overview.hosting) return
+                    ghost.landing = true
+                    var it = overview.thumbs[key]
+                    var c = overview.cardData[key]
+                    if (it && c) {
+                        var pic = it.picture
+                        var at = pic.mapToItem(tilesLayer, 0, 0)
+                        var w = Math.max(8, pic.width * ghost.held.homeW / c.geom.w)
+                        var h = Math.max(6, pic.height * ghost.held.homeH / c.geom.h)
+                        lx.to = at.x + (pic.width - w) / 2
+                        ly.to = at.y + (pic.height - h) / 2
+                        lw.to = w
+                        lh.to = h
+                        landAnim.restart()
+                        return
+                    }
+                    // Over this screen's windows: it waits where it was let
+                    // go for the window to turn up among them, and the
+                    // window's tile sets off from here.
+                    overview.arrivals[ghost.held.address] = Qt.rect(ghost.x, ghost.y, ghost.width, ghost.height)
+                    arrivalGuard.restart()
+                }
+
+                // The window's tile has taken over, or the window never came.
+                function handOver() {
+                    if (!ghost.held || handOverAnim.running) return
+                    arrivalGuard.stop()
+                    handOverAnim.restart()
+                }
+
+                Timer {
+                    id: arrivalGuard
+                    interval: 1500
+                    onTriggered: ghost.handOver()
+                }
+
+                NumberAnimation {
+                    id: handOverAnim
+                    target: ghost; property: "fade"; to: 1
+                    duration: Theme.durShort; easing.type: Easing.OutQuad
+                    onFinished: {
+                        ghost.landing = false
+                        ghost.held = null
+                        ghost.fade = 0
+                    }
+                }
+
+                ParallelAnimation {
+                    id: landAnim
+                    NumberAnimation { id: lx; target: ghost; property: "x"; duration: Theme.durLong; easing.type: Easing.OutCubic }
+                    NumberAnimation { id: ly; target: ghost; property: "y"; duration: Theme.durLong; easing.type: Easing.OutCubic }
+                    NumberAnimation { id: lw; target: ghost; property: "width"; duration: Theme.durLong; easing.type: Easing.OutCubic }
+                    NumberAnimation { id: lh; target: ghost; property: "height"; duration: Theme.durLong; easing.type: Easing.OutCubic }
+                    NumberAnimation { target: ghost; property: "fade"; from: 0; to: 1; duration: Theme.durLong; easing.type: Easing.InQuad }
+                    onFinished: {
+                        ghost.landing = false
+                        ghost.held = null
+                        ghost.fade = 0
+                    }
+                }
+
+                RectangularShadow {
+                    anchors.fill: parent
+                    radius: ghostFace.radius
+                    blur: 30
+                    offset.y: 10
+                    color: Theme.alpha(Theme.shadow, 0.45)
+                    opacity: ghost.landing ? 0 : 1
+                }
+
+                ClippingRectangle {
+                    id: ghostFace
+                    anchors.fill: parent
+                    radius: ghost.landing ? Theme.radiusSmall : Theme.radiusLarge
+                    color: Theme.surfaceContainerHigh
+
+                    IconImage {
+                        anchors.centerIn: parent
+                        implicitSize: 40
+                        mipmap: true
+                        visible: !ghostShot.hasContent
+                        source: ghost.held ? overview.iconFor(ghost.held.cls) : ""
+                    }
+
+                    // Taken as the drag starts, so it is there by the time
+                    // the window comes over the edge.
+                    ScreencopyView {
+                        id: ghostShot
+                        anchors.fill: parent
+                        captureSource: ghost.held ? ghost.held.toplevel.wayland : null
+                        live: false
                     }
                 }
             }

@@ -1,6 +1,7 @@
 import Quickshell
 import Quickshell.Wayland
 import QtQuick
+import qs.config
 import qs.services
 
 // One monitor's desktop widgets, on the layer under every window
@@ -34,7 +35,33 @@ PanelWindow {
     readonly property bool editing: Panels.widgetsOpen && Panels.widgetsScreen === desk.screenName
 
     readonly property bool showing: widgets.count > 0 && !desk.bar.fullscreen
-    visible: desk.showing
+
+    // The workspace overview covers every screen, opaque, so for as long as
+    // it is up the surface goes too -- once its backdrop is up, and back the
+    // moment it starts to close, before the backdrop has gone -- and the
+    // widgets stop, as they do when covered. (The spectrum's helper waits a
+    // few seconds before quitting, so it is not restarted every Super+Tab.)
+    property bool underOverview: false
+
+    Timer {
+        id: overviewCover
+        interval: Theme.durMedium + 50
+        onTriggered: desk.underOverview = Panels.overviewOpen
+    }
+
+    Connections {
+        target: Panels
+        function onOverviewOpenChanged() {
+            if (Panels.overviewOpen) {
+                overviewCover.restart()
+            } else {
+                overviewCover.stop()
+                desk.underOverview = false
+            }
+        }
+    }
+
+    visible: desk.showing && !desk.underOverview
 
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
@@ -86,7 +113,7 @@ PanelWindow {
                 // A hidden window keeps its items, so this has to say so
                 // itself: nothing redraws or listens while covered, under a
                 // fullscreen window, or while the picker shows its own copy.
-                live: desk.showing && !desk.editing && !Widgets.isCovered(desk.screenName)
+                live: desk.showing && !desk.editing && !desk.underOverview && !Widgets.isCovered(desk.screenName)
             }
         }
     }

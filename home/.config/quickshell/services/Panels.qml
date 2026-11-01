@@ -189,20 +189,61 @@ Singleton {
         root.launcherOpen = !root.launcherOpen
     }
 
-    // The workspace overview (Super+Tab): every workspace, with its windows.
-    // Pinned to the screen it was opened on, like the launcher.
+    // The workspace overview (Super+Tab): every workspace, with its windows,
+    // up on every screen at once. The keyboard goes with the pointer.
     property bool overviewOpen: false
     property string overviewScreen: ""
+    // Closing to go to another workspace: every screen's is gone at once, and
+    // lets go of the keyboard, wherever the click was.
+    property bool overviewLeaving: false
+
+    // A window being dragged in the overview, for every screen's to see: the
+    // one it was picked up on keeps getting the pointer, and draws it as far
+    // as its edge; the one the pointer is over draws the rest and says where
+    // it would land there.
+    //   overviewDrag     { address, toplevel, cls, from, w, h, fx, fy }
+    //   overviewDragAt   the pointer, in the layout's coordinates
+    //   overviewDropAt   { screen, key, id, isNew, scale }, from that screen
+    //   overviewDropped  { address, screen, key }, once it is let go there
+    property var overviewDrag: null
+    property point overviewDragAt: Qt.point(0, 0)
+    property var overviewDropAt: null
+    property var overviewDropped: null
 
     onOverviewOpenChanged: {
         root.syncSubmap()
         if (!root.overviewOpen) return
         var monitor = Hyprland.focusedMonitor
         root.overviewScreen = monitor ? monitor.name : ""
+        roundingProc.running = true
+    }
+
+    // Hyprland's corner rounding, for the overview's windows to leave and
+    // land with. Asked on every opening -- it is a setting (Settings -> Look)
+    // -- with the last answer kept meanwhile; -1 until the first.
+    property int overviewRounding: -1
+
+    Process {
+        id: roundingProc
+        command: ["hyprctl", "getoption", "decoration:rounding", "-j"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    var v = JSON.parse(text).int
+                    if (typeof v === "number" && v >= 0) root.overviewRounding = v
+                } catch (e) {}
+            }
+        }
     }
 
     function toggleOverview() {
-        if (!root.overviewOpen) root.launcherOpen = false
+        if (!root.overviewOpen) {
+            root.launcherOpen = false
+            root.overviewLeaving = false
+            root.overviewDrag = null
+            root.overviewDropAt = null
+            root.overviewDropped = null
+        }
         root.overviewOpen = !root.overviewOpen
     }
 
