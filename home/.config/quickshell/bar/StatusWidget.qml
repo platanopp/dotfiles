@@ -409,14 +409,29 @@ PanelWindow {
                 size: Theme.iconLarge
             }
 
+            // Keyboard layout as a keycap the size of the icons beside it;
+            // a tap switches it, like Super+Ctrl+Space.
             PillButtonArea {
-                onTapped: statusItem.togglePanel("wifi")
+                visible: KeyLayout.multiple && KeyLayout.code !== ""
+                onTapped: KeyLayout.switchNext()
 
-                // The icon alone: the network's name is in the panel it opens.
-                IconGlyph {
-                    text: statusItem.networkIcon
-                    color: Network.wifiSsid.length > 0 || Network.ethernetUp ? Theme.textPrimary : Theme.textMuted
-                    size: Theme.iconLarge
+                Rectangle {
+                    implicitWidth: 25
+                    implicitHeight: 17
+                    radius: 4
+                    color: "transparent"
+                    border.width: 1.25
+                    border.color: Theme.textMuted
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: KeyLayout.code
+                        color: Theme.textPrimary
+                        font.pixelSize: 10
+                        font.weight: Font.Bold
+                        font.letterSpacing: 0.4
+                        font.family: Theme.fontText
+                    }
                 }
             }
 
@@ -439,6 +454,17 @@ PanelWindow {
                     font.bold: true
                     font.family: Theme.fontText
                     font.features: Theme.tabular
+                }
+            }
+
+            PillButtonArea {
+                onTapped: statusItem.togglePanel("wifi")
+
+                // The icon alone: the network's name is in the panel it opens.
+                IconGlyph {
+                    text: statusItem.networkIcon
+                    color: Network.wifiSsid.length > 0 || Network.ethernetUp ? Theme.textPrimary : Theme.textMuted
+                    size: Theme.iconLarge
                 }
             }
 

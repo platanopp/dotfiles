@@ -219,8 +219,8 @@ PanelWindow {
         autoPaddingEnabled: true
     }
 
-    // The pill, closed: the bell for the notification centre and the CachyOS logo for
-    // the panel, two buttons in one glass.
+    // The pill, closed: record (hidden while recording), the bell for the notification
+    // centre and the CachyOS logo for the panel, in one glass.
     Row {
         id: compactRow
         anchors.centerIn: parent
@@ -300,6 +300,7 @@ PanelWindow {
 
         Repeater {
             model: [
+                { key: "record" },
                 { key: "notifications" },
                 { key: "panel" }
             ]
@@ -308,6 +309,9 @@ PanelWindow {
                 id: compactButton
                 required property var modelData
                 readonly property bool bell: compactButton.modelData.key === "notifications"
+                readonly property bool record: compactButton.modelData.key === "record"
+                // While recording or counting, the red indicator before it takes its place.
+                visible: !compactButton.record || !recIndicator.visible
                 width: 30
                 height: 30
 
@@ -327,16 +331,19 @@ PanelWindow {
                     // The CachyOS logo (Nerd Font linux-cachyos) rather than a gear: the
                     // panel is the way into the whole machine. The bell is struck
                     // through under do not disturb.
-                    text: !compactButton.bell ? "\u{F385}"
+                    text: compactButton.record ? "\u{F0EC3}"
+                        : !compactButton.bell ? "\u{F385}"
                         : Notifications.dnd ? "\u{F009B}"
                         : Notifications.unread > 0 ? "\u{F009E}" : "\u{F009C}"
                     color: compactButton.bell && Notifications.dnd ? Theme.textMuted : Theme.textPrimary
                     size: Theme.iconLarge
                 }
 
-                // Unread, as a dot on the bell's shoulder.
+                // Unread, as a dot on the bell's shoulder; on the CachyOS logo,
+                // a new published version of the shell (Settings -> About).
                 Rectangle {
-                    visible: compactButton.bell && Notifications.unread > 0
+                    visible: compactButton.bell ? Notifications.unread > 0
+                           : compactButton.modelData.key === "panel" && System.updateNew
                     width: 8
                     height: 8
                     radius: 4
@@ -356,6 +363,10 @@ PanelWindow {
                     id: compactTap
                     enabled: !settingsItem.panelOpen && !settingsItem.notifOpen
                     onTapped: {
+                        if (compactButton.record) {
+                            Recorder.toggleRecording(settingsItem.screen ? settingsItem.screen.name : "")
+                            return
+                        }
                         if (compactButton.bell) {
                             settingsItem.notifOpen = true
                             return

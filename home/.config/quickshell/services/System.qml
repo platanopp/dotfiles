@@ -90,6 +90,40 @@ Singleton {
     // The last update: { ok, error?, files?, saved? }
     property var updateLast: null
 
+    // The published head last looked at in Settings -> About. Commits left out
+    // on purpose keep the state "behind" for good, so the bar's dot is for a
+    // head newer than that, not for "behind" itself.
+    property string updateSeenHead: ""
+    readonly property bool updateNew: updateStatus.state === "behind" && !!updateStatus.head
+                                      && updateSeenHead !== "" && updateStatus.head !== updateSeenHead
+
+    function markUpdateSeen() {
+        var h = root.updateStatus.head
+        if (!h || h === root.updateSeenHead) return
+        root.updateSeenHead = h
+        updateSeenFile.setText(h + "\n")
+    }
+
+    FileView {
+        id: updateSeenFile
+        path: Quickshell.env("HOME") + "/.cache/quickshell/update-seen"
+        printErrors: false
+        onLoaded: root.updateSeenHead = updateSeenFile.text().trim()
+    }
+
+    // A look for new published commits a minute after login, then every 6 h.
+    Timer {
+        interval: 6 * 3600 * 1000
+        running: true
+        repeat: true
+        onTriggered: root.updateCmd("status")
+    }
+    Timer {
+        interval: 60 * 1000
+        running: true
+        onTriggered: root.updateCmd("status")
+    }
+
     // status | update
     function updateCmd(action) {
         if (updateProc.running) return
@@ -112,6 +146,8 @@ Singleton {
                 try { d = JSON.parse(text) } catch (e) { return }
                 if (updateProc.action === "status") {
                     root.updateStatus = d
+                    // First check on this machine: what is published now counts as seen.
+                    if (root.updateSeenHead === "") root.markUpdateSeen()
                     return
                 }
                 root.updateLast = d

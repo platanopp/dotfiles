@@ -297,6 +297,10 @@ Scope {
                 bar: bar
             }
 
+            LayoutToast {
+                bar: bar
+            }
+
             ClockWidget {
                 id: clockWidget
                 bar: bar
