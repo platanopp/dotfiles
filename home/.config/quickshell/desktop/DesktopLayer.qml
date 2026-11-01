@@ -97,6 +97,7 @@ PanelWindow {
                 y: Math.max(0, Math.min(model.wy, area.height - height))
                 kind: model.kind
                 size: model.ws
+                glass: model.wg
                 bar: desk.bar
                 // A hidden window keeps its items, so they are told: nothing redraws while covered,
                 // under fullscreen, or while the picker shows its own copy.

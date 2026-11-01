@@ -11,6 +11,7 @@ Item {
     property bool live: true
     property var bar: null
     property real size: 1
+    property real glass: Widgets.defaultGlass
 
     readonly property var spec: Widgets.spec(host.kind)
 
@@ -31,4 +32,5 @@ Item {
 
     Binding { target: loader.item; property: "live"; value: host.live; when: loader.item !== null }
     Binding { target: loader.item; property: "bar"; value: host.bar; when: loader.item !== null }
+    Binding { target: loader.item; property: "glassAlpha"; value: host.glass; when: loader.item !== null }
 }
