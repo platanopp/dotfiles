@@ -17,7 +17,6 @@ Singleton {
                                  : name.indexOf("Spanish") === 0 ? "LA" : name.slice(0, 2).toUpperCase()
     readonly property string label: english ? "English (US)"
                                   : name.indexOf("Spanish") === 0 ? "Spanish (Latin America)" : name
-    readonly property string hint: english ? "Right Alt + N for ñ" : ""
 
     // A change after the first reading, for the toast.
     signal switched()

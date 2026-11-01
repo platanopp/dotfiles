@@ -108,15 +108,6 @@ PanelWindow {
                 font.weight: Font.DemiBold
                 font.family: Theme.fontText
             }
-
-            Text {
-                visible: KeyLayout.hint !== ""
-                anchors.verticalCenter: parent.verticalCenter
-                text: KeyLayout.hint
-                color: Theme.textMuted
-                font.pixelSize: 12
-                font.family: Theme.fontText
-            }
         }
     }
 }
