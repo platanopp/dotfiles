@@ -17,6 +17,12 @@ Column {
 
     Component.onCompleted: System.refreshAbout()
 
+    // Seen here, so the bar's update dot goes out.
+    Connections {
+        target: System
+        function onUpdateStatusChanged() { System.markUpdateSeen() }
+    }
+
     // The machine, as a card of its own
     Rectangle {
         width: parent.width

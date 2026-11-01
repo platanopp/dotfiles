@@ -339,9 +339,11 @@ PanelWindow {
                     size: Theme.iconLarge
                 }
 
-                // Unread, as a dot on the bell's shoulder.
+                // Unread, as a dot on the bell's shoulder; on the CachyOS logo,
+                // a new published version of the shell (Settings -> About).
                 Rectangle {
-                    visible: compactButton.bell && Notifications.unread > 0
+                    visible: compactButton.bell ? Notifications.unread > 0
+                           : compactButton.modelData.key === "panel" && System.updateNew
                     width: 8
                     height: 8
                     radius: 4
