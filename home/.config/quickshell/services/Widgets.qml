@@ -12,7 +12,7 @@ Singleton {
 
     // The kinds: `file` is the component under desktop/widgets/. Each is laid out for its own w and
     // h, so resizing scales the whole widget (its `size`) instead of stretching it.
-    readonly property var categories: ["Clock", "Calendar", "Weather", "Media", "System"]
+    readonly property var categories: ["Clock", "Calendar", "Weather", "Media", "System", "Notes"]
 
     readonly property var catalog: [
         { kind: "clock-pill", name: "Pill", category: "Clock", file: "PillClock",
@@ -36,7 +36,9 @@ Singleton {
         { kind: "system", name: "Resources", category: "System", file: "SystemMeters",
           description: "CPU, memory and GPU, as they work.", w: 320, h: 248 },
         { kind: "machine", name: "This machine", category: "System", file: "MachineInfo",
-          description: "What it runs, and what it runs on.", w: 320, h: 256 }
+          description: "What it runs, and what it runs on.", w: 320, h: 256 },
+        { kind: "notes-fast", name: "Fast Notes", category: "Notes", file: "FastNotes",
+          description: "Sticky notes kept in your Obsidian vault.", w: 320, h: 360 }
     ]
 
     function spec(kind) {

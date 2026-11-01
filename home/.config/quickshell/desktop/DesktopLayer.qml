@@ -56,7 +56,8 @@ PanelWindow {
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Bottom
     WlrLayershell.namespace: "quickshell:desktop"
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+    // OnDemand so Fast Notes can be typed into; a click elsewhere gives the keys back.
+    WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
 
     anchors {
         top: true
