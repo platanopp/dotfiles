@@ -409,6 +409,20 @@ PanelWindow {
                 size: Theme.iconLarge
             }
 
+            // Keyboard layout; a tap switches it, like Super+Alt+Space.
+            PillButtonArea {
+                visible: KeyLayout.code !== ""
+                onTapped: KeyLayout.switchNext()
+
+                Text {
+                    text: KeyLayout.code
+                    color: Theme.textPrimary
+                    font.pixelSize: 12
+                    font.bold: true
+                    font.family: Theme.fontText
+                }
+            }
+
             PillButtonArea {
                 onTapped: statusItem.togglePanel("wifi")
 
