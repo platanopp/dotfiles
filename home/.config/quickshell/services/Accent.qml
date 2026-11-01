@@ -1,6 +1,7 @@
 pragma Singleton
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import qs.config
 
 // The shell's one accent, taken from the wallpaper: it marks what is active (current
@@ -27,6 +28,15 @@ Singleton {
     onPickedChanged: {
         fade.to = root.picked
         fade.restart()
+        accentFile.setText(root.picked.toString() + "\n")
+    }
+
+    // For the terminal: ~/.zshrc reads it into the prompt's colours, and an
+    // open shell picks a change up at its next prompt.
+    FileView {
+        id: accentFile
+        path: Quickshell.env("HOME") + "/.cache/quickshell/accent"
+        printErrors: false
     }
 
     ColorAnimation {
