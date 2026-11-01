@@ -72,6 +72,68 @@ PanelWindow {
         function onDismissRequested() { statusItem.expandedPanel = "" }
     }
 
+    // Each list is kept current by events only while a panel shows it; the services count who looks.
+    readonly property bool watchingAudioStreams: statusItem.expandedPanel === "audio"
+    onWatchingAudioStreamsChanged:
+        watchingAudioStreams ? Audio.watchAudioStreams() : Audio.unwatchAudioStreams()
+    readonly property bool watchingWifi: statusItem.expandedPanel === "wifi"
+    onWatchingWifiChanged: {
+        if (statusItem.watchingWifi) {
+            Network.watchWifi()
+        } else {
+            Network.unwatchWifi()
+            // Closed, a network opened for its password folds back.
+            Network.wifiExpandedSsid = ""
+        }
+    }
+    readonly property bool watchingBluetooth: statusItem.expandedPanel === "bluetooth"
+    onWatchingBluetoothChanged:
+        watchingBluetooth ? Bluetooth.watchBluetooth() : Bluetooth.unwatchBluetooth()
+    Component.onDestruction: {
+        if (statusItem.escapeOpen) Panels.setPanelOpen(statusItem.escapeKey, false)
+        if (watchingAudioStreams) Audio.unwatchAudioStreams()
+        if (watchingWifi) Network.unwatchWifi()
+        if (watchingBluetooth) Bluetooth.unwatchBluetooth()
+    }
+
+    // What the panel shows. It trails expandedPanel so the content leaves the way it came: on close
+    // it fades out as the glass shrinks instead of vanishing first, and a switch fades the old
+    // panel out before the new one comes in.
+    property string shownPanel: ""
+
+    onExpandedPanelChanged: {
+        var next = statusItem.expandedPanel
+        panelFade.stop()
+        // Nothing else showing: straight in, so the box grows to this panel's height from the start.
+        // Reopened while closing: on from where the fade is, not from nothing.
+        if (next !== "" && (statusItem.shownPanel === next || panelFlick.opacity === 0)) {
+            statusItem.shownPanel = next
+            fadeOut.to = panelFlick.opacity
+            fadeOut.duration = 0
+        } else {
+            fadeOut.to = 0
+            fadeOut.duration = Theme.durShort
+        }
+        panelFade.next = next
+        fadeIn.to = next === "" ? 0 : 1
+        fadeIn.duration = next === "" ? 0 : Theme.durMedium
+        panelFade.start()
+    }
+
+    SequentialAnimation {
+        id: panelFade
+        property string next: ""
+
+        NumberAnimation { id: fadeOut; target: panelFlick; property: "opacity"; easing.type: Easing.OutCubic }
+        ScriptAction {
+            script: {
+                if (statusItem.shownPanel !== panelFade.next) panelFlick.contentY = 0
+                statusItem.shownPanel = panelFade.next
+            }
+        }
+        NumberAnimation { id: fadeIn; target: panelFlick; property: "opacity"; easing.type: Easing.OutCubic }
+    }
+
     // A panel's heading: title, a line of state under it, and its controls on the right.
     component PanelHeader: RowLayout {
         id: header
@@ -111,10 +173,13 @@ PanelWindow {
         }
     }
 
-    // Refresh that spins while its scan runs.
+    // Refresh that spins while its scan runs, and finishes its turn when the scan ends rather than
+    // snapping back upright.
     component ScanButton: IconButton {
         id: scan
         property bool busy: false
+        // One turn's time: the spin's pace, not a transition.
+        readonly property int turn: 900
         icon: "\u{F0450}"
         size: 28
         glyphSize: Theme.iconMedium
@@ -122,12 +187,30 @@ PanelWindow {
         interactive: !scan.busy
         opacity: scan.busy ? 0.6 : 1
 
+        Behavior on opacity { NumberAnimation { duration: Theme.durMedium } }
+
         RotationAnimation on rotation {
             running: scan.busy
             loops: Animation.Infinite
             from: 0; to: 360
-            duration: 900
-            onStopped: scan.rotation = 0
+            duration: scan.turn
+        }
+
+        RotationAnimation {
+            id: settle
+            target: scan
+            property: "rotation"
+            to: 360
+            easing.type: Easing.OutCubic
+            onFinished: scan.rotation = 0
+        }
+
+        onBusyChanged: {
+            settle.stop()
+            if (scan.busy) return
+            // The rest of the turn, eased out over a little longer than it would take at speed.
+            settle.duration = Math.max(Theme.durShort, (360 - scan.rotation % 360) / 360 * scan.turn * 1.5)
+            settle.start()
         }
     }
 
@@ -197,8 +280,14 @@ PanelWindow {
             return
         }
         statusItem.expandedPanel = name
-        if (name === "wifi") Network.scanWifiNetworks()
-        if (name === "bluetooth") Bluetooth.scanBluetoothDevices()
+        if (name === "wifi") {
+            Network.clearWifiStatus()
+            Network.scanWifiNetworks()
+        }
+        if (name === "bluetooth") {
+            Bluetooth.clearBtStatus()
+            Bluetooth.scanBluetoothDevices()
+        }
         if (name === "audio") {
             Audio.refreshAudioSinks()
             Audio.refreshAudioSources()
@@ -371,11 +460,19 @@ PanelWindow {
                     font.features: Theme.tabular
                 }
 
+                // 5% a notch. A notch is 120: touchpads and high-resolution wheels send many smaller
+                // deltas, which each moved 5% and raced the volume. Turning it up unmutes.
                 WheelHandler {
+                    id: volumeWheel
+                    property real carry: 0
                     acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
                     onWheel: event => {
-                        var d = event.angleDelta.y
-                        if (d !== 0) Audio.setVolume(Audio.volumePercent + (d > 0 ? 5 : -5))
+                        volumeWheel.carry += event.angleDelta.y
+                        var steps = Math.trunc(volumeWheel.carry / 120)
+                        if (steps === 0) return
+                        volumeWheel.carry -= steps * 120
+                        if (steps > 0 && Audio.volumeMuted) Audio.setVolumeMuted(false)
+                        Audio.setVolume(Audio.volumePercent + steps * 5)
                     }
                 }
             }
@@ -420,19 +517,10 @@ PanelWindow {
         onCleared: statusItem.expandedPanel = ""
     }
 
-    // The media widget reads the same list, so the polling lives in Audio and
-    // each viewer says whether it looks.
-    readonly property bool watchingAudioStreams: statusItem.expandedPanel === "audio"
-    onWatchingAudioStreamsChanged:
-        watchingAudioStreams ? Audio.watchAudioStreams() : Audio.unwatchAudioStreams()
-    Component.onDestruction: {
-        if (statusItem.escapeOpen) Panels.setPanelOpen(statusItem.escapeKey, false)
-        if (watchingAudioStreams) Audio.unwatchAudioStreams()
-    }
-
     Flickable {
-        visible: statusItem.expandedPanel !== ""
-        opacity: statusItem.expandedPanel !== "" ? 1 : 0
+        id: panelFlick
+        visible: opacity > 0
+        opacity: 0
         anchors.top: compactRowContainer.bottom
         anchors.left: parent.left
         anchors.right: parent.right
@@ -443,10 +531,6 @@ PanelWindow {
         clip: true
         boundsBehavior: Flickable.StopAtBounds
 
-        Behavior on opacity {
-            NumberAnimation { duration: 200 }
-        }
-
         Column {
             id: expandedColumn
             width: parent.width
@@ -456,7 +540,7 @@ PanelWindow {
             Column {
                 width: parent.width
                 spacing: 10
-                visible: statusItem.expandedPanel === "wifi"
+                visible: statusItem.shownPanel === "wifi"
 
                 PanelHeader {
                     title: "Wi-Fi"
@@ -579,7 +663,7 @@ PanelWindow {
                                         if (n.inUse || (n.secure && !n.saved))
                                             Network.toggleWifiExpand(n.ssid)
                                         else
-                                            Network.connectToWifi(n.ssid, "", n.secure, n.saved)
+                                            Network.connectToWifi(n.ssid, "", n.secure, n.savedName)
                                     }
                                 }
                             }
@@ -593,7 +677,7 @@ PanelWindow {
                                 PillButton {
                                     text: "Disconnect"
                                     available: !Network.wifiConnecting
-                                    onClicked: Network.disconnectWifi(networkRow.modelData.ssid)
+                                    onClicked: Network.disconnectWifi()
                                 }
                             }
 
@@ -676,7 +760,7 @@ PanelWindow {
                 id: btPanel
                 width: parent.width
                 spacing: 10
-                visible: statusItem.expandedPanel === "bluetooth"
+                visible: statusItem.shownPanel === "bluetooth"
 
                 readonly property var mine: Bluetooth.bluetoothDevices.filter(d => d.paired)
                 readonly property var nearby: Bluetooth.bluetoothDevices.filter(d => !d.paired)
@@ -839,7 +923,7 @@ PanelWindow {
             Column {
                 width: parent.width
                 spacing: 14
-                visible: statusItem.expandedPanel === "audio"
+                visible: statusItem.shownPanel === "audio"
 
                 PanelHeader {
                     title: "Sound"
@@ -895,7 +979,18 @@ PanelWindow {
                             from: 0; to: level.isMic ? 150 : 100; step: 1
                             neutral: level.isMic ? 100 : NaN
                             value: level.isMic ? Audio.micVolume : Audio.volumePercent
-                            onMoved: v => level.isMic ? Audio.setMicVolume(v) : Audio.setVolume(v)
+                            // Moving the output's level unmutes it, as the wheel does; the
+                            // microphone stays muted until asked.
+                            onMoved: v => {
+                                if (level.isMic) {
+                                    Audio.setMicVolume(v)
+                                } else {
+                                    if (Audio.volumeMuted) Audio.setVolumeMuted(false)
+                                    Audio.setVolume(v)
+                                }
+                            }
+
+                            Behavior on opacity { NumberAnimation { duration: Theme.durShort; easing.type: Easing.OutCubic } }
                         }
 
                         Text {

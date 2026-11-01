@@ -14,10 +14,30 @@ Singleton {
     property real volumePercent: 50
     property bool volumeMuted: false
 
-    function toggleVolumeMute() {
-        volumeSetProc.command = ["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"]
-        volumeSetProc.running = true
-        root.volumeMuted = !root.volumeMuted
+    function toggleVolumeMute() { root.setVolumeMuted(!root.volumeMuted) }
+
+    // The state itself rather than "toggle", on its own process, and sent again when a press lands
+    // while wpctl still runs: a dropped toggle left the icon and the sound disagreeing.
+    function setVolumeMuted(on) {
+        root.volumeMuted = on
+        root.sendVolumeMute()
+    }
+
+    function sendVolumeMute() {
+        if (volumeMuteProc.running) {
+            volumeMuteProc.queued = true
+            return
+        }
+        volumeMuteProc.queued = false
+        volumeMuteProc.command = ["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", root.volumeMuted ? "1" : "0"]
+        volumeMuteProc.running = true
+    }
+
+    Process {
+        id: volumeMuteProc
+        running: false
+        property bool queued: false
+        onExited: if (volumeMuteProc.queued) Qt.callLater(root.sendVolumeMute)
     }
 
     function setVolume(percent) {
@@ -41,7 +61,7 @@ Singleton {
                 // "Volume: 0.71" or "Volume: 0.71 [MUTED]"
                 var m = /Volume:\s*([\d.]+)/.exec(text)
                 var v = m ? Math.round(parseFloat(m[1]) * 100) : NaN
-                if (!volumeSetProc.running) root.volumeMuted = text.indexOf("MUTED") !== -1
+                if (!volumeMuteProc.running && !volumeMuteProc.queued) root.volumeMuted = text.indexOf("MUTED") !== -1
                 // Mid-drag this reading is already stale, and applying it would pull the
                 // handle back under the pointer.
                 if (volumeThrottle.running || volumeSetProc.running)
@@ -102,7 +122,7 @@ Singleton {
             list.push({ id: parts[0], name: parts[1], isDefault: parts[2] === "1",
                         volume: parts.length > 3 ? parseInt(parts[3]) : 100 })
         }
-        root.audioSinks = list
+        if (JSON.stringify(list) !== JSON.stringify(root.audioSinks)) root.audioSinks = list
     }
 
     function setDefaultSink(id) {
@@ -208,9 +228,8 @@ Singleton {
     property bool micMuted: false
 
     function toggleMicMute() {
-        micToggleProc.command = ["bash", "-c", "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"]
-        micToggleProc.running = true
         root.micMuted = !root.micMuted
+        root.sendMicMute()
         // Cued off the new state rather than a re-read, so the sound isn't
         // a poll behind the key press.
         root.playCue(root.micMuted ? "device-removed" : "device-added")
@@ -235,7 +254,7 @@ Singleton {
         running: false
         command: ["bash", "-c", "wpctl get-volume @DEFAULT_AUDIO_SOURCE@ | grep -q MUTED && echo true || echo false"]
         stdout: StdioCollector {
-            onStreamFinished: root.micMuted = text.trim() === "true"
+            onStreamFinished: if (!micToggleProc.running && !micToggleProc.queued) root.micMuted = text.trim() === "true"
         }
     }
 
@@ -245,9 +264,22 @@ Singleton {
         if (root.allOutputs) root.applyAllOutputs(true)
     }
 
+    // Like the output's mute: the state, resent if a press arrives mid-command.
+    function sendMicMute() {
+        if (micToggleProc.running) {
+            micToggleProc.queued = true
+            return
+        }
+        micToggleProc.queued = false
+        micToggleProc.command = ["wpctl", "set-mute", "@DEFAULT_AUDIO_SOURCE@", root.micMuted ? "1" : "0"]
+        micToggleProc.running = true
+    }
+
     Process {
         id: micToggleProc
         running: false
+        property bool queued: false
+        onExited: if (micToggleProc.queued) Qt.callLater(root.sendMicMute)
     }
 
     // Input devices and the microphone's level, for Settings -> Sound.
@@ -325,7 +357,12 @@ Singleton {
         audioStreamsProc.running = true
     }
 
+    // The same answer again would rebuild every app's row (icon, slider) for nothing.
+    property string lastStreamsText: ""
+
     function parseAudioStreams(text) {
+        if (text === root.lastStreamsText) return
+        root.lastStreamsText = text
         try {
             root.audioStreams = JSON.parse(text)
         } catch (e) {
@@ -453,14 +490,21 @@ Singleton {
         }
     }
 
-    // Re-read while shown, since volumes change from outside. Paused mid-drag, or a
-    // stale poll snaps the slider back.
+    // Re-read while shown when PipeWire reports a stream change (an app starting, stopping or
+    // changing its volume), and slowly in case an event is lost. Paused mid-drag, or a stale
+    // reading snaps the slider back.
     Timer {
         id: audioStreamsPollTimer
-        interval: 1500
+        interval: 10000
         repeat: true
         running: root.audioStreamWatchers > 0
         onTriggered: if (!root.audioStreamsDragging) root.refreshAudioStreams()
+    }
+
+    Timer {
+        id: audioStreamsEvent
+        interval: 150
+        onTriggered: if (!root.audioStreamsDragging && !audioStreamsProc.running) root.refreshAudioStreams()
     }
 
     // Audio changes as they happen: `pactl subscribe` prints a line per sink, source or stream
@@ -474,6 +518,10 @@ Singleton {
                 if (line.indexOf("on sink") !== -1 || line.indexOf("on server") !== -1) audioEventDebounce.sink = true
                 if (line.indexOf("on source") !== -1 || line.indexOf("on server") !== -1) audioEventDebounce.source = true
                 if (audioEventDebounce.sink || audioEventDebounce.source) audioEventDebounce.restart()
+                if (root.audioStreamWatchers > 0 && line.indexOf("on sink-input") !== -1) audioStreamsEvent.restart()
+                // A device plugged in or gone, or a new default, while the device list shows.
+                if (root.audioStreamWatchers > 0 && (/'(new|remove)' on sink #/.test(line) || line.indexOf("on server") !== -1))
+                    audioSinksRefreshTimer.restart()
             }
         }
         // Should pactl go (PipeWire restarting), start it again shortly.
@@ -498,6 +546,9 @@ Singleton {
         onTriggered: {
             if (audioEventDebounce.sink && !volumeGetProc.running) volumeGetProc.running = true
             if (audioEventDebounce.source && !micMutedProc.running) micMutedProc.running = true
+            // The microphone's level shows only in the sound panel and page.
+            if (audioEventDebounce.source && root.audioStreamWatchers > 0 && !micVolumeProc.running)
+                micVolumeProc.running = true
             audioEventDebounce.sink = false
             audioEventDebounce.source = false
         }

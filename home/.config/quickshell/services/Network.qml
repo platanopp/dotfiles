@@ -19,8 +19,26 @@ Singleton {
     property string wifiExpandedSsid: ""
     property string wifiStatusMessage: ""
     property bool wifiConnecting: false
+    // What the running connect or disconnect is, for its message.
+    property string wifiAction: ""
 
     readonly property bool wifiScanning: wifiScanProc.running
+
+    // Panels showing the list: while any is open, NetworkManager's events refresh it too.
+    property int wifiWatchers: 0
+    function watchWifi() { root.wifiWatchers++ }
+    function unwatchWifi() { root.wifiWatchers = Math.max(0, root.wifiWatchers - 1) }
+
+    // A result stays a few seconds; an error until the panel opens again.
+    function clearWifiStatus() {
+        if (!root.wifiConnecting) root.wifiStatusMessage = ""
+    }
+
+    Timer {
+        id: wifiStatusClear
+        interval: 4000
+        onTriggered: if (!root.wifiConnecting) root.wifiStatusMessage = ""
+    }
 
     function toggleWifiRadio() {
         wifiToggleProc.command = ["bash", "-c", "nmcli radio wifi " + (root.wifiRadioEnabled ? "off" : "on")]
@@ -29,36 +47,61 @@ Singleton {
         wifiRadioRefreshTimer.restart()
     }
 
+    // What NetworkManager already knows, listed at once; then a real scan, which takes the card off
+    // its channel for a few seconds, so only when asked.
     function scanWifiNetworks() {
+        root.listWifiNetworks()
         if (!wifiScanProc.running) wifiScanProc.running = true
     }
 
-    function disconnectWifi(ssid) {
+    function listWifiNetworks() {
+        if (!wifiListProc.running) wifiListProc.running = true
+    }
+
+    // The active connection on the Wi-Fi device, whatever it is named.
+    function disconnectWifi() {
         root.wifiConnecting = true
-        root.wifiStatusMessage = "Disconnecting..."
-        wifiConnectProc.command = ["bash", "-c", "nmcli connection down id \"$1\" 2>&1 && echo DISCONNECTED", "_", ssid]
+        root.wifiAction = "disconnect"
+        root.wifiStatusMessage = "Disconnecting…"
+        wifiConnectProc.command = ["bash", "-c", "export LC_ALL=C; "
+            + "dev=$(nmcli -t -f DEVICE,TYPE,STATE device | awk -F: '$2==\"wifi\" && $3==\"connected\"{print $1; exit}'); "
+            + "uuid=$(nmcli -g GENERAL.CON-UUID device show \"$dev\" 2>/dev/null); "
+            + "nmcli connection down uuid \"$uuid\" 2>&1 && echo DISCONNECTED"]
         wifiConnectProc.running = true
     }
 
+    // The networks in range as "IN-USE:SIGNAL:SECURITY:SSID", the SSID last and unescaped so a colon
+    // in it stays whole; then "--saved--" and each saved Wi-Fi connection as "SSID<TAB>name", since
+    // a connection's name need not be its SSID. "rescan" first makes the card look again.
+    readonly property string listScript: "export LC_ALL=C; "
+        + "[ \"$1\" = rescan ] && { nmcli dev wifi rescan >/dev/null 2>&1; sleep 1; }; "
+        + "nmcli -t -e no -f IN-USE,SIGNAL,SECURITY,SSID dev wifi list --rescan no; echo --saved--; "
+        + "nmcli -t -f UUID,TYPE connection show | awk -F: '$2==\"802-11-wireless\"{print $1}' | "
+        + "while read -r u; do nmcli -e no -g 802-11-wireless.ssid,connection.id connection show uuid \"$u\" | paste -s -d '\\t'; done"
+
     function parseWifiScan(text) {
-        // The scan, then "--saved--" and the names of saved Wi-Fi
-        // connections: a saved network connects without asking again.
         var halves = text.split("--saved--")
-        var savedNames = (halves[1] || "").split("\n").map(l => l.trim()).filter(l => l.length > 0)
+        var saved = {}
+        var savedLines = (halves[1] || "").split("\n")
+        for (var k = 0; k < savedLines.length; k++) {
+            var pair = savedLines[k].split("\t")
+            if (pair.length >= 2 && pair[0].length > 0) saved[pair[0]] = pair.slice(1).join("\t")
+        }
         var lines = halves[0].trim().length > 0 ? halves[0].trim().split("\n") : []
         var byS = {}
         for (var i = 0; i < lines.length; i++) {
             var parts = lines[i].split(":")
             if (parts.length < 4) continue
-            var ssid = parts[1]
+            var ssid = parts.slice(3).join(":")
             if (ssid.length === 0) continue
-            var signal = parseInt(parts[2]) || 0
+            var signal = parseInt(parts[1]) || 0
             var entry = {
                 ssid: ssid,
                 inUse: parts[0] === "*",
                 signal: signal,
-                secure: parts[3] !== "--" && parts[3].length > 0,
-                saved: savedNames.indexOf(ssid) !== -1
+                secure: parts[2].length > 0 && parts[2] !== "--",
+                saved: saved[ssid] !== undefined,
+                savedName: saved[ssid] || ""
             }
             // A multi-band AP shows once per band: keep the strongest but carry the in-use flag, or
             // a connected weaker band looked disconnected.
@@ -77,7 +120,8 @@ Singleton {
             if (a.inUse !== b.inUse) return a.inUse ? -1 : 1
             return b.signal - a.signal
         })
-        root.wifiNetworks = list
+        // The same list again would rebuild every row for nothing.
+        if (JSON.stringify(list) !== JSON.stringify(root.wifiNetworks)) root.wifiNetworks = list
     }
 
     function toggleWifiExpand(ssid) {
@@ -85,11 +129,13 @@ Singleton {
         root.wifiStatusMessage = ""
     }
 
-    function connectToWifi(ssid, password, secure, saved) {
+    // savedName: the saved connection for this network, which connects without asking again.
+    function connectToWifi(ssid, password, secure, savedName) {
         root.wifiConnecting = true
-        root.wifiStatusMessage = "Connecting to " + ssid + "..."
-        if (saved) {
-            wifiConnectProc.command = ["bash", "-c", "nmcli connection up id \"$1\" 2>&1", "_", ssid]
+        root.wifiAction = "connect"
+        root.wifiStatusMessage = "Connecting to " + ssid + "…"
+        if (savedName) {
+            wifiConnectProc.command = ["bash", "-c", "nmcli connection up id \"$1\" 2>&1", "_", savedName]
         } else if (secure) {
             wifiConnectProc.command = ["bash", "-c", "nmcli device wifi connect \"$1\" password \"$2\" 2>&1", "_", ssid, password]
         } else {
@@ -137,9 +183,18 @@ Singleton {
     }
 
     Process {
+        id: wifiListProc
+        running: false
+        command: ["bash", "-c", root.listScript, "_"]
+        stdout: StdioCollector {
+            onStreamFinished: root.parseWifiScan(text)
+        }
+    }
+
+    Process {
         id: wifiScanProc
         running: false
-        command: ["bash", "-c", "nmcli dev wifi rescan >/dev/null 2>&1; sleep 1; LC_ALL=C nmcli -t -f IN-USE,SSID,SIGNAL,SECURITY dev wifi list; echo --saved--; LC_ALL=C nmcli -t -f NAME,TYPE connection show | awk -F: '$NF==\"802-11-wireless\"{print $1}'"]
+        command: ["bash", "-c", root.listScript, "_", "rescan"]
         stdout: StdioCollector {
             onStreamFinished: root.parseWifiScan(text)
         }
@@ -151,25 +206,28 @@ Singleton {
         stdout: StdioCollector {
             onStreamFinished: {
                 var out = text.trim()
-                if (out.indexOf("DISCONNECTED") !== -1) {
-                    root.wifiStatusMessage = ""
-                    root.wifiExpandedSsid = ""
-                    wifiProc.running = true
-                    wifiScanProc.running = true
-                } else if (out.toLowerCase().indexOf("error") !== -1) {
-                    var low = out.toLowerCase()
+                var low = out.toLowerCase()
+                if (root.wifiAction === "disconnect") {
+                    root.wifiStatusMessage = out.indexOf("DISCONNECTED") !== -1 ? "Disconnected" : "Could not disconnect"
+                } else if (low.indexOf("error") !== -1) {
                     root.wifiStatusMessage = low.indexOf("secrets were required") !== -1 || low.indexOf("password") !== -1
                         ? "Wrong password"
                         : low.indexOf("no network with ssid") !== -1 ? "That network is out of range"
                         : "Could not connect"
                 } else {
                     root.wifiStatusMessage = "Connected"
-                    root.wifiExpandedSsid = ""
-                    wifiProc.running = true
-                    wifiIpProc.running = true
-                    wifiScanProc.running = true
                 }
+                if (!/^Could not|^Wrong|out of range$/.test(root.wifiStatusMessage)) {
+                    root.wifiExpandedSsid = ""
+                    wifiStatusClear.restart()
+                }
+                // The list from what NetworkManager knows: a rescan right after connecting would
+                // take the card off its new channel.
+                wifiProc.running = true
+                wifiIpProc.running = true
+                root.listWifiNetworks()
                 root.wifiConnecting = false
+                root.wifiAction = ""
             }
         }
     }
@@ -218,6 +276,9 @@ Singleton {
     Timer {
         id: networkEventThrottle
         interval: 400
-        onTriggered: root.refreshNetwork()
+        onTriggered: {
+            root.refreshNetwork()
+            if (root.wifiWatchers > 0) root.listWifiNetworks()
+        }
     }
 }

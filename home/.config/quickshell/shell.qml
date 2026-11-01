@@ -82,7 +82,6 @@ Scope {
 
             WlrLayershell.namespace: "quickshell:bar-blur"
             WlrLayershell.layer: WlrLayer.Overlay
-            WlrLayershell.keyboardFocus: (statusWidget.expandedPanel === "wifi" && Network.wifiExpandedSsid.length > 0) ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
             property var monitor: Hyprland.monitorFor(modelData)
 
