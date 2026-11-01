@@ -2,13 +2,13 @@ import QtQuick
 import qs.config
 
 // The shell's spring: a NumberAnimation that runs a little past its target
-// and settles back (see Theme's springs for when to use it, and when not).
+// and settles (see Theme's springs).
 //
-//   Behavior on x { Elastic {} }              panels, cards, overlays
-//   Behavior on x { Elastic { small: true } } knobs, indicators, chips
+// Behavior on x { Elastic {} }              panels, cards, overlays
+// Behavior on x { Elastic { small: true } } knobs, indicators, chips
 //
-// Spatial properties only: never opacity, which cannot go past 1, nor a size
-// that is shrinking towards nothing, which would overshoot below zero.
+// Spatial properties only: never opacity, nor a size shrinking towards zero,
+// which would overshoot below it.
 NumberAnimation {
     property bool small: false
 

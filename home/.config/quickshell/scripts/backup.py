@@ -31,9 +31,8 @@ import urllib.request
 
 HOME = os.path.expanduser("~")
 
-# What a new backup keeps, if this user has it. An allowlist rather than
-# "everything under ~/.config": most of that is caches, browser profiles and
-# session tokens, and a backup can end up public.
+# What a new backup keeps, if present: an allowlist, since most of ~/.config is caches, browser
+# profiles and tokens, and a backup can end up public.
 DEFAULT_MANIFEST = [
     ".config/quickshell", ".config/hypr",
     ".zshrc", ".zprofile", ".profile", ".bashrc", ".bash_profile",
@@ -45,9 +44,8 @@ DEFAULT_MANIFEST = [
 ]
 
 SYNC_SH = r'''#!/usr/bin/env bash
-# Pull the live configuration into this repository: every path in
-# manifest.txt (relative to $HOME) is copied into home/. Written by the
-# shell's Settings window; edit the manifest to change what is kept.
+# Pull the live configuration into this repository: every path in manifest.txt (relative to $HOME)
+# is copied into home/. Written by the shell's Settings window.
 set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 dest="$repo/home"

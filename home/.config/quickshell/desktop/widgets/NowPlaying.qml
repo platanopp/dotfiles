@@ -7,11 +7,8 @@ import qs.config
 import qs.desktop
 import qs.services
 
-// The bar's media panel, left open on the desktop: the cover across the top
-// edge to edge, fading down into the glass, then the title, the progress and
-// the transport row, set as the panel sets them. It follows the same player
-// as the bar's media pill (the bar's activePlayer), so the two never disagree
-// about what "the music" is.
+// The bar's media panel left open on the desktop, following the same player
+// as the bar's pill (activePlayer).
 WidgetCard {
     id: root
 
@@ -51,11 +48,8 @@ WidgetCard {
 
     onPlayerChanged: root.position = root.player ? root.player.position : 0
 
-    // ── The cover ────────────────────────────────────────────────────────
-    //
-    // Masked by a gradient so it is gone before the title starts: no text on
-    // the cover, the panel's rule. Paused, it steps back into the glass. The
-    // mask is cached: it is redrawn when the cover changes, not per frame.
+    // The cover, masked by a gradient so it is gone before the title starts; paused, it steps back.
+    // The mask is cached and redrawn only when the cover changes.
     Item {
         id: hero
         anchors.left: parent.left
@@ -240,9 +234,7 @@ WidgetCard {
                 onTapped: root.player.previous()
             }
 
-            // Play in a filled circle, in the text colour, as in the panel:
-            // the accent marks state, and this button is there whether
-            // anything plays or not.
+            // Play in a filled circle, text colour, as in the panel: the accent marks state.
             Rectangle {
                 Layout.preferredWidth: 48
                 Layout.preferredHeight: 48

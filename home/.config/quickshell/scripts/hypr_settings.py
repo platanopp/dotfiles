@@ -50,15 +50,14 @@ DOTFILES = backup_repo()
 
 # key: (hyprctl option, type, range or choices, label)
 #
-# Left out on purpose: the keyboard layout (a wrong one and the lock screen's
-# password cannot be typed), monitors (the Displays page, with its
-# keep-or-revert), binds, window rules and anything that runs a command.
+# Left out on purpose: the keyboard layout (a wrong one makes the lock's password
+# untypable), monitors (the Displays page, with keep-or-revert), binds, window rules
+# and anything that runs a command.
 SPEC = {
     "gaps_in":          ("general:gaps_in", "int", (0, 40), "Gap between windows"),
     "gaps_out":         ("general:gaps_out", "sides", (0, 80), "Gap to the screen edge"),
-    # The top edge of the same option, on a slider of its own: the bar sits
-    # in it, and the shell's pills follow it down (Hypr.gapTop). Stored
-    # inside gaps_out's entry -- one option, one line in gui-settings.lua.
+    # The top edge of gaps_out on its own slider: the bar sits in it and the pills follow
+    # (Hypr.gapTop). Stored in gaps_out's entry, one line in gui-settings.lua.
     "gaps_top":         ("general:gaps_out", "top", (0, 80), "Gap to the top edge"),
     "border_size":      ("general:border_size", "int", (0, 8), "Border"),
     "layout":           ("general:layout", "enum", ("dwindle", "master", "scrolling"), "Layout"),
@@ -185,19 +184,11 @@ def render(state):
             node = node.setdefault(part, {})
         node[path[-1]] = entry["value"]
 
-    # Click-to-focus has to hold across monitors too. With follow_mouse at 2
-    # Hyprland keeps the keyboard where it is inside a monitor, but moving the
-    # pointer onto the other monitor still focused that monitor -- and with
-    # it its window, no click -- so Click behaved like Hover the moment the
-    # pointer crossed the gap. Written either way, true for Hover (Hyprland's
-    # default): a change is applied live, without a reload, so a line that
-    # merely went missing would leave the last value in force.
-    #
-    # And float_switch_override_focus, which moves the focus whenever the
-    # pointer goes from a tiled window to a floating one or back -- under any
-    # follow_mouse. With a floating terminal over tiled windows that is most
-    # of the time, so Click kept acting like Hover. Off for Click, Hyprland's
-    # 1 for Hover.
+    # Click-to-focus must hold across monitors: with follow_mouse 2, crossing to the other monitor
+    # still focused it (and its window), so mouse_move_focuses_monitor goes off for Click.
+    # float_switch_override_focus refocuses between tiled and floating windows under any
+    # follow_mouse, so it is 0 for Click and Hyprland's 1 for Hover. Both are written either way:
+    # changes apply live, so a missing line would leave the last value in force.
     fm = state.get("follow_mouse", {}).get("value", 1)
     hover = str(fm) == "1"
     tree.setdefault("misc", {})["mouse_move_focuses_monitor"] = hover

@@ -1,12 +1,9 @@
 import QtQuick
 import qs.config
 
-// A section of the Settings window: a heading, a line under it, and a stack
-// of SettingsRows that it tells where they sit, so the stack gets round outer
-// corners and near-square seams (see SettingsRow).
-//
-// Recounted whenever a row is shown or hidden, so a row that only applies
-// sometimes does not leave the group with a square corner at an open end.
+// A Settings section: a heading, a line under it and a stack of SettingsRows it tells where
+// they sit (round outer corners, near-square seams). Recounted when a row shows or hides, so
+// no square corner is left at an open end.
 Column {
     id: group
 

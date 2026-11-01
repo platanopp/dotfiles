@@ -65,9 +65,8 @@ LIB_CANDIDATES = [
     "libwooting-rgb-sdk.so.0",
 ]
 
-# A 60% ISO board, row by row as it sits on the desk: (width in key units,
-# column in Wooting's matrix). Matrix rows are these rows plus one; row 0
-# is the function row a 60% board does not have. Every row is 15 units.
+# A 60% ISO board, row by row: (width in key units, column in Wooting's matrix). Matrix rows are
+# these plus one (row 0 is the missing function row); every row is 15 units.
 LAYOUT = [
     [(1, 0), (1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8), (1, 9),
      (1, 10), (1, 11), (1, 12), (2, 13)],
@@ -81,18 +80,14 @@ LAYOUT = [
 ]
 UNITS = 15
 
-# The colours last sent (sRGB, full brightness), per keyboard, for the next
-# sweep to start from. A cache, not a setting: without it a sweep starts
-# from dark.
+# The colours last sent, per keyboard, for the next sweep to start from; a cache,
+# so a sweep never starts from dark.
 LAST = os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")),
                     "quickshell", "keyboard-rgb.json")
 
 
-# ── The picture, place by place ──────────────────────────────────────────
-#
-# Every keyboard describes its LEDs the same way: {led id: (x0, y0, x1, y1)},
-# a rectangle on the picture in fractions of its width and height. What
-# follows does not care which keyboard it is.
+# The picture, place by place. Every keyboard describes its LEDs as {led id: (x0, y0,
+# x1, y1)} in fractions of the picture.
 
 def sample(image_path, spots):
     """{led: (h, l, s)}: the colour of the picture under each place. The
@@ -335,12 +330,8 @@ class Wooting(Device):
         self.lib.wooting_rgb_reset_rgb()
 
 
-# ── OpenRGB ──────────────────────────────────────────────────────────────
-#
-# The SDK protocol, the few packets used here: a 16-byte header ("ORGB",
-# device index, packet id, data size -- little-endian) and a body. Protocol
-# version 3 is asked for: every server since 0.6 speaks it, and its device
-# description has no segments or later extras to parse.
+# OpenRGB SDK protocol, the few packets used: a 16-byte little-endian header ("ORGB", device index,
+# packet id, data size) and a body. Version 3: every server since 0.6 speaks it.
 
 ORGB_PORT = 6742
 ORGB_PROTOCOL = 3
@@ -529,9 +520,8 @@ class OpenRGBKeyboard(Device):
         self.client.update(self.index, self.frame)
 
     def restore(self):
-        # OpenRGB has no "give it back": the keyboard keeps the last colours
-        # until its own software or a profile sets it again. Dark is the
-        # honest thing to leave rather than a stale wallpaper.
+        # OpenRGB has no "give it back": the keyboard keeps the last colours, so
+        # leave it dark rather than stale.
         self.frame = [(0, 0, 0)] * self.total
         self.client.update(self.index, self.frame)
 
@@ -687,14 +677,9 @@ class Keyboards:
                 "devices": [d.info() for d in self.devices()]}
 
 
-# ── The active profile (Wooting) ─────────────────────────────────────────
-#
-# Read over hidraw, not the SDK: the SDK waits for a 2046-byte answer and a
-# 60HE (ARM) sends 33, so it gives up and drops the connection. The request
-# is Wooting's command 11 (GetCurrentKeyboardProfileIndex) as a feature
-# report on the configuration interface (usage page 0xFF55); the answer is
-# an input report [id, D1, DA, 11, status, length, data...] whose second data
-# byte is the profile, 0-3.
+# The active Wooting profile, over hidraw: the SDK waits for a 2046-byte answer and a 60HE (ARM)
+# sends 33. Command 11 (GetCurrentKeyboardProfileIndex) as a feature report on usage page 0xFF55;
+# the answer's second data byte is the profile, 0-3.
 
 WOOTING_VENDOR = "31E3"
 PROFILE_COMMAND = 11

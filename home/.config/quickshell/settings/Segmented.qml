@@ -2,14 +2,12 @@ import QtQuick
 import qs.components
 import qs.config
 
-// One choice out of a few, in one pill: the chosen segment filled in the
-// accent with a check beside its label, the rest plain. The fill slides from
-// one segment to the next rather than blinking, so the control says which way
-// the choice moved.
+// One choice out of a few in one pill: the chosen segment filled with a
+// check, the fill sliding between them.
 //
-//   options: [{ value, label }]    value compared with ===
-//   value:   the current choice
-//   picked(value) when another segment is tapped
+// options: [{ value, label }]    value compared with ===
+// value:   the current choice
+// picked(value) when another segment is tapped
 Rectangle {
     id: root
 

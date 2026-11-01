@@ -8,9 +8,8 @@ import qs.components
 import qs.config
 import qs.services
 
-// The bar's clock. Tapping it expands the pill in place -- the way the status
-// and control widgets behave -- into today's date over the calendar and the
-// week's weather side by side.
+// The bar's clock. Tapping expands the pill in place, like the status and control pills, into
+// today's date over the calendar and the week's weather.
 PanelWindow {
     id: clockItem
 
@@ -18,11 +17,9 @@ PanelWindow {
     screen: bar ? bar.screen : null
     visible: true
 
-    // Hidden by cutting input and drawing nothing, never by unmapping the
-    // window. Toggling visible destroys the layer surface, and Hyprland
-    // restacks it on the way back: the full-width bar came back above the
-    // pills and swallowed every click meant for them. The blur rule ignores
-    // pixels below 0.3 alpha, so a surface drawing nothing leaves no band.
+    // Hidden by cutting input and drawing nothing, never by unmapping: a remapped layer is
+    // restacked above the pills and swallowed their clicks. The blur rule ignores pixels
+    // under 0.3 alpha, so nothing shows.
     mask: bar.barHidden ? blankMask : stageMask
 
     Region {
@@ -37,8 +34,7 @@ PanelWindow {
         item: stage
     }
 
-    // Keeps the bar up while the pointer is on it; shell.qml folds these
-    // together with the reveal zone's own hover.
+    // Keeps the bar up while hovered; shell.qml folds these together with the reveal zone's hover.
     readonly property bool barHovered: barHover.hovered
 
     HoverHandler {
@@ -72,31 +68,22 @@ PanelWindow {
         top: true
         left: true
     }
-    // The content inside insets itself by 12, so the window sits back by
-    // that much and the drawn edge lands exactly on Hyprland's gap.
+    // The content insets by 12, so the window sits back that much and the
+    // drawn edge lands on Hyprland's gap.
     margins.top: Math.max(0, Hypr.gapTop - 12)
 
-    // PanelWindow anchors to edges, so centring is done by hand. Held in a
-    // plain property as well as the margin: a grouped property is not
-    // guaranteed to notify. The window is as wide as the open panel all the
-    // time (see the stage below), so this does not move as the pill grows.
+    // PanelWindow anchors to edges, so centring is by hand; a plain property because a
+    // grouped one may not notify. The window is always as wide as the open panel, so
+    // this doesn't move as the pill grows.
     readonly property int leftMargin: screen ? Math.round((screen.width - implicitWidth) / 2) : 0
     margins.left: leftMargin
 
-    // Breathing room between the text and the edge of the pill.
-    //
-    // Named rather than folded into the width below, because the arithmetic is
-    // not obvious: the window is wider than the pill by the 12px inset on each
-    // side of the Item that holds it. So the window has to carry 24 of chrome
-    // plus twice this value, and a bare number here reads as if it were the
-    // padding when it is not.
+    // Named, not folded into the width: the window carries 24px of chrome
+    // (12 each side) plus twice this.
     readonly property int compactPaddingH: Theme.pillPaddingH
 
-    // The pill's box, centred in a window as wide as the open panel -- so
-    // neither the date folding out on hover nor the panel opening ever
-    // resizes the window sideways; only the box inside grows, both ways from
-    // the middle (see PillStage).
-    // The open calendar's height, the largest seen (see panelColumn).
+    // The pill's box, centred in a window as wide as the open panel, so only the box grows (see
+    // PillStage). The open calendar's height, the largest seen (see panelColumn).
     property real openHeight: 0
 
     PillStage {
@@ -107,33 +94,25 @@ PanelWindow {
         anchors.horizontalCenter: parent.horizontalCenter
         duration: Theme.durLong
         minWindowWidth: clockItem.panelWidth
-        // As tall as the calendar has been once opened, from then on, so the
-        // window does not drop to the pill's height as the panel closes: that
-        // resize left a frame with nothing drawn and the pill blinked out
-        // (measured on the media pill, which had the same shape).
+        // As tall as the calendar once opened, so closing doesn't shrink the window:
+        // that resize left a blank frame.
         minWindowHeight: clockItem.openHeight
-        // Centred in a 568-wide window: an even width puts both edges on
-        // whole pixels.
+        // Centred in a 568-wide window: an even width puts both edges on whole pixels.
         evenWidth: true
         targetWidth: clockItem.panelOpen ? clockItem.panelWidth
                    : compactRow.implicitWidth + 24 + clockItem.compactPaddingH * 2
         targetHeight: clockItem.panelOpen ? panelColumn.implicitHeight + 56 : 64
-        // Off while the date is folding in or out: that change is animated
-        // where it starts (revealDate below), and a second animation chasing
-        // it here made the pill grow in stutters.
+        // Off while the date folds in or out: revealDate animates that, and a second
+        // animation made the pill stutter.
         animateWidth: !revealAnim.running
     }
 
     implicitWidth: stage.windowWidth
     implicitHeight: stage.windowHeight
 
-    // ── Time only, date on hover ─────────────────────────────────────────
-    //
-    // At rest the pill carries the time and nothing else; the date opens out
-    // beside it while the pointer is on the pill, and folds away a moment
-    // after it leaves -- the moment is so that brushing the pill's edge does
-    // not make it flicker. The pill is centred, so it grows both ways.
-    // "Always" in Settings -> Shell keeps the date out for good.
+    // Time only, date on hover: the date opens beside the time while hovered and
+    // folds away a moment after, so brushing the edge does not flicker. "Always" in
+    // Settings -> Shell keeps it out.
     readonly property bool showDate: ShellSettings.clockDate === "always"
                                      || barHover.hovered || clockItem.panelOpen
     property real revealDate: 0
@@ -167,13 +146,13 @@ PanelWindow {
         easing.type: Easing.OutCubic
     }
 
-    // -- Calendar state ---------------------------------------------------
+    // Calendar state
     property date today: new Date()
     property int viewYear: today.getFullYear()
     property int viewMonth: today.getMonth()
 
-    // Which way the last change of month went: the grid slides in from that
-    // side (1: a later month, from the right).
+    // Which way the last month change went: the grid slides in from that side (1:
+    // a later month, from the right).
     property int slideDir: 1
     signal monthTurned()
 
@@ -259,10 +238,8 @@ PanelWindow {
         RowLayout {
             id: compactRow
             anchors.centerIn: parent
-            // No spacing between the time and the date: the gap lives inside
-            // the date (its leading margin below), so it folds away with it.
-            // A row spacing stayed behind at rest as eight pixels of padding
-            // on the right of the time.
+            // No spacing: the gap lives inside the date (its leading
+            // margin), so it folds away with it.
             spacing: 0
             visible: !clockItem.panelOpen
             opacity: clockItem.panelOpen ? 0 : 1
@@ -280,9 +257,8 @@ PanelWindow {
                 font.features: Theme.tabular
             }
 
-            // The date, folded to nothing at rest. Its width is what opens,
-            // so the pill grows with it frame by frame; clipped so the text is
-            // uncovered rather than squeezed.
+            // The date, folded to nothing at rest: its width opens frame by frame, clipped so
+            // the text is uncovered, not squeezed.
             Item {
                 Layout.preferredWidth: (dateRow.implicitWidth + 8) * clockItem.revealDate
                 Layout.preferredHeight: dateRow.implicitHeight
@@ -327,15 +303,12 @@ PanelWindow {
             spacing: 14
             visible: clockItem.panelOpen
 
-            // Hidden, a Column measures nothing, so the height is kept from
-            // when it was last shown (see the stage's minWindowHeight).
+            // A hidden Column measures nothing, so the height is kept from when it
+            // last showed (minWindowHeight).
             onImplicitHeightChanged: if (implicitHeight > 0)
                 clockItem.openHeight = Math.max(clockItem.openHeight, implicitHeight + 56)
 
-            // -- Today --------------------------------------------------------
-            //
-            // Time and date only. Who is logged in, the machine and its load
-            // are the control panel's header, not the calendar's.
+            // Today: time and date only; the user, machine and load are the control panel's header.
             RowLayout {
                 width: parent.width
                 spacing: 12
@@ -369,7 +342,7 @@ PanelWindow {
                 color: Theme.outline
             }
 
-            // -- Calendar and weather, side by side ---------------------------
+            // Calendar and weather, side by side
             RowLayout {
                 width: parent.width
                 spacing: 18
@@ -439,8 +412,8 @@ PanelWindow {
                         }
                     }
 
-                    // The days, sliding in from the side the month moved to.
-                    // The wheel turns months too.
+                    // The days, sliding in from the side the month moved to;
+                    // the wheel turns months too.
                     Item {
                         Layout.fillWidth: true
                         Layout.preferredHeight: daysGrid.implicitHeight

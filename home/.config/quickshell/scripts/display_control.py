@@ -95,11 +95,8 @@ def remember(section, key, value):
         write_monitor_config(d)
 
 
-# The layout, where Hyprland itself reads it. hyprland.lua runs this file right
-# after its own monitor rules, so what was picked in Settings is what Hyprland
-# starts with, and what it goes back to on every config reload. Kept only in
-# the state file, it was applied by the shell some time after login -- and
-# undone by the next reload, which re-read the rules in hyprland.lua.
+# The layout, where Hyprland reads it: hyprland.lua runs this file after its own monitor rules, so
+# the Settings choice survives config reloads (applied later by the shell, a reload undid it).
 MONITOR_LUA = os.path.join(os.path.expanduser("~/.config/hypr"), "monitors.lua")
 
 
@@ -187,14 +184,9 @@ def apply_monitor(name, *, mode=None, position=None, scale=None):
     return ok
 
 
-# The layout is kept with the Xiaomi at 0,0, wherever it is dragged to: the
-# others move instead. It is the monitor that drops its link when it is
-# switched off (hypr/scripts/idle-screens.sh), and Hyprland 0.56 brings a
-# monitor back as if it were at y=0 -- its floating windows came back 120px
-# low every night while it sat at 0,-120. XWayland also lines every monitor up
-# at y=0, so X programs (Steam's toasts) and Hyprland only agree on a monitor
-# that is there. The arrangement is the same either way; only the numbers
-# shift. Matched by make, like idle-screens.sh does.
+# The layout is kept with the Xiaomi at 0,0; the others move instead. It drops its link when
+# switched off, and Hyprland brings a monitor back as if at y=0 (its floating windows came back
+# 120px low); XWayland also puts every monitor at y=0. Matched by make, like idle-screens.sh.
 ANCHOR_MAKE = "Xiaomi"
 
 
@@ -312,12 +304,8 @@ def apply_gamma(value):
     is linear: it cannot express out = in^(1/g). So the exponent is compiled
     into a one-line fragment shader and Hyprland applies it per frame.
 
-    The usual argument against a screen shader is that it blocks direct
-    scanout. Not a cost here: render:direct_scanout is off anyway, so
-    fullscreen games already go through composition.
-
-    At exactly 1.0 the shader is unset rather than applied as a no-op, so
-    neutral costs nothing at all.
+    A screen shader blocks direct scanout, so at exactly 1.0 it is unset
+    rather than applied as a no-op: neutral costs nothing.
     """
     value = max(0.4, min(2.5, float(value)))
     if abs(value - 1.0) < 0.005:
@@ -336,12 +324,8 @@ def apply_gamma(value):
     # Cleared first: assigning the path Hyprland already holds is a no-op, and
     # it would keep serving the old exponent.
     hypr_eval('hl.config({ decoration = { screen_shader = "" } })')
-    # Whole frames while the shader is on. Hyprland redraws only the regions
-    # that changed, and with a full-screen shader in the way those regions
-    # and the rest of the picture fell a frame out of step: anything that
-    # updates -- the cursor, an animation, text changing -- flickered. The
-    # cost is a full redraw per frame, only when something moves, and only
-    # while gamma is off neutral.
+    # Whole frames while the shader is on: with damage tracking, a full-screen shader made anything
+    # that updates flicker. The cost is a full redraw per frame, only while gamma is off neutral.
     hypr_eval('hl.config({ debug = { damage_tracking = 0 } })')
     return hypr_eval(f'hl.config({{ decoration = {{ screen_shader = "{SHADER}" }} }})')
 

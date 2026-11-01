@@ -1,8 +1,6 @@
 #!/bin/bash
-# Bluetooth devices for the bar's panel: "MAC|PAIRED|CONNECTED|NAME|ICON".
-# Scans for four seconds first when the adapter is on. Devices nearby that
-# never gave a name (bluetoothctl shows their address, dashed, as the name)
-# are left out unless they are paired: a list of addresses helps nobody.
+# Bluetooth devices for the bar's panel: "MAC|PAIRED|CONNECTED|NAME|ICON". Scans four seconds first
+# when on; unnamed devices (shown as dashed addresses) are left out unless paired.
 export LC_ALL=C
 powered=$(bluetoothctl show | awk '/Powered:/{print $2; exit}')
 [ "$powered" = "yes" ] && bluetoothctl --timeout 4 scan on >/dev/null 2>&1

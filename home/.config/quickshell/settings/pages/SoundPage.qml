@@ -4,10 +4,8 @@ import qs.config
 import qs.services
 import qs.settings
 
-// Settings -> Sound: where sound goes out and comes in, how loud each is, and
-// how loud each application is. The output side and the per-application
-// levels are the same functions the bar's audio panel uses; the input side is
-// the Settings window's own (Audio.audioSources, micVolume).
+// Settings -> Sound: outputs, inputs and per-app levels. Output and per-app use the bar's audio
+// panel functions; the input side is this page's own (Audio.audioSources, micVolume).
 Column {
     id: page
     spacing: 24
@@ -57,9 +55,8 @@ Column {
             }
         }
 
-        // While everything plays everywhere: each device's own level, under
-        // the volume above (which moves them all). The combined output isn't
-        // in the list -- PipeWire files it under filters, not devices.
+        // With All outputs on: each device's own level under the master. The combined output is not
+        // listed (PipeWire files it under filters).
         Repeater {
             model: Audio.allOutputs ? Audio.audioSinks : []
 

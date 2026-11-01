@@ -3,23 +3,11 @@ import QtQuick
 import Quickshell
 import Quickshell.Services.Notifications
 
-// Native notification daemon. Replaces the dunstctl calls the shell used to
-// make, which silently did nothing because dunst is not installed.
-//
-// Every notification goes to the centre (the bell in the control pill) and
-// stays there until it is cleared or the app withdraws it. A toast is only
-// how it arrives: when the toast times out the notification leaves the
-// screen, not the centre. Do not disturb keeps the toasts away (all but
-// Critical) and still files everything in the centre, quietly.
-//
-// The views read two ListModels of keys -- `model` (the centre) and `popups`
-// (the toasts) -- and look each key up with `get(key)`. They are changed a row
-// at a time, never replaced: a view built on a JS array rebuilt the whole list
-// on every change, so each new toast restarted every other toast's countdown
-// and entrance, and the centre's add/remove animations never played.
-//
-// Each notification keeps its own countdown (see Notif), so a toast's time
-// is its own whatever happens to the cards around it.
+// Native notification daemon. Everything goes to the centre (the control pill's bell) until
+// cleared or withdrawn; a toast is only how it arrives. Do not disturb keeps toasts away (all
+// but Critical). The views read two ListModels of keys (`model` for the centre, `popups` for
+// toasts), changed a row at a time: a JS array rebuilt every view on each change and restarted
+// every toast's countdown and entrance.
 Singleton {
     id: root
 
@@ -27,8 +15,7 @@ Singleton {
     property bool dnd: false
     function toggleDnd() { root.dnd = !root.dnd }
 
-    // Toasts on screen at once; the rest wait their turn, their five seconds
-    // not started until they show.
+    // Toasts on screen at once; the rest wait, their countdown not started until they show.
     readonly property int maxVisible: 4
     // How long a toast stays, in ms, counted while it shows and not hovered.
     readonly property int lifetime: 5000
@@ -65,14 +52,9 @@ Singleton {
         return -1
     }
 
-    // A toast that has had its time: off the screen, still in the centre.
-    //
-    // It leaves in two steps: marked `leaving`, its card animates out
-    // (NotificationPopups) and then calls finishLeave; only then does its row
-    // go. Removing the row at once destroyed the card on the spot, with no
-    // exit at all. A toast still waiting its turn (past the fourth) has no
-    // card on screen and goes straight away; and in case a card never gets
-    // to call back, a timer finishes the job.
+    // A toast that has had its time: off the screen, still in the centre. Marked `leaving` so
+    // its card animates out and calls finishLeave; a waiting toast goes at once, and a timer
+    // covers a card that never calls back.
     function expire(wrapper) {
         if (!wrapper) return
         wrapper.popup = false
@@ -108,8 +90,8 @@ Singleton {
         }
     }
 
-    // Up as a toast again (a new one, or one its app has just updated), its
-    // countdown starting afresh when it shows.
+    // Up as a toast again (new, or just updated by its app), its
+    // countdown restarting when it shows.
     function raise(wrapper) {
         if (!wrapper || wrapper.gone) return
         var quiet = root.centreOpen
@@ -130,8 +112,8 @@ Singleton {
 
     function markRead() { root.unread = 0 }
 
-    // Set while the centre is open: toasts would only repeat what is on it,
-    // on top of it -- the ones up go, and new ones arrive straight in.
+    // Set while the centre is open: toasts would repeat what it shows, so the ones
+    // up go and new ones go straight in.
     property bool centreOpen: false
     onCentreOpenChanged: {
         if (!root.centreOpen) return
@@ -141,8 +123,8 @@ Singleton {
         root.unread = 0
     }
 
-    // User-initiated close. Going through the daemon makes the sending app
-    // aware; onClosed then removes the wrapper.
+    // User-initiated close, through the daemon so the app hears of it;
+    // onClosed then removes the wrapper.
     function dismiss(wrapper) {
         if (!wrapper || wrapper.gone) return
         if (wrapper.notification) wrapper.notification.dismiss()
@@ -158,8 +140,8 @@ Singleton {
     // Removes a wrapper whose notification is already closed.
     function _drop(wrapper) {
         if (!wrapper || wrapper.gone) return
-        // A toast on screen leaves the way a timed-out one does, animated;
-        // the rest of the removal does not wait for it.
+        // A toast on screen leaves animated, like a timed-out one; the rest
+        // of the removal doesn't wait.
         var p = root.indexIn(root.popups, wrapper.key)
         if (p !== -1 && p < root.maxVisible && !wrapper.leaving) {
             wrapper.leaving = true
@@ -173,8 +155,7 @@ Singleton {
         var next = Object.assign({}, root.byKey)
         delete next[wrapper.key]
         root.byKey = next
-        // Later, so a view still showing its last frame of it is not left
-        // pointing at nothing mid-animation.
+        // Later, so a view still drawing its last frame is not left pointing at nothing.
         destroyLater.createObject(root, { target: wrapper })
     }
 
@@ -191,9 +172,8 @@ Singleton {
         }
     }
 
-    // One notification. The daemon's object can be freed once the app closes
-    // it, so the fields the views show are copied -- and copied again when the
-    // app replaces it with new text, which it does in place.
+    // One notification. The daemon's object can be freed once the app closes it, so the shown
+    // fields are copied, and copied again when the app replaces the text in place.
     component Notif: QtObject {
         id: wrapper
 
@@ -208,8 +188,8 @@ Singleton {
         // On its way off the screen: its card is animating out (see expire).
         property bool leaving: false
 
-        // Its toast's countdown, in Date.now() ms: when it runs out (0 until
-        // the toast first shows), and when a hover paused it (0 if not).
+        // Its toast's countdown, in Date.now() ms: when it runs out (0 until first
+        // shown), and when a hover paused it.
         property real expiresAt: 0
         property real pausedAt: 0
 
@@ -225,8 +205,8 @@ Singleton {
         readonly property Connections conn: Connections {
             target: wrapper.notification
             function onClosed() { root._drop(wrapper) }
-            // Replaced by its app (a download's progress, the next track):
-            // the new text, and the toast up again.
+            // Replaced by its app (a download's progress, the next track): new
+            // text, and the toast up again.
             function onSummaryChanged() { wrapper.copy(); root.raise(wrapper) }
             function onBodyChanged() { wrapper.copy(); root.raise(wrapper) }
             function onImageChanged() { wrapper.copy() }
@@ -259,8 +239,8 @@ Singleton {
             for (var i = 0; i < len; i++) {
                 var a = src[i]
                 if (!a) continue
-                // Bind the action object into the closure so invoking it later
-                // does not depend on the loop variable.
+                // Bind the action object into the closure, so invoking it later does not
+                // depend on the loop variable.
                 out.push({
                     identifier: a.identifier,
                     text: a.text,
@@ -308,8 +288,8 @@ Singleton {
                     root.model.remove(root.model.count - 1)
                     continue
                 }
-                // Dropped here and now: the app's "closed" comes back later,
-                // and the loop cannot wait for it.
+                // Dropped now: the app's "closed" comes back later, and the
+                // loop cannot wait for it.
                 if (old.notification) old.notification.dismiss()
                 root._drop(old)
             }

@@ -6,10 +6,8 @@ import qs.config
 import qs.desktop
 import qs.services
 
-// What fastfetch used to print in its terminal window, set as the control
-// panel's header sets the same facts: the user's picture and name, the host
-// and how long it has been up, then the system and the hardware under it as
-// label and value. The data is Settings -> About's (scripts/about.py).
+// What fastfetch used to print, set like the control panel's header: picture, name, host and
+// uptime, then the system and hardware as label and value (Settings -> About's data, about.py).
 WidgetCard {
     id: root
 
@@ -39,9 +37,8 @@ WidgetCard {
         onTriggered: uptimeFile.reload()
     }
 
-    // The vendor's boilerplate off the hardware names, which otherwise run
-    // past the card: "Intel(R) Core(TM) i7-10700F CPU @ 2.90GHz" is an
-    // i7-10700F to anyone reading it.
+    // Vendor boilerplate off the hardware names: "Intel(R) Core(TM) i7-10700F
+    // CPU @ 2.90GHz" is an i7-10700F.
     function shortCpu(s) {
         return (s || "").replace(/\(R\)|\(TM\)/g, "").replace(/\bCPU\b.*$/, "")
                         .replace(/^Intel\s+Core\s+/, "Core ").replace(/\s+/g, " ").trim()

@@ -4,19 +4,14 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
 
-// Monitors, for Settings -> Displays and Colour: modes, scale, layout, VRR,
-// vibrance and the colour filter, all through scripts/display_control.py.
-// Plus the keep-or-revert countdown after a mode or scale change.
+// Monitors, for Settings -> Displays and Colour: modes, scale, layout, VRR, vibrance and
+// the colour filter, all through scripts/display_control.py, plus the keep-or-revert
+// countdown after a mode or scale change.
 Singleton {
     id: root
 
-    // ── Display settings ─────────────────────────────────────────────────
-    //
-    // Everything the Settings window's Displays and Colour pages show comes
-    // from one script, because the three things it drives speak three
-    // different languages: hyprctl for modes and layout, nvibrant for
-    // saturation, hyprsunset for the colour matrix. Each command returns the
-    // whole snapshot, so the UI never has to ask twice.
+    // Display settings: one script drives hyprctl (modes, layout), nvibrant (saturation) and
+    // hyprsunset (colour matrix), and every command returns the whole snapshot.
     property var displayState: ({
         monitors: [], vibrance: ({}),
         colour: ({ temperature: 6000, brightness: 100, gamma: 1.0 }),
@@ -26,10 +21,8 @@ Singleton {
     readonly property string displayScript:
         Quickshell.env("HOME") + "/.config/quickshell/scripts/display_control.py"
 
-    // Queued, because there is one process and a command given while it is
-    // still busy used to be dropped without a word: setting `running` on a
-    // Process that is already running does nothing. Picking a resolution and
-    // then a scale straight after lost the scale.
+    // Queued: setting `running` on a busy Process does nothing, so a scale picked
+    // right after a resolution was lost.
     property var displayQueue: []
 
     function displayCmd(args) {
@@ -47,23 +40,15 @@ Singleton {
 
     function refreshDisplay()                  { displayCmd(["list"]) }
 
-    // What Settings -> Displays and Colour chose -- mode, position and scale
-    // per monitor, vibrance, the colour filter -- played back: nothing of it
-    // survives on its own (Hyprland re-reads its config, nvibrant resets with
-    // the driver, hyprsunset starts fresh), and the script saves every choice
-    // for exactly this. Once as the shell starts, which is the session
-    // starting, and again whenever a monitor is plugged back in. It answers
-    // with the whole state, like `list`.
+    // Plays back what Settings chose (mode, position, scale, vibrance, colour filter),
+    // since none of it survives on its own. At shell start and whenever a monitor is
+    // plugged back in; answers with the whole state.
     function restoreDisplay()                  { displayCmd(["restore"]) }
 
     Component.onCompleted: root.restoreDisplay()
 
-    // Monitors come and go -- a cable pulled, a screen that drops its link in
-    // standby -- and the list was only read when Settings opened, so an
-    // unplugged screen stayed on the Displays page. Read again whenever
-    // Hyprland says one was added or removed, once the burst of events a
-    // hotplug brings has settled; a monitor that arrived also gets its saved
-    // settings back.
+    // Re-read when Hyprland adds or removes a monitor, once the hotplug burst settles; an arriving
+    // monitor also gets its saved settings back.
     property bool hotplugAdded: false
 
     Connections {
@@ -90,12 +75,9 @@ Singleton {
         }
     }
 
-    // Focus the monitor the pointer is on. Used before spawning anything from
-    // the launcher: follow_mouse cannot do it while a layer surface holds the
-    // keyboard, so the first window would land on the previously focused
-    // screen. Straight to Hyprland's Lua, which knows the cursor's monitor:
-    // it went through display_control.py, and starting Python cost 80ms on
-    // every launch.
+    // Focus the pointer's monitor before the launcher spawns anything: follow_mouse
+    // can't while a layer holds the keyboard. Straight to Hyprland's Lua: going
+    // through Python cost 80ms per launch.
     function focusCursorMonitor() {
         Quickshell.execDetached(["hyprctl", "eval",
             "local m = hl.get_monitor_at_cursor(); if m then hl.dispatch(hl.dsp.focus({ monitor = m.name })) end"])
@@ -114,16 +96,9 @@ Singleton {
         displayCmd(["set-position", out, String(Math.round(x)), String(Math.round(y))])
     }
 
-    // ── Keep or revert ───────────────────────────────────────────────────
-    //
-    // A resolution or scale the screen cannot show leaves it black, and then
-    // there is no way to reach the control that would undo it. So those two
-    // are applied on approval: the new setting goes on at once, and unless it
-    // is kept within fifteen seconds the old one comes back -- the same
-    // safety every desktop's display settings have.
-    //
-    // Lives here rather than in the Settings page so the countdown survives
-    // the page, or the whole window, being closed with the question open.
+    // Keep or revert: a resolution or scale the screen cannot show leaves it black, so it
+    // reverts unless kept within fifteen seconds. Lives here so the countdown survives
+    // the Settings page or window closing.
     property var displayRevert: null      // { name, mode, scale }
     property int displayRevertLeft: 0
 
@@ -141,8 +116,7 @@ Singleton {
     function proposeDisplayMode(name, mode) {
         var m = root.monitorByName(name)
         if (!m) return
-        // Only the first change of a run is remembered: reverting should go
-        // back to what worked, not to the previous experiment.
+        // Only the first change of a run is remembered, so reverting goes back to what worked.
         if (!root.displayRevert || root.displayRevert.name !== name)
             root.displayRevert = root.remembrance(m)
         root.setDisplayMode(name, mode)
@@ -190,8 +164,8 @@ Singleton {
         try {
             root.displayState = JSON.parse(text)
         } catch (e) {
-            // A failed command still leaves the last good snapshot on screen,
-            // which beats blanking the panel on one bad parse.
+            // A failed command keeps the last good snapshot on screen
+            // rather than blanking the panel.
         }
     }
 

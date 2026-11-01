@@ -1,15 +1,7 @@
--- Reports the keybinds of a Hyprland Lua config as JSON, for the shell's
--- control panel.
---
--- The config is Lua, and its binds are built with locals, concatenation and
--- a `for` loop over the workspace keys -- none of which survive a regex. So
--- instead of parsing the file we *run* it against a stub `hl` table that
--- records calls and does nothing else. Whatever the file computes is what we
--- report, and it keeps working when the file is rewritten.
---
--- `hyprctl binds` cannot answer this: in Lua mode every bind reports the
--- dispatcher `__lua` with an opaque callback index, so it knows the keys but
--- not what any of them do.
+-- Reports the keybinds of a Hyprland Lua config as JSON, for the shell's keybinds sheet.
+-- The binds are built with locals, concatenation and loops, so the file is run against a
+-- stub `hl` table that records calls. `hyprctl binds` can't answer this: in Lua mode every
+-- bind reports the dispatcher `__lua`.
 
 local config_path = arg[1]
 if not config_path or config_path == "" then
@@ -20,17 +12,15 @@ local config_dir = config_path:match("^(.*)/[^/]*$") or "."
 
 -- ── Recording ────────────────────────────────────────────────────────────
 
--- Every bind and unbind in the order the config makes them, so a later
--- unbind/rebind (which is how HyprMod's generated file overrides SUPER+R)
--- resolves the same way Hyprland resolves it.
+-- Every bind and unbind in config order, so a later unbind/rebind (HyprMod overriding
+-- SUPER+R) resolves as Hyprland resolves it.
 local events = {}
 local includes = {}
 
 local Proxy = {}
 
--- Any `hl.*` path the config touches becomes a value that can be indexed
--- further and called: `hl.dsp.window.float({...})` records its path and
--- arguments rather than dispatching anything.
+-- Any `hl.*` path becomes a value that can be indexed and called:
+-- `hl.dsp.window.float({...})` records its path and arguments.
 local function proxy(path, args)
     return setmetatable({ _path = path, _args = args }, Proxy)
 end
@@ -82,9 +72,8 @@ local hl = setmetatable({}, {
 local env
 local loaded = {}
 
--- `require`/`dofile` resolve next to the entry file and run in the same
--- sandbox, so a config split across files (HyprMod's generated
--- hyprland-gui.lua being the usual one) is followed rather than missed.
+-- `require`/`dofile` resolve next to the entry file and run in the same sandbox, so split configs
+-- (HyprMod's hyprland-gui.lua) are followed.
 local function run_file(path, name)
     local chunk, err = loadfile(path, "t", env)
     if not chunk then error(err, 0) end
@@ -200,9 +189,8 @@ local function pretty_keyspec(spec)
     return table.concat(out, " + "), label
 end
 
--- Commands are matched on the whole string, not the first word: the file
--- manager bind runs `kitty --class yazi -e yazi`, whose leading binary says
--- "terminal" and whose point is yazi.
+-- Matched on the whole command, not the first word: `kitty --class yazi -e
+-- yazi` is yazi, not a terminal.
 local EXEC_RULES = {
     { "grimblast",                 "Screenshot" },
     { "yazi",                      "File manager" },
@@ -249,10 +237,8 @@ local function workspace_label(ws)
     return s, tonumber(s) ~= nil
 end
 
--- A bind that runs a Lua function says nothing about itself, so it is read
--- off the `description` the config gives it. "Go to workspace 3 of this
--- monitor" folds with its nine siblings like a dispatcher bind would, the
--- tail after the number carried over to the folded row.
+-- A bind running a Lua function is read off its `description`; numbered ones fold with
+-- their siblings like dispatcher binds.
 local function describe_function(opts)
     local text = opts and opts.description
     if type(text) ~= "string" or text == "" then
@@ -267,10 +253,8 @@ local function describe_function(opts)
     return { action = text, category = "Windows" }
 end
 
--- Returns a table: the action text, the raw command when there is one, the
--- category the bind belongs under, and -- for the numbered workspace binds --
--- a fold tag plus the workspace it targets, so the ten of them can collapse
--- into one row.
+-- Returns the action text, the raw command if any, the category, and for numbered workspace binds a
+-- fold tag plus the target workspace, so the ten collapse into one row.
 local function describe(action, bind_opts)
     if type(action) == "function" then return describe_function(bind_opts) end
     if not is_proxy(action) then return { action = "Custom action", category = "Windows" } end
@@ -382,9 +366,7 @@ end
 
 -- ── Resolve ──────────────────────────────────────────────────────────────
 
--- Replayed in file order: an unbind drops the binding made before it and a
--- rebind of the same key replaces it, so the effective set is what a HyprMod
--- override actually leaves behind.
+-- Replayed in file order: an unbind drops the earlier binding and a rebind replaces it.
 local resolved = {}
 local order = {}
 
@@ -493,9 +475,8 @@ local function jstr(s)
     end) .. '"'
 end
 
--- The keys the config points at this shell's cheatsheet. Reported
--- separately so the control panel can label its button with the live bind
--- instead of a combination hardcoded in the QML.
+-- The keys bound to this shell's cheatsheet, so the control panel labels
+-- its button with the live bind.
 local overlay_keys = nil
 for _, e in ipairs(entries) do
     if e.overlay then overlay_keys = e.keys end
@@ -518,11 +499,8 @@ for _, g in ipairs(grouped) do
         out[#out + 1] = (first_group and "" or ",") .. '{"name":' .. jstr(g.name) .. ',"binds":['
         first_group = false
         for i, b in ipairs(g.binds) do
-            -- The command is only carried for launchers, where "Terminal"
-            -- is a name for `kitty` and the reader may well want the other.
-            -- Elsewhere it restates the label: a row reading "Subir
-            -- volumen / wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ 5%+"
-            -- costs a line and says nothing new.
+            -- The command only for launchers, where "Terminal" names `kitty`;
+            -- elsewhere it restates the label.
             local cmd = g.name == "Applications" and b.command or nil
             out[#out + 1] = (i > 1 and "," or "")
                 .. '{"keys":' .. jstr(b.keys)

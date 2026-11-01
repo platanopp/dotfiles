@@ -2,16 +2,9 @@ import Quickshell
 import Quickshell.Wayland
 import QtQuick
 
-// Hot corner that brings the bar back while an app is fullscreen.
-//
-// A hidden bar has nothing to hover, so something has to stay behind to catch
-// the pointer. This sits at the top-right corner, where the cursor stops
-// against the screen edge, and grows to cover the whole bar strip once the bar
-// is up -- otherwise crossing a gap between two pills would drop the pointer
-// and collapse the bar again.
-//
-// It sits on the Top layer, below the pills on Overlay, so it never swallows a
-// click meant for them.
+// Hot corner that brings the bar back while an app is fullscreen: it sits at the top-right
+// corner and grows to the whole strip once the bar is up. On the Top layer, below the pills on
+// Overlay, so it never takes their clicks.
 PanelWindow {
     id: root
 
@@ -34,9 +27,8 @@ PanelWindow {
         right: true
     }
 
-    // Only ever the corner. Keeping it small means it can sit above the pills
-    // in the stack without taking anything from them, and once the bar is up
-    // the bar's own window handles the rest of the strip.
+    // Only ever the corner, so it never takes from the pills; once the bar is up
+    // its own window handles the strip.
     implicitWidth: 180
     implicitHeight: 6
 

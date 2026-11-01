@@ -4,20 +4,14 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
 
-// What the keybinds sheet lists: Hyprland's binds, read out of its Lua
-// config, and Yazi's, out of its keymap. Both files are watched, so the sheet
-// follows an edit.
+// What the keybinds sheet lists: Hyprland's binds from its Lua config and Yazi's from its keymap;
+// both files are watched, so the sheet follows an edit.
 Singleton {
     id: root
 
-    // ── Hyprland's binds ─────────────────────────────────────────────────
-    //
-    // Read out of the config file rather than `hyprctl binds`: with a Lua
-    // config every bind reports the dispatcher "__lua" and an opaque
-    // callback index, so the compositor can list the keys but cannot say
-    // what a single one of them does. scripts/hypr_binds.lua runs the config
-    // against a stub `hl` table instead, which gets the loops, the locals and
-    // any required file along with everything else.
+    // Hyprland's binds, read from the config: with Lua, `hyprctl binds` reports every
+    // dispatcher as "__lua". scripts/hypr_binds.lua runs the config against a stub `hl`
+    // table, loops and required files included.
     readonly property string hyprConfigPath: Quickshell.env("HOME") + "/.config/hypr/hyprland.lua"
 
     // [{ name, binds: [{ keys, action, command }] }]
@@ -25,9 +19,7 @@ Singleton {
     property int hyprBindCount: 0
     property string hyprBindsError: ""
 
-    // Keys the config points at this shell's cheatsheet, read back out of
-    // that config so the control panel's hint follows a rebind instead of
-    // repeating a combination written in the QML.
+    // The keys the config binds to this cheatsheet, so the control panel's hint follows a rebind.
     property string hyprOverlayKeys: ""
 
     function refreshHyprBinds() {
@@ -57,8 +49,7 @@ Singleton {
         }
     }
 
-    // An editor usually writes a config as a rename over the old inode, which
-    // can land as several events; the debounce collapses those into one read.
+    // An editor writing by rename can fire several events; the debounce makes them one read.
     Timer {
         id: hyprBindsDebounce
         interval: 400
@@ -73,12 +64,8 @@ Singleton {
         onFileChanged: hyprBindsDebounce.restart()
     }
 
-    // ── Yazi's binds ─────────────────────────────────────────────────────
-    //
-    // Its own reader and its own section in the sheet: yazi's keymap is TOML
-    // and most of what its keyboard does is compiled into the binary rather
-    // than written in any file, so nothing about it is shaped like the
-    // Hyprland side. See scripts/yazi_binds.py.
+    // Yazi's binds: its own reader (scripts/yazi_binds.py), since the keymap is TOML and
+    // most of yazi's keys are compiled in.
     property var yaziBindGroups: []
     property int yaziBindCount: 0
     property string yaziBindsError: ""
@@ -124,8 +111,8 @@ Singleton {
         onTriggered: root.refreshYaziBinds()
     }
 
-    // Second path to the same refresh: a rename-over can cost the watch above
-    // its inode, and this fires whenever Hyprland itself picks the file up.
+    // A second path to the same refresh: a rename can cost the watch its inode, and
+    // this fires when Hyprland reloads.
     Connections {
         target: Hyprland
 

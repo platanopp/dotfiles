@@ -32,11 +32,9 @@ DEFAULT_RE = re.compile(
     r'\s*desc\s*=\s*"(?P<desc>(?:[^"\\]|\\.)*)"'
 )
 
-# The defaults worth putting on a cheat sheet, keyed by the key sequence as
-# it is written in the config, with the label to show for it. A default whose
-# key is not here is skipped, and one that has disappeared from the binary is
-# skipped too -- so this can only ever show fewer things than yazi does,
-# never something yazi no longer supports.
+# The defaults worth a cheat sheet line, keyed by key sequence, with their labels.
+# Defaults not listed, or gone from the binary, are skipped, so this never shows
+# something yazi no longer supports.
 CURATED = {
     "<Enter>": ("Open · extract archives", "Files"),
     "o": ("Open", "Files"),

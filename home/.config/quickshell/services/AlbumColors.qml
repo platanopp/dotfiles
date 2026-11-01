@@ -4,13 +4,9 @@ import Quickshell
 import Quickshell.Io
 import qs.config
 
-// Dominant colour of the current track's artwork, for the spectrum ring.
-//
-// ColorQuantizer only reads local files -- pointed at an https URL it fails
-// with "No file name specified" -- and MPRIS art is usually remote, so the
-// cover is fetched to a cache file first. A singleton rather than a copy per
-// widget: with a bar on every monitor the same cover would otherwise be
-// downloaded once per screen.
+// Dominant colour of the current track's artwork, for the spectrum ring. ColorQuantizer
+// reads only local files, so remote MPRIS art is fetched to a cache file first; one
+// singleton so every bar shares one download.
 Singleton {
     id: root
 
@@ -21,23 +17,21 @@ Singleton {
 
     // Greys carry no identity, so a cover that quantises to one is ignored.
     readonly property real minSaturation: 0.2
-    // Album art is often darker than the panel wants; lift the pick clear of
-    // the glass without letting it go neon.
+    // Album art is often darker than the panel wants: lift the pick clear of
+    // the glass without going neon.
     readonly property real minValue: 0.72
     readonly property real maxSaturation: 0.85
 
     readonly property string cacheDir:
         (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/quickshell/album-art"
 
-    // Local art needs no download; anything else is cached under its own hash
-    // so a new cover gets a new path and the quantizer actually reloads.
+    // Local art needs no download; anything else is cached under its own hash,
+    // so a new cover gets a new path.
     readonly property bool artIsLocal: root.artUrl.indexOf("file://") === 0
     readonly property string localPath: {
         if (root.artUrl.length === 0) return ""
-        // decodeURIComponent porque un file:// es una URI y viene escapada:
-        // osu manda ".../osu%21/Songs/302447%20penoreri%20-%20..." y sin
-        // decodificar eso no es una ruta que exista en disco. Da igual para
-        // rutas sin escapar -- decodificar algo sin % no lo toca.
+        // A file:// art URL is percent-encoded (osu sends
+        // ".../osu%21/Songs/302447%20..."), so decode it to get a real path.
         if (root.artIsLocal) return decodeURIComponent(root.artUrl.substring(7))
         return root.cacheDir + "/" + Qt.md5(root.artUrl)
     }
@@ -56,21 +50,16 @@ Singleton {
             return
         }
 
-        // Set the arguments here rather than binding them: a binding is not
-        // guaranteed to have caught up with localPath at the moment the
-        // process starts, and a stale empty path sends curl to the wrong file.
+        // Arguments set here, not bound: a binding may not have caught up with
+        // localPath when the process starts.
         fetchProc.command = ["bash", "-c", root.fetchScript,
                              "bash", root.artUrl, root.localPath]
         fetchProc.running = true
     }
 
-    // url and path arrive as arguments rather than spliced into the script, so
-    // an odd character in a cover URL cannot become shell syntax. The empty
-    // guard matters: with no path, curl would write "./.part" into whatever
-    // directory the shell happens to be running from.
-    // Only prints a path once the file is really on disk, so a cover that
-    // fails to download leaves readyPath empty and the ring keeps the theme
-    // colour, instead of pointing the quantizer at a file that is not there.
+    // url and path arrive as arguments, never spliced into the script, so a cover URL cannot
+    // become shell syntax; the empty guard stops curl writing "./.part" into the cwd. Prints
+    // a path only once the file is on disk.
     readonly property string fetchScript:
         '[ -n "$1" ] && [ -n "$2" ] || exit 0;' +
         ' mkdir -p "$(dirname "$2")";' +

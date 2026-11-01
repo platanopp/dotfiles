@@ -29,9 +29,8 @@ CACHE = os.path.join(
     "quickshell", "wallpaper-thumbs",
 )
 WALLPAPERS = os.path.expanduser("~/Pictures/Wallpapers")
-# panelHeight caps at 520; 560 leaves a little headroom without paying for
-# pixels nothing samples. The parallax widens the image, it does not raise it,
-# so height is the only dimension that has to cover the panel.
+# panelHeight caps at 520; 560 leaves headroom. The parallax widens the image, not raises it,
+# so only height has to cover the panel.
 HEIGHT = 560
 QUALITY = 88
 EXTS = (".jpg", ".jpeg", ".png", ".webp")
@@ -59,10 +58,8 @@ def build(directory):
         if not os.path.exists(dst):
             try:
                 im = Image.open(src)
-                # draft() lets the JPEG decoder skip straight to a smaller
-                # scale instead of unpacking full resolution first. A no-op on
-                # PNG, which is why PNGs stay the slow case even here -- but
-                # this runs once per file, not on every open.
+                # draft() lets the JPEG decoder skip to a smaller scale; a no-op on PNG,
+                # but this runs once per file.
                 im.draft("RGB", (HEIGHT * 4, HEIGHT * 4))
                 im = im.convert("RGB")
                 w = max(1, round(im.width * HEIGHT / im.height))

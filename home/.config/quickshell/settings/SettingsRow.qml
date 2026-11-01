@@ -3,15 +3,9 @@ import QtQuick.Layouts
 import qs.components
 import qs.config
 
-// One setting: its badge, its name, and its control -- to the right, or
-// underneath when `stacked` (a slider, a row of chips: anything that wants the
-// card's full width). A description is allowed but kept to a short hint;
-// the badge and the name are meant to carry the row.
-//
-// Rows sit in a SettingsGroup, which tells each one where it falls in the
-// stack. The outer corners of a group are round and the corners where two
-// rows meet are nearly square, so a group reads as one block cut into strips
-// rather than as separate cards floating near each other.
+// One setting: badge, name and control, to the right or underneath when `stacked`; a description
+// is a short hint at most. Rows sit in a SettingsGroup: round outer corners, nearly square where
+// rows meet, so a group reads as one block.
 Rectangle {
     id: row
 
@@ -66,9 +60,8 @@ Rectangle {
             TintBadge {
                 visible: row.icon.length > 0
                 icon: row.icon
-                // Neutral: a badge on every row is a label, not a state. The
-                // row's tint still reaches its switch or slider, which is
-                // where "on" is shown.
+                // Neutral: a badge on every row is a label, not a state; "on" shows
+                // in the row's switch or slider.
                 tint: Theme.textSecondary
                 box: 32
             }

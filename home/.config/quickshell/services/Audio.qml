@@ -4,17 +4,13 @@ import Quickshell
 import Quickshell.Io
 import qs.config
 
-// Sound: the output's volume and mute, the microphone, the devices on either
-// side, and the per-app streams. wpctl and pactl do the work; `pactl
-// subscribe` says when anything changed, so the poll at the bottom is only a
-// safety net.
+// Sound: output volume and mute, the microphone, devices and per-app streams, via wpctl and pactl.
+// `pactl subscribe` reports changes, so the poll at the bottom is only a safety net.
 Singleton {
     id: root
 
-    // ── Output: volume and mute ──────────────────────────────────────────
-    //
-    // The default output's level and mute: the sound panel's slider, the
-    // scroll on the bar's sound icon, the media panel.
+    // Output: the default output's level and mute (the sound panel's slider, the bar
+    // icon's scroll, the media panel).
     property real volumePercent: 50
     property bool volumeMuted: false
 
@@ -28,8 +24,8 @@ Singleton {
         var clamped = Math.max(0, Math.min(100, Math.round(percent)))
         root.volumePercent = clamped
         volumeThrottle.pendingValue = clamped
-        // First move of a drag is sent straight away; the timer then rate
-        // limits the rest and delivers the last one. See volumeThrottle.
+        // The first move of a drag is sent at once; the timer rate-limits the rest and
+        // delivers the last (volumeThrottle).
         if (!volumeThrottle.running) {
             volumeThrottle.send()
             volumeThrottle.start()
@@ -46,9 +42,8 @@ Singleton {
                 var m = /Volume:\s*([\d.]+)/.exec(text)
                 var v = m ? Math.round(parseFloat(m[1]) * 100) : NaN
                 if (!volumeSetProc.running) root.volumeMuted = text.indexOf("MUTED") !== -1
-                // Mid-drag this reading is already out of date -- it was
-                // taken before the moves still in flight -- and applying it
-                // would drag the handle backwards under the pointer.
+                // Mid-drag this reading is already stale, and applying it would pull the
+                // handle back under the pointer.
                 if (volumeThrottle.running || volumeSetProc.running)
                     return
                 if (!isNaN(v)) root.volumePercent = v
@@ -61,16 +56,9 @@ Singleton {
         running: false
     }
 
-    // Dragging the volume slider calls setVolume() on every mouse move, and
-    // each one costs a process. This used to be a 150ms debounce that
-    // restart()ed on every move -- which never fires *during* a drag, only
-    // once the pointer stops, so the sound stayed put while the handle moved
-    // and only caught up at the end.
-    //
-    // A throttle instead: the first move is sent immediately, further moves
-    // at most one per interval, and the value the drag ended on is always
-    // sent -- the timer keeps running until what was sent matches what is
-    // pending, so the last move cannot be the one that gets dropped.
+    // A throttle, not a debounce: a restarting debounce never fired during a drag, so the
+    // sound lagged until release. The first move goes at once, then one per interval, and the
+    // timer runs until the last value is sent.
     Timer {
         id: volumeThrottle
         interval: 45
@@ -80,10 +68,8 @@ Singleton {
         property int sentValue: -1
 
         function send() {
-            // wpctl is quick, but a tick can still land on top of the
-            // previous one; Process ignores a command set while running, so
-            // sending now would be a silent no-op. Leave sentValue behind
-            // instead and the next tick retries.
+            // A tick can land while the previous wpctl still runs, and Process ignores a command
+            // set then; leave sentValue behind and the next tick retries.
             if (volumeSetProc.running)
                 return
             volumeSetProc.command = ["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", volumeThrottle.pendingValue + "%"]
@@ -100,9 +86,7 @@ Singleton {
         }
     }
 
-    // ── Output devices ───────────────────────────────────────────────────
-    //
-    // Where the sound goes, and which is the default.
+    // Output devices: where the sound goes, and which is the default.
     property var audioSinks: []
 
     function refreshAudioSinks() {
@@ -141,9 +125,8 @@ Singleton {
         running: false
     }
 
-    // One device's own level, under the default output's: with All outputs
-    // on, how loud each of them plays (Settings -> Sound). Throttled like
-    // the master slider, for the same reason.
+    // One device's own level (with All outputs on, Settings -> Sound),
+    // throttled like the master slider.
     function setSinkVolume(id, percent) {
         sinkVolumeThrottle.pendingId = String(id)
         sinkVolumeThrottle.pendingValue = Math.max(0, Math.min(150, Math.round(percent)))
@@ -193,12 +176,9 @@ Singleton {
         onTriggered: audioSinksProc.running = true
     }
 
-    // ── All outputs at once ──────────────────────────────────────────────
-    //
-    // Settings -> Sound: one combined output that plays through every device
-    // (scripts/audio_all_outputs.sh). It is a PipeWire module, gone whenever
-    // PipeWire is, so the choice is kept in ShellSettings and put back at
-    // start and after PipeWire restarts (audioEvents, below).
+    // All outputs at once (Settings -> Sound): a PipeWire module combining every device
+    // (audio_all_outputs.sh). It dies with PipeWire, so the choice lives in ShellSettings and is
+    // restored at start and after restarts.
     readonly property bool allOutputs: ShellSettings.audioAllOutputs
 
     function setAllOutputs(on) {
@@ -215,41 +195,29 @@ Singleton {
     Process {
         id: allOutputsProc
         running: false
-        // The device list and the volume then show the combined output (or
-        // the one it went back to) as the default.
+        // The device list and volume then show the combined output (or the one it
+        // went back to) as the default.
         onExited: {
             audioSinksProc.running = true
             if (!volumeGetProc.running) volumeGetProc.running = true
         }
     }
 
-    // ── Microphone ───────────────────────────────────────────────────────
-    //
-    // Mute, from the bar, the control panel, Settings and a global shortcut
-    // (shell.qml); each toggle answers with a sound.
+    // Microphone mute, from the bar, the control panel, Settings and a global
+    // shortcut; each toggle plays a cue.
     property bool micMuted: false
 
     function toggleMicMute() {
         micToggleProc.command = ["bash", "-c", "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"]
         micToggleProc.running = true
         root.micMuted = !root.micMuted
-        // Cued off the state we just moved to rather than off a re-read: the
-        // sound is the answer to the key press, and waiting for wpctl to be
-        // asked back would put it a poll behind the thing it is confirming.
+        // Cued off the new state rather than a re-read, so the sound isn't
+        // a poll behind the key press.
         root.playCue(root.micMuted ? "device-removed" : "device-added")
     }
 
-    // A short sound from the freedesktop theme, by name.
-    //
-    // device-added and device-removed are a rising and a falling pair, which
-    // is the distinction that matters here: muted or not has to be audible
-    // without looking, and two sounds that differ only in being sounds would
-    // not tell you which way the toggle went.
-    //
-    // Detached on purpose. The cue is 0.22s and the shortcut can be pressed
-    // again inside that, and the second press should be heard rather than
-    // cancelling the first -- which is what re-running a tracked Process
-    // would do.
+    // A short freedesktop sound: device-added/removed rise and fall, so the direction is audible.
+    // Detached, so a second press within the 0.22s cue is heard rather than cancelling the first.
     function playCue(name) {
         cueProc.command = ["bash", "-c",
             "exec setsid pw-play --volume=0.5 \"/usr/share/sounds/freedesktop/stereo/$1.oga\" >/dev/null 2>&1 &",
@@ -271,8 +239,7 @@ Singleton {
         }
     }
 
-    // Read once at start; pactl subscribe (audioEvents, below) keeps it
-    // current after that.
+    // Read once at start; pactl subscribe (audioEvents) keeps it current.
     Component.onCompleted: {
         micMutedProc.running = true
         if (root.allOutputs) root.applyAllOutputs(true)
@@ -283,10 +250,7 @@ Singleton {
         running: false
     }
 
-    // ── Input devices and the microphone's level ─────────────────────────
-    //
-    // For the Settings window's Sound page. The bar only ever needed mute;
-    // choosing the capture device and its level is new.
+    // Input devices and the microphone's level, for Settings -> Sound.
     property var audioSources: []
     property real micVolume: 100
 
@@ -341,25 +305,20 @@ Singleton {
     Process { id: audioSourceSetProc; running: false }
     Process { id: micVolumeSetProc; running: false }
 
-    // wpctl answers before PipeWire has moved the default, so the list is
-    // read again a moment later rather than straight away.
+    // wpctl answers before PipeWire moves the default, so re-read a moment later.
     Timer {
         id: audioSourcesRefresh
         interval: 400
         onTriggered: root.refreshAudioSources()
     }
 
-    // ── Per-app streams ──────────────────────────────────────────────────
-    //
-    // What each application is playing, for the per-app sliders in the
-    // sound panel, the media panel and Settings -> Sound.
+    // Per-app streams, for the per-app sliders in the sound panel, the media
+    // panel and Settings -> Sound.
     property var audioStreams: []
     property bool audioStreamsDragging: false
 
-    // The stream list is polled only while something is showing it, and more
-    // than one panel now does -- the audio panel and the media widget, once
-    // per monitor. A count rather than a flag, so the last one to close is
-    // the one that stops the polling.
+    // Polled only while something shows it (the audio panel, the media widget per monitor): a
+    // count, so the last to close stops it.
     property int audioStreamWatchers: 0
 
     function refreshAudioStreams() {
@@ -376,8 +335,7 @@ Singleton {
 
     function watchAudioStreams() {
         root.audioStreamWatchers++
-        // The first watcher opens onto whatever the list was when it last
-        // closed, so it is refreshed now instead of a poll interval later.
+        // The first watcher sees the list as it was when last closed, so refresh now.
         if (root.audioStreamWatchers === 1)
             root.refreshAudioStreams()
     }
@@ -386,19 +344,15 @@ Singleton {
         root.audioStreamWatchers = Math.max(0, root.audioStreamWatchers - 1)
     }
 
-    // "PipeWire ALSA [osu!]" is how a Wine game's stream is named; the part
-    // in brackets is the name worth showing.
+    // "PipeWire ALSA [osu!]" is how a Wine game's stream is named; the
+    // bracketed part is worth showing.
     function streamName(n) {
         var m = /\[(.+)\]\s*$/.exec(n || "")
         return m ? m[1] : (n || "Unknown")
     }
 
-    // Which sink input a media player is feeding.
-    //
-    // The script resolves this through the process that owns the MPRIS bus
-    // name, which is exact where it works. It does not work for a player
-    // whose stream has gone away -- a paused browser drops it -- so the
-    // caller has to handle a null.
+    // Which sink input a media player feeds, via the process owning its MPRIS bus name. Null when
+    // the stream has gone (a paused browser drops it).
     function streamForPlayer(player) {
         if (!player) return null
 
@@ -411,10 +365,8 @@ Singleton {
             }
         }
 
-        // Fallback for a player the bus lookup missed: match the names the
-        // two sides do agree on. Kept loose on purpose -- "Spotify" the
-        // MPRIS identity against "spotify" the node name -- and only used
-        // when the exact link found nothing.
+        // Fallback when the bus lookup missed: a loose name match ("Spotify"
+        // identity against "spotify" node).
         var keys = []
         var entry = (player.desktopEntry || "").toLowerCase()
         var identity = (player.identity || "").toLowerCase()
@@ -455,8 +407,7 @@ Singleton {
         running: false
     }
 
-    // The per-app sliders had the same trailing debounce as the master one,
-    // and the same symptom: an app's volume only moved once you let go.
+    // Throttled like the master slider: a debounce only moved the app's volume once you let go.
     Timer {
         id: streamVolumeThrottle
         interval: 45
@@ -502,10 +453,8 @@ Singleton {
         }
     }
 
-    // Volumes also move from outside this shell, so the list is re-read while
-    // anything is showing it. Paused mid-drag: a poll landing between a write
-    // and pactl catching up reports the old volume and snaps the slider back
-    // under the pointer.
+    // Re-read while shown, since volumes change from outside. Paused mid-drag, or a
+    // stale poll snaps the slider back.
     Timer {
         id: audioStreamsPollTimer
         interval: 1500
@@ -514,12 +463,8 @@ Singleton {
         onTriggered: if (!root.audioStreamsDragging) root.refreshAudioStreams()
     }
 
-    // ── Audio changes, as they happen ────────────────────────────────────
-    //
-    // `pactl subscribe` prints a line whenever a sink, source or stream
-    // changes; the volume and mute are read then, rather than asking wpctl
-    // every three seconds whether anything moved. A burst of events (a drag
-    // on a slider, an app starting) is read once.
+    // Audio changes as they happen: `pactl subscribe` prints a line per sink, source or stream
+    // change, and a burst (a slider drag, an app starting) is read once.
     Process {
         id: audioEvents
         running: true
@@ -558,15 +503,13 @@ Singleton {
         }
     }
 
-    // Belt and braces for the events above: a slow poll in case one is lost.
+    // A slow poll in case an event is lost.
     Timer {
         interval: 30000
         running: true
         repeat: true
         triggeredOnStart: true
-        // Volume only. CPU, memory, disk and temperature were polled here
-        // too, four processes every three seconds, for gauges that have since
-        // left the control panel and the clock; nothing reads them now.
+        // Volume only; the CPU, memory, disk and temperature gauges once polled here are gone.
         onTriggered: volumeGetProc.running = true
     }
 }

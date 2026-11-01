@@ -17,11 +17,9 @@ PanelWindow {
     screen: bar.screen
     visible: bar.trackTitle.length > 0
 
-    // Hidden by cutting input and drawing nothing, never by unmapping the
-    // window. Toggling visible destroys the layer surface, and Hyprland
-    // restacks it on the way back: the full-width bar came back above the
-    // pills and swallowed every click meant for them. The blur rule ignores
-    // pixels below 0.3 alpha, so a surface drawing nothing leaves no band.
+    // Hidden by cutting input and drawing nothing, never by unmapping: a remapped layer is
+    // restacked above the pills and swallowed their clicks. The blur rule ignores pixels
+    // under 0.3 alpha, so nothing shows.
     mask: bar.barHidden ? blankMask : stageMask
 
     Region {
@@ -36,8 +34,7 @@ PanelWindow {
         item: stage
     }
 
-    // Keeps the bar up while the pointer is on it; shell.qml folds these
-    // together with the reveal zone's own hover.
+    // Keeps the bar up while hovered; shell.qml folds these together with the reveal zone's hover.
     readonly property bool barHovered: barHover.hovered
 
     HoverHandler {
@@ -53,12 +50,11 @@ PanelWindow {
         top: true
         left: true
     }
-    // The content inside insets itself by 12, so the window sits back by
-    // that much and the drawn edge lands exactly on Hyprland's gap.
+    // The content insets by 12, so the window sits back that much and the
+    // drawn edge lands on Hyprland's gap.
     margins.top: Math.max(0, Hypr.gapTop - 12)
-    // contentArea insets by 12, so this leaves a 10px gap after the pill.
-    // Not animated here: the workspaces pill it follows animates its own
-    // width, and a second animation chasing that one only made this lag.
+    // contentArea insets by 12, leaving a 10px gap after the pill. Not animated: the workspaces
+    // pill animates its own width, and a second animation chasing it lagged.
     margins.left: bar ? bar.leftPillRight - 2 : 50
 
     property bool panelOpen: false
@@ -90,20 +86,14 @@ PanelWindow {
     // Cycling is pointless while a preferred player holds the widget.
     readonly property bool canCyclePlayer: playerCount > 1 && bar && !bar.playerLocked
 
-    // The sink input this player is feeding, when it has one, so the slider
-    // below moves the same number the audio panel shows for the app. Null
-    // for a player that dropped its stream -- a paused browser does -- which
-    // is why the slider falls back to the master rather than going dead.
-    //
-    // Read from the last known list even while the panel is shut, so opening
-    // it does not show the fallback for the moment before the first poll
-    // lands. A stale id is written to at worst once, and pactl ignores it.
+    // The sink input this player feeds, so the slider moves the number the audio panel shows for
+    // the app; null when the player dropped its stream (a paused browser), then the slider falls
+    // back to master. Read even while shut.
     readonly property var appStream: Audio.streamForPlayer(player)
     readonly property bool onAppVolume: appStream !== null
 
-    // Held across a drag: the poll is paused while the pointer is down, so
-    // this is the only thing that knows where the slider was left until
-    // pactl reports back.
+    // Held across a drag: the poll pauses while the pointer is down, so this alone
+    // knows where the slider was left.
     property real appStreamVolume: 0
     onAppStreamChanged: if (appStream) appStreamVolume = appStream.volume
 
@@ -119,13 +109,11 @@ PanelWindow {
         }
     }
 
-    // Only the open panel draws the slider, so only the open panel needs the
-    // list kept current.
+    // Only the open panel draws the slider, so only then is the list kept current.
     onPanelOpenChanged: {
         panelOpen ? Audio.watchAudioStreams() : Audio.unwatchAudioStreams()
-        // The pill's own cover and title: gone at once when the panel opens;
-        // back only once it has mostly shut, so they do not fade in over the
-        // panel's cover on its way out (see compactArt).
+        // The pill's cover and title: gone at once when the panel opens, back once it
+        // has mostly shut (see compactArt).
         if (panelOpen) {
             compactBack.stop()
             compactShown = false
@@ -142,12 +130,11 @@ PanelWindow {
         onTriggered: mediaWidgetItem.compactShown = true
     }
 
-    // The capture helper only runs while the ring is both on screen and
-    // moving, so nothing listens to the speakers in the background.
+    // The capture helper runs only while the ring is on screen and moving.
     readonly property bool wantSpectrum: panelOpen && !!bar && bar.isPlaying
 
-    // Hand the cover to the colour extractor. With a bar per monitor this is
-    // assigned several times with the same value, which the singleton ignores.
+    // Hands the cover to the colour extractor; the same value from every bar
+    // is ignored by the singleton.
     readonly property string artUrl: bar ? bar.trackArtUrl : ""
     onArtUrlChanged: AlbumColors.artUrl = artUrl
     onWantSpectrumChanged: wantSpectrum ? Spectrum.subscribe() : Spectrum.unsubscribe()
@@ -181,8 +168,8 @@ PanelWindow {
 
     // The compact pill's inside: its 64px box less the 12px inset each side.
     readonly property int compactInner: 40
-    // How long the pill's own cover and title wait, when the panel closes,
-    // before fading back in (see compactArt).
+    // How long the pill's cover and title wait after the panel closes before
+    // fading back in (see compactArt).
     readonly property int compactDelay: 130
 
     function loopIcon() {
@@ -201,10 +188,8 @@ PanelWindow {
         targetWidth: mediaWidgetItem.panelOpen ? 396
                    : mediaWidgetRow.implicitWidth + 24 + 74 + Theme.pillPaddingH
         targetHeight: mediaWidgetItem.panelOpen ? Math.min(mediaContentColumn.implicitHeight + 60, 640) : 64
-        // Sized once for the open panel and never resized, as the status
-        // pill is. Dropping from the panel's height to the pill's when the
-        // panel had shut left one frame with nothing drawn: the whole pill
-        // blinked out as it came to rest. Input stays on the box (stageMask).
+        // Sized once for the open panel and never resized: shrinking to the pill's height left one
+        // blank frame. Input stays on the box (stageMask).
         minWindowWidth: 396
         minWindowHeight: 640
     }
@@ -221,8 +206,8 @@ PanelWindow {
         Rectangle {
             id: mediaGlass
             anchors.fill: parent
-            // The panel's radius is the cover's (heroMask), so the cover's
-            // corners sit exactly in the glass's; the pill is round-ended.
+            // The panel's radius is the cover's (heroMask), so their corners
+            // match; the pill is round-ended.
             radius: mediaWidgetItem.panelOpen ? Theme.radiusXLarge : mediaWidgetItem.compactInner / 2
             color: Theme.glass
             visible: false
@@ -244,23 +229,16 @@ PanelWindow {
             autoPaddingEnabled: true
         }
 
-        // ── Compact pill ─────────────────────────────────────────────────
-        //
-        // The cover fills the pill's left end, full height and following
-        // its rounded edge, and fades out into the glass towards the title.
-        // Paused, the cover steps back under a pause mark.
+        // Compact pill: the cover fills its left end and fades into the glass towards
+        // the title; paused, it steps back.
         Item {
             id: compactArt
             anchors.left: parent.left
             anchors.top: parent.top
-            // Only the pill's end: the cover has faded to nothing before the
-            // title starts, so a pale cover never sits under the text.
+            // Only the pill's end, so a pale cover never sits under the text.
             width: 70
-            // The pill's height, not the box's. Filling the box, the cover
-            // and the title came back at the height of the panel still
-            // closing around them: a tall stretched strip with the title
-            // riding up its middle, and the cover's layer, a frame behind
-            // the size, left hanging below the glass.
+            // The pill's height, not the box's: filling the box, the cover and title
+            // came back stretched while closing.
             height: mediaWidgetItem.compactInner
             visible: opacity > 0
             opacity: mediaWidgetItem.compactShown ? 1 : 0
@@ -271,10 +249,8 @@ PanelWindow {
 
             readonly property bool hasArt: coverImage.status === Image.Ready
 
-            // Rounded on the left only, following the pill's end: the
-            // rectangle runs twice as wide and is cut off at this item's edge
-            // (the mask is taken at this item's size), so its right-hand
-            // corners never show and the cover fades out straight.
+            // Rounded on the left only: twice as wide and cut at this item's edge, so
+            // the cover fades out straight.
             Item {
                 id: coverMask
                 anchors.fill: parent
@@ -303,9 +279,8 @@ PanelWindow {
                 visible: false
             }
 
-            // OpacityMask, not MultiEffect's mask: MultiEffect thresholds
-            // the mask, and would cut the gradient to a hard edge (or, set
-            // soft, not cut at all). This takes the gradient's alpha as it is.
+            // OpacityMask, not MultiEffect's mask: MultiEffect thresholds the mask
+            // and would cut the gradient hard.
             OpacityMask {
                 anchors.fill: parent
                 visible: compactArt.hasArt
@@ -359,7 +334,7 @@ PanelWindow {
         RowLayout {
             id: mediaWidgetRow
             anchors.left: parent.left
-            // Centred on the pill (compactArt), not the box: see compactArt.
+            // Centred on the pill (compactArt), not the box.
             anchors.verticalCenter: compactArt.verticalCenter
             // The title starts where the cover has gone.
             anchors.leftMargin: 74
@@ -376,8 +351,8 @@ PanelWindow {
 
                 Item {
                     id: titleMarquee
-                    // As wide as the title, up to the cap. A fixed 180 left a
-                    // short title ("Remember Me") beside an empty strip.
+                    // As wide as the title, up to the cap: a fixed 180 left a short
+                    // title beside an empty strip.
                     width: Math.min(titleText.implicitWidth, 180)
                     height: titleText.implicitHeight
                     clip: true
@@ -390,25 +365,16 @@ PanelWindow {
                         font.bold: true
                         font.family: Theme.fontText
 
-                        // An animation on a property leaves that property
-                        // wherever it stopped, and this one stops whenever a
-                        // title is short enough not to need scrolling. So a
-                        // long title that had scrolled left, followed by a
-                        // short one, drew the short one off the clipped edge:
-                        // the track was playing and its name was simply not
-                        // there. Both handlers are needed -- one for the title
-                        // changing under a stopped animation, one for the
-                        // animation stopping because the new title fits.
+                        // The marquee leaves x where it stopped, so a short title after a scrolled
+                        // long one drew off the edge. Both handlers: a title change under a stopped
+                        // animation, and the animation stopping because it fits.
                         onTextChanged: {
                             x = 0
                             marquee.restart()
                         }
 
-                        // Scrolls twice when the track starts and then rests
-                        // at the start; again while the pointer is on the
-                        // pill. It used to scroll for as long as the song
-                        // played -- the window redrawing every frame, all
-                        // song long, for a title nobody was reading.
+                        // Scrolls twice when the track starts, then rests; again on hover.
+                        // Scrolling all song long redrew every frame.
                         readonly property bool overflows: titleText.implicitWidth > titleMarquee.width
                         readonly property bool hovered: mediaWidgetItem.barHovered
 
@@ -481,22 +447,17 @@ PanelWindow {
             onTriggered: if (mediaWidgetItem.player) mediaWidgetItem.currentPosition = mediaWidgetItem.player.position
         }
 
-        // ── Expanded panel ───────────────────────────────────────────────
-        //
-        // The cover across the top of the panel, edge to edge under the
-        // glass's rounded corners, fading down into it. The spectrum rises
-        // from where it fades; the title and the rest start below, where the
-        // picture has gone -- the same rule as the pill: no text on the cover.
-        // Cut to the box: closing, the box shrinks past the cover's 230px
-        // well before the cover has faded, and it hung out below the glass.
+        // Expanded panel: the cover across the top, fading down; the spectrum rises from
+        // the fade and the text starts below it. Clipped to the box, or the 230px cover
+        // hung below the glass while closing.
         Item {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
             height: Math.min(hero.height, parent.height)
             clip: true
-            // hero.opacity, not hero.visible: a child's visible is false while
-            // its parent is hidden, and this would never show again.
+            // hero.opacity, not hero.visible: a child's visible is false
+            // while its parent is hidden.
             visible: hero.opacity > 0
 
             Item {
@@ -567,9 +528,8 @@ PanelWindow {
                     size: 44
                 }
 
-                // The spectrum: bars across the width, rising from where the
-                // cover fades out, in the album's colour. Mirrored about the
-                // middle, low bands at the centre.
+                // The spectrum: bars from where the cover fades, in the album colour,
+                // mirrored with the low bands centred.
                 Row {
                     id: bars
                     anchors.horizontalCenter: parent.horizontalCenter
@@ -593,8 +553,8 @@ PanelWindow {
                         Rectangle {
                             required property int index
                             readonly property real level: bars.level(index)
-                            // Not readonly: Behavior smooths the step between the
-                            // helper's frames.
+                            // Not readonly: a Behavior smooths the step between
+                            // the helper's frames.
                             property real len: 2 + level * 34
 
                             anchors.bottom: parent.bottom
@@ -771,10 +731,8 @@ PanelWindow {
                         onTapped: mediaWidgetItem.player.previous()
                     }
 
-                    // Play sits in a filled circle, as the primary action. In
-                    // the text colour, not the accent: the accent here marks
-                    // state (how far along, which toggles are on), and a play
-                    // button is there whether anything is on or not.
+                    // Play in a filled circle, the primary action. Text colour, not accent:
+                    // the accent marks state here.
                     Rectangle {
                         Layout.preferredWidth: 48
                         Layout.preferredHeight: 48
@@ -823,19 +781,9 @@ PanelWindow {
                     }
                 }
 
-                // This player's own volume -- the very slider the audio
-                // panel shows for the app, writing to the same sink input.
-                //
-                // It drove the master volume before, which was at least one
-                // number rather than two, but it meant turning the music down
-                // also turned down everything else. It cannot drive the MPRIS
-                // volume either: for Spotify that is a third quantity again,
-                // reading 0.72 while its stream sat at 0.69.
-                //
-                // So the widget finds the app's stream and moves that. The
-                // panel's slider for the same app is then the same slider,
-                // and neither has to be told when the other moves: both read
-                // the one list Audio polls.
+                // This player's own volume: the same sink input as the audio panel's
+                // slider for the app. Not the master (it turned everything down) nor MPRIS
+                // volume (a third number for Spotify).
                 RowLayout {
                     width: parent.width
                     spacing: 10
@@ -853,19 +801,14 @@ PanelWindow {
                         live: true
                         from: 0; to: 100; step: 1
                         value: mediaWidgetItem.shownVolume
-                        // The list is polled on a timer, and a poll that lands
-                        // between the write and pactl catching up reports the
-                        // old volume -- the slider jumping backwards under the
-                        // pointer. Held off for the length of the drag, the
-                        // same way the audio panel's sliders do it.
+                        // A poll between the write and pactl catching up reports the old volume, so
+                        // polling holds off during the drag.
                         onDraggingChanged: Audio.audioStreamsDragging = dragging
                         onMoved: v => mediaWidgetItem.setShownVolume(v / 100)
                     }
 
-                    // Says which volume this is. A player that has dropped
-                    // its stream has no per-app level left to show, and the
-                    // row falls back to the master rather than to nothing --
-                    // worth saying, since the two behave differently.
+                    // Says which volume this is: a player without a stream
+                    // falls back to the master.
                     Text {
                         text: Math.round(mediaWidgetItem.shownVolume) + "%"
                             + (mediaWidgetItem.onAppVolume ? "" : " · system")
@@ -903,8 +846,8 @@ PanelWindow {
                                 if (!mediaWidgetItem.player) return ""
                                 var entry = mediaWidgetItem.player.desktopEntry || ""
                                 var name = (mediaWidgetItem.player.identity || "").toLowerCase()
-                                // Same guessing the audio panel does: the entry
-                                // name and the theme's icon name often differ.
+                                // Same guessing as the audio panel: entry names and
+                                // icon names often differ.
                                 return Audio.resolveAppIcon([entry, name, name + "-browser",
                                                                 name.split(" ").pop()])
                             }
@@ -931,7 +874,7 @@ PanelWindow {
                         IconGlyph {
                             visible: mediaWidgetItem.canCyclePlayer
                             // Swap, not a chevron: the tap moves to the next
-                            // player, it opens no list.
+                            // player and opens no list.
                             text: "󰓡"
                             color: Theme.textMuted
                             size: Theme.iconSmall

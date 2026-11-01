@@ -38,10 +38,8 @@ def read(path):
 
 
 def write(path, text):
-    # Written beside and renamed over, so a crash halfway never leaves a
-    # truncated config -- and given the original's mode first: a fresh file
-    # comes out 644, and idle-screens.sh is run directly by hypridle, so
-    # losing its executable bit silently stops the screens ever going off.
+    # Written beside and renamed over, keeping the original's mode: idle-screens.sh is run directly
+    # by hypridle, so losing its executable bit would silently stop the screens going off.
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as fh:
         fh.write(text)
@@ -66,9 +64,8 @@ def timeout_of(text, marker):
 
 
 def set_timeout(marker, seconds):
-    # Every listener running it: the screens go off by two at the same
-    # timeout, one for while the session is unlocked and one for behind the
-    # lock. From the last, so the earlier matches keep their offsets.
+    # Every listener running it: two share the screens-off timeout (unlocked and locked). From the
+    # last, so the earlier matches keep their offsets.
     text = read(CONF)
     blocks = [m for m in BLOCK.finditer(text) if marker in m.group(0)]
     if not blocks:
@@ -86,9 +83,8 @@ def restart_hypridle():
         if subprocess.run(["pgrep", "-x", "hypridle"], capture_output=True).returncode != 0:
             break
         time.sleep(0.05)
-    # Through Hyprland rather than spawned from here, so it belongs to the
-    # compositor's session the same way the one started at login does -- and
-    # does not die with whatever process asked for the restart.
+    # Through Hyprland, so it belongs to the compositor's session like the one started at login and
+    # doesn't die with the process that asked.
     subprocess.run(
         ["hyprctl", "eval",
          'hl.dispatch(hl.dsp.exec_cmd("hypridle > $HOME/.local/state/hypridle.log 2>&1"))'],

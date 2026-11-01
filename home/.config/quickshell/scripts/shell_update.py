@@ -123,9 +123,8 @@ def ignored(paths):
     return {line[len(IN_REPO) + 1:] for line in r.stdout.splitlines()}
 
 
-# What the repository keeps wherever a path into the publisher's home folder
-# was (its sync.sh puts it there). Spelled in two pieces: whole, it would be
-# filled in here too, by install.sh and by this very updater.
+# What the repository holds where a path into the publisher's home was (sync.sh puts it there).
+# Spelled in two pieces, or install.sh and this updater would fill it in here too.
 HOME_TOKEN = ("@" + "HOME@").encode()
 
 
@@ -269,9 +268,8 @@ def update(source, branch, backup_repo):
     for rel in changed:
         dst = os.path.join(LIVE, rel)
         os.makedirs(os.path.dirname(dst), exist_ok=True)
-        # Written beside and renamed over, so the running shell never reads a
-        # half-copied file when it reloads. The mode comes along: the scripts
-        # are run as programs.
+        # Written beside and renamed over, so a reloading shell never reads a
+        # half-copied file; the mode comes along.
         with open(dst + ".update-tmp", "wb") as f:
             f.write(published(rel))
         shutil.copymode(os.path.join(CACHE, IN_REPO, rel), dst + ".update-tmp")
@@ -288,9 +286,8 @@ def update(source, branch, backup_repo):
 
 
 def restart():
-    # Detached into a session of its own: the shell that ran this is about to
-    # be stopped, and takes its children with it. A file-by-file reload is not
-    # enough after an update -- widgets loaded by URL keep their old code.
+    # Detached into its own session: the shell that ran this is about to stop and takes its
+    # children. A full restart, since widgets loaded by URL keep old code across a reload.
     subprocess.Popen(["sh", "-c", "sleep 1; pkill -x quickshell; pkill -x qs; "
                       "while pgrep -x quickshell >/dev/null || pgrep -x qs >/dev/null; do sleep 0.2; done; "
                       "setsid -f quickshell >/dev/null 2>&1"],

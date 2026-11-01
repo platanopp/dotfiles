@@ -7,11 +7,8 @@ import qs.components
 import qs.config
 import qs.services
 
-// The notification centre: what the bell in the control pill opens. Every
-// notification that arrived and has not been cleared, newest first -- a
-// toast timing out moves it off the screen, not out of here (see
-// Notifications). Tap a card to run its default action; the cross clears
-// it. Do not disturb is switched from the header.
+// The notification centre the control pill's bell opens: everything not cleared, newest first. Tap
+// a card to run its default action, the cross clears it; do not disturb is in the header.
 Item {
     id: centre
 
@@ -54,7 +51,7 @@ Item {
         anchors.fill: parent
         spacing: 14
 
-        // ── Header ───────────────────────────────────────────────────────
+        // Header
         RowLayout {
             id: header
             Layout.fillWidth: true
@@ -113,7 +110,7 @@ Item {
             }
         }
 
-        // ── Nothing here ─────────────────────────────────────────────────
+        // Nothing here
         Column {
             id: empty
             visible: Notifications.count === 0
@@ -137,7 +134,7 @@ Item {
             }
         }
 
-        // ── The list ─────────────────────────────────────────────────────
+        // The list
         ListView {
             id: list
             visible: Notifications.count > 0

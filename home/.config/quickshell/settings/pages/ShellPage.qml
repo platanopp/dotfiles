@@ -4,9 +4,8 @@ import qs.config
 import qs.services
 import qs.settings
 
-// Settings -> Shell: how the bar, the clock and the lock screen behave --
-// choices that used to be written into the code. Kept in
-// ~/.config/quickshell/shell-settings.json (see ShellSettings).
+// Settings -> Shell: how the bar, the clock and the lock screen behave, kept in
+// shell-settings.json (ShellSettings).
 Column {
     id: page
     spacing: 24

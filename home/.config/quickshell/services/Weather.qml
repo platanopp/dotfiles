@@ -3,11 +3,8 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Current conditions plus a 7-day forecast from Open-Meteo.
-//
-// The location is resolved from the public IP, which means one request to
-// ip-api.com per refresh. Set latitude/longitude below to pin a place and skip
-// that lookup entirely.
+// Current conditions and a 7-day forecast from Open-Meteo. The location comes from the public IP
+// (one ip-api.com request per refresh); set latitude/longitude below to pin a place and skip it.
 Singleton {
     id: root
 

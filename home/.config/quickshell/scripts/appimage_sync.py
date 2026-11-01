@@ -42,9 +42,8 @@ APPS_DIR = os.path.join(HOME, "Applications")
 DESKTOP_DIR = os.path.join(HOME, ".local/share/applications")
 ICON_DIR = os.path.join(HOME, ".local/share/icons/hicolor")
 STATE_DIR = os.path.join(HOME, ".local/state/appimage-sync")
-# AppImages found to have a .desktop of their own by name, with the stamp of
-# the file then: looking inside one costs a second, and it would otherwise
-# be paid on every change to the folder.
+# AppImages known to ship their own .desktop, with the file stamp then:
+# looking inside one costs a second.
 SKIP_FILE = os.path.join(STATE_DIR, "covered.json")
 MARK = "X-AppImage-Sync"
 PREFIX = "appimage-"
@@ -234,9 +233,8 @@ def main():
 
     added, removed, mime = [], [], False
 
-    # Covered by a .desktop someone else wrote: by what it runs, or by name.
-    # One whose AppImage in ~/Applications is gone is dead -- it would sit in
-    # the launcher opening nothing -- and goes with it, hand-made or not.
+    # Covered by someone else's .desktop, by what it runs or by name. One whose AppImage is gone
+    # is dead and goes too, hand-made or not.
     covered_progs = set()
     covered_names = set()
     apps_prefix = os.path.realpath(APPS_DIR) + os.sep

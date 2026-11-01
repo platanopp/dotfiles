@@ -10,13 +10,9 @@ import qs.components
 import qs.config
 import qs.services
 
-// Toasts: how a notification arrives. They stack under the right-hand end of
-// the bar, in the bar's glass, as wide as the control panel they sit under.
-// Each shows for five seconds -- the line along its foot runs down to show
-// how long is left -- and then leaves the screen for the centre (the bell),
-// not for good. Hovering or dragging holds it; the cross or a drag to the
-// right sends it on at once; tapping it does what the notification is for.
-// Critical ones stay until dealt with, and have no line.
+// Toasts: how a notification arrives, stacked under the bar's right end in its glass. Five seconds
+// each (the line along the foot shows what's left), then off to the centre; hover or drag holds it,
+// the cross or a drag right sends it on, a tap runs it. Critical ones stay until dealt with.
 PanelWindow {
     id: popups
 
@@ -26,8 +22,8 @@ PanelWindow {
     readonly property int cardWidth: 372 - 24
     readonly property int lifetime: Notifications.lifetime
 
-    // What a card shows for the instant between its notification closing and
-    // the card going, so no binding reads a field of nothing.
+    // What a card shows between its notification closing and the card going, so no
+    // binding reads a field of nothing.
     readonly property var emptyNotif: ({ summary: "", body: "", appName: "", appIcon: "", image: "",
                                          actions: [], urgency: NotificationUrgency.Normal,
                                          invoke: function () {} })
@@ -40,14 +36,12 @@ PanelWindow {
         top: true
         right: true
     }
-    // Under the bar's pills by the same gap the pills keep between each
-    // other, the right edge in line with theirs. The 12 is the inset every
-    // surface here draws its content at.
+    // Under the pills by the gap they keep between each other, right edge in
+    // line; 12 is the content inset.
     margins.top: Hypr.gapTop + 40 + 10 - 12
     margins.right: Hypr.gapRight - 12
 
-    // One stack per screen would show the same notification on every monitor,
-    // so only the focused one draws it.
+    // Only the focused monitor draws the stack, or every monitor would show the same notification.
     readonly property bool onFocusedMonitor: {
         if (!bar || !bar.monitor) return false
         var focused = Hyprland.focusedMonitor
@@ -57,8 +51,7 @@ PanelWindow {
     visible: Notifications.popups.count > 0 && onFocusedMonitor
     color: "transparent"
 
-    // A fixed size, never animated: a surface that resizes every frame
-    // stutters (see PillStage). The stack moves inside; input is kept to it.
+    // A fixed size, never animated (see PillStage); the stack moves inside, input is kept to it.
     implicitWidth: cardWidth + 24
     implicitHeight: screen ? Math.min(screen.height - 120, 820) : 700
 
@@ -85,8 +78,8 @@ PanelWindow {
                 id: card
                 required property int key
                 required property int index
-                // Held on to: an app closing its notification drops it from
-                // Notifications at once, and the card still has to leave.
+                // Held: an app closing its notification drops it from Notifications at once,
+                // and the card still has to leave.
                 property var live: null
                 readonly property var current: Notifications.get(card.key)
                 onCurrentChanged: if (card.current) card.live = card.current
@@ -96,20 +89,16 @@ PanelWindow {
                 }
                 readonly property var n: card.live || popups.emptyNotif
 
-                // Only the newest few show; the rest wait, their time not yet
-                // running (see the countdown).
+                // Only the newest few show; the rest wait with their time not running.
                 readonly property bool shown: card.index < Notifications.maxVisible && card.live !== null
                 visible: card.shown
                 width: popups.cardWidth
-                // Collapses to nothing on the way out, so the cards below
-                // slide up into its place instead of jumping.
+                // Collapses on the way out, so the cards below slide up instead of jumping.
                 property real collapse: 1
                 height: (card.shown ? glass.height : 0) * card.collapse
 
-                // ── Leaving ─────────────────────────────────────────────────
-                //
-                // Off to the right and fading, then the space it took closes;
-                // then Notifications drops the row (finishLeave).
+                // Leaving: off to the right and fading, then its space closes; then
+                // Notifications drops the row (finishLeave).
                 readonly property bool leaving: !!card.live && card.live.leaving
                 onLeavingChanged: {
                     if (card.leaving) exit.restart()
@@ -138,13 +127,9 @@ PanelWindow {
                     return null
                 }
 
-                // ── Its own time ────────────────────────────────────────────
-                //
-                // Kept on the notification (expiresAt), not in this card: the
-                // card can be rebuilt, the time cannot be restarted by it. It
-                // starts when the toast first shows, stops while the pointer
-                // is on it or it is being dragged -- the pause is added to its
-                // end -- and when it runs out the toast leaves for the centre.
+                // Its own time, kept on the notification (expiresAt) so a rebuilt card can't
+                // restart it. Starts when first shown, pauses while hovered or dragged, and on
+                // running out the toast leaves for the centre.
                 readonly property bool held: hover.hovered || drag.active
                 property real remaining: 1
 
@@ -199,8 +184,7 @@ PanelWindow {
                     }
                 }
 
-                // Drag right past a third of the card to send it on, like the
-                // cross.
+                // Drag right past a third of the card to send it on, like the cross.
                 DragHandler {
                     id: drag
                     target: card
@@ -223,7 +207,7 @@ PanelWindow {
                     easing.type: Easing.OutCubic
                 }
 
-                // ── The glass, as the bar's pills have it ───────────────────
+                // The glass, as the bar's pills have it
                 Rectangle {
                     id: glass
                     width: parent.width
@@ -386,11 +370,8 @@ PanelWindow {
                     }
                 }
 
-                // ── Time left ───────────────────────────────────────────────
-                //
-                // Along the foot of the card, running down from full to
-                // nothing over the five seconds; it holds while the pointer is
-                // on the card.
+                // Time left, along the foot: runs down over the five seconds
+                // and holds while hovered.
                 Rectangle {
                     visible: !card.sticky
                     anchors.left: glass.left

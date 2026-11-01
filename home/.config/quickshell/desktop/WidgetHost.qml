@@ -1,13 +1,9 @@
 import QtQuick
 import qs.services
 
-// One desktop widget of a given kind, at the size its kind is laid out for
-// times `size`. The desktop layer, the picker's editable copies, its previews
-// and the one being dragged out are all this, so they are the same drawing.
-//
-// The widget is laid out at its kind's own size and scaled as a whole, never
-// laid out bigger: the text is drawn from distance fields and the rest are
-// rectangles, so it stays sharp at any size the picker allows.
+// One desktop widget, laid out at its kind's size and scaled by `size` as a whole
+// (distance-field text stays sharp). The desktop, the picker's copies, its previews
+// and the dragged one are all this.
 Item {
     id: host
 

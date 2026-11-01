@@ -1,28 +1,16 @@
 #!/usr/bin/env bash
 # Records a monitor until it is sent SIGINT.
 #
-#   screen_record.sh [--monitor NAME] [--height native|2160|1440|1080|720]
-#                    [--fps N] [--quality medium|high|very_high|ultra]
-#                    [--codec h264|hevc] [--audio none|system|mic|both]
-#                    [--cursor yes|no] [--dir FOLDER]
+# screen_record.sh [--monitor NAME] [--height native|2160|1440|1080|720]
+#                  [--fps N] [--quality medium|high|very_high|ultra]
+#                  [--codec h264|hevc] [--audio none|system|mic|both]
+#                  [--cursor yes|no] [--dir FOLDER]
 #
-# Everything has a default (the monitor in use, 1080p, 60 fps, very high,
-# H.264, the computer's sound, ~/Videos/Recordings); Settings -> Recording
-# picks them (ShellSettings, passed in by Recorder.startRecording).
-#
-# Prints the file it writes to as its first line, then becomes the recorder
-# (exec), so the SIGINT the shell sends to stop it reaches
-# gpu-screen-recorder itself -- which is what makes it finish the file.
-#
-# gpu-screen-recorder, not wf-recorder or OBS: it encodes on the GPU (NVENC
-# on this RTX 3060), so a recording costs next to no CPU and nothing a game
-# would notice. Always MP4 at a constant frame rate (-fm cfr): what editors
-# and phones expect, where a variable rate stutters.
-#
-# And with the index at the front (movflags=faststart; "+faststart" makes the
-# recorder fail to write the header). Written at the end, as it is by
-# default, a browser's player -- Discord's, WhatsApp's -- cannot start until
-# it has the whole file, and an uploaded clip sat at 0:00 and would not play.
+# Defaults: the monitor in use, 1080p, 60 fps, very high, H.264, system sound, ~/Videos/Recordings;
+# Settings -> Recording picks them. Prints the output file first, then execs the recorder so the
+# shell's SIGINT reaches it and the file is finished. gpu-screen-recorder encodes on NVENC; MP4 at
+# constant frame rate (-fm cfr). movflags=faststart ("+faststart" fails): without the index up
+# front, Discord and WhatsApp clips won't play.
 set -euo pipefail
 
 monitor="" height="1080" fps="60" quality="very_high" codec="h264"
@@ -50,9 +38,7 @@ m = next((m for m in ms if m['name'] == want), None) or next((m for m in ms if m
 print(m['name'], m['width'], m['height'])
 " "$monitor")
 
-# Scaled down to the height asked for, the width following the monitor's
-# shape -- and never up: a 1440p recording of a 1080p monitor is recorded
-# at 1080p rather than stretched.
+# Scaled down to the height asked for, the width following the monitor's shape, and never up.
 args=()
 if [ "$height" != "native" ] && [ "$height" -lt "$mh" ]; then
     w=$(( (height * mw / mh + 1) / 2 * 2 ))

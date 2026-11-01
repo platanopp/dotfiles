@@ -5,11 +5,9 @@ import qs.config
 import qs.desktop
 import qs.services
 
-// The media panel's spectrum on its own: thin bars mirrored about the middle,
-// low notes at the centre, in the album's colour (AlbumColors, which the bar's
-// media pill keeps up to date). It took cava's place, and like cava it shows
-// the speakers -- but it only listens while a player is playing and the
-// desktop can be seen, since capturing the audio is the costly part.
+// The media panel's spectrum on its own: mirrored bars, low notes at the centre, in the
+// album colour. Listens only while a player plays and the desktop can be seen, since
+// capturing audio is the costly part.
 WidgetCard {
     id: root
 
@@ -75,11 +73,9 @@ WidgetCard {
         Repeater {
             model: root.count
 
-            // Drawn at the helper's own rate (~43 a second), which already
-            // smooths each band, rising fast and falling slow. A Behavior
-            // easing every bar between its frames never settled -- a new
-            // frame came every 23 ms for a 70 ms ease -- so the whole desktop
-            // layer redrew at the monitor's rate for as long as music played.
+            // Drawn at the helper's own rate (~43 a second), already smoothed. A per-bar
+            // Behavior never settled between frames, so the whole desktop layer redrew at the
+            // monitor's rate while music played.
             Rectangle {
                 required property int index
                 readonly property real level: root.level(index)

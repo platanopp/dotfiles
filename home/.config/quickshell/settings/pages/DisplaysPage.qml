@@ -5,9 +5,8 @@ import qs.config
 import qs.services
 import qs.settings
 
-// Settings -> Displays: where each screen sits, and the mode, refresh rate and
-// scale of the one picked on the map. Adaptive sync is compositor-wide in
-// Hyprland, so it sits on its own.
+// Settings -> Displays: where each screen sits, and the mode, refresh rate and scale of the one
+// picked on the map. Adaptive sync is compositor-wide in Hyprland, so it sits on its own.
 Column {
     id: page
     spacing: 24
@@ -80,11 +79,8 @@ Column {
         if (best) Display.proposeDisplayMode(page.mon.name, best.text)
     }
 
-    // ── Keep or revert ───────────────────────────────────────────────────
-    //
-    // Resolution and scale go on at once and come back by themselves unless
-    // kept: a mode the screen cannot show leaves it dark, with no way to reach
-    // the control that would undo it.
+    // Keep or revert: resolution and scale revert by themselves unless kept, since a mode
+    // the screen cannot show leaves it dark.
     Rectangle {
         width: parent.width
         visible: Display.displayRevert !== null
@@ -148,7 +144,7 @@ Column {
         }
     }
 
-    // ── Arrangement ──────────────────────────────────────────────────────
+    // Arrangement
     SettingsGroup {
         width: parent.width
         title: "Arrangement"
@@ -172,7 +168,7 @@ Column {
         }
     }
 
-    // ── The picked display ───────────────────────────────────────────────
+    // The picked display
     SettingsGroup {
         width: parent.width
         visible: page.mon !== null
@@ -229,7 +225,7 @@ Column {
         }
     }
 
-    // ── Sync ─────────────────────────────────────────────────────────────
+    // Sync
     SettingsGroup {
         width: parent.width
         title: "Every display"

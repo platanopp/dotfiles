@@ -1,22 +1,16 @@
 #!/usr/bin/env python3
-"""Publica la cancion actual de osu!lazer como un reproductor MPRIS.
+"""Publishes osu!lazer's current song as an MPRIS player.
 
-Por que un puente y no un caso especial en el widget: shell.qml ya tiene
-seleccion de reproductor -- activePlayer, playerRank, pinnedPlayer y ciclado --
-construida para varios MPRIS a la vez. Apareciendo como uno mas, osu hereda todo
-eso gratis y MediaWidget.qml no se toca.
+A bridge rather than a special case in the widget: shell.qml already picks between MPRIS players
+(activePlayer, playerRank, pinnedPlayer, cycling), so as one more player osu gets all of it.
 
-De donde sale el dato: lazer no registra MPRIS ni pone la cancion en el titulo de
-la ventana; se comprobo. Lo unico que la publica es su propio log, que en cada
-cambio de mapa escribe
+lazer registers no MPRIS and keeps the song out of its window title; only its log names it, on
+every map change:
 
-    Invalidating working beatmap cache for <artista> - <titulo> (<mapper>) [<dif>]
+    Invalidating working beatmap cache for <artist> - <title> (<mapper>) [<difficulty>]
 
-Eso es fragil por naturaleza -- es un log, no una API, y su formato puede cambiar
-en cualquier version. Si un dia osu deja de aparecer en la barra, esa linea es lo
-primero a mirar.
-
-Usa Gio en vez de dbus-next o pydbus porque PyGObject ya esta instalado y esas no.
+That is a log, not an API, and may change in any release: if osu stops showing in the bar, look
+at that line first. Gio rather than dbus-next or pydbus, since PyGObject is already installed.
 """
 
 import glob
@@ -36,32 +30,21 @@ BUS_NAME = "org.mpris.MediaPlayer2.osu"
 OBJECT_PATH = "/org/mpris/MediaPlayer2"
 MARKER = "working beatmap cache for"
 
-# De donde salen las imagenes de fondo.
-#
-# El log no dice ni la ruta ni el id del mapa, solo artista/titulo/mapper/
-# dificultad -- se reviso el contexto alrededor de la linea y no hay nada mas.
-# Y los archivos de lazer se guardan por hash de contenido, con la base Realm
-# como unico indice, que desde Python no es practico de leer.
-#
-# La instalacion de osu! stable si tiene las carpetas con nombre legible, y
-# resulta que cubre lo que se juega: 141 de 142 mapas de una sesion real
-# encontraron carpeta. El que faltaba era "cYsmix - triangles", el tema del menu
-# de lazer, que no es un mapa descargado sino algo que el juego trae adentro.
-#
-# Si esta carpeta desaparece, se pierden las caratulas y nada mas: los titulos
-# siguen saliendo del log igual.
+# Where the background images come from. The log names only artist/title/mapper/difficulty, and
+# lazer stores files by content hash with Realm as the only index, impractical from Python. osu!
+# stable's song folders have readable names and cover what gets played (141 of 142 maps in a real
+# session); without it only covers are lost.
 SONGS_DIR = os.environ.get(
     "OSU_SONGS_DIR", "/mnt/ssd/Juegos/osu!/Songs")
 
 
 def normalise(text):
-    """Clave de busqueda: sin acentos, sin signos, todo junto en minuscula."""
+    """Search key: no accents, no punctuation, all run together in lower case."""
     text = unicodedata.normalize("NFKD", text).lower()
     return re.sub(r"[^a-z0-9]", "", text)
 
-# Lo minimo que quickshell necesita para tratarlo como reproductor. Todo lo que
-# se puede controlar va en false: esto es una ventana a lo que osu esta haciendo,
-# no un mando a distancia -- no hay forma de pedirle que cambie de cancion.
+# The minimum quickshell needs to treat it as a player. Every control is false: this mirrors what
+# osu is doing and cannot ask it to change songs.
 INTROSPECTION = """
 <node>
   <interface name="org.mpris.MediaPlayer2">
@@ -88,11 +71,10 @@ INTROSPECTION = """
 
 
 def strip_trailing(text, opening, closing):
-    """Quita un grupo (...) o [...] final contando profundidad.
+    """Drops a trailing (...) or [...] group, counting depth.
 
-    Una expresion regular no sirve aca: los nombres de dificultad de osu anidan
-    corchetes -- "[Maddy's Boss Stage [Adjusted Offset]]" es real, y habia 140
-    lineas asi en el historial. Contar desde la derecha las parsea todas.
+    Not a regex: osu difficulty names nest brackets ("[Maddy's Boss Stage [Adjusted Offset]]"
+    is real, 140 such lines in the history); counting from the right parses them all.
     """
     text = text.rstrip()
     if not text.endswith(closing):
@@ -109,7 +91,7 @@ def strip_trailing(text, opening, closing):
 
 
 def parse_beatmap(payload):
-    """'<artista> - <titulo> (<mapper>) [<dif>]' -> (artista, titulo)."""
+    """'<artist> - <title> (<mapper>) [<difficulty>]' -> (artist, title)."""
     rest = strip_trailing(payload, "[", "]")
     rest = strip_trailing(rest, "(", ")")
     if " - " not in rest:
@@ -120,14 +102,14 @@ def parse_beatmap(payload):
 
 
 def log_directory():
-    """La carpeta de logs, siguiendo el storage.ini si redirige los datos."""
+    """The log folder, following storage.ini if it moves the data."""
     local = os.path.expanduser("~/.local/share/osu")
     ini = os.path.join(local, "storage.ini")
     try:
         with open(ini, encoding="utf-8") as handle:
             for line in handle:
-                # IniConfigManager de osu-framework: 'Clave = Valor', sin
-                # secciones, y descarta cualquier linea sin '='.
+                # osu-framework's IniConfigManager: 'Key = Value', no sections, and any
+                # line without '=' is skipped.
                 if line.lstrip().startswith("#") or "=" not in line:
                     continue
                 key, value = line.split("=", 1)
@@ -159,13 +141,13 @@ class OsuPlayer:
         self.index_stamp = None
         self.art_cache = {}
 
-    # ── Fondo del mapa ───────────────────────────────────────────────────
+    # Map background
 
     def song_index(self):
-        """{normalizado(artista+titulo): carpeta}, reconstruido si Songs cambio.
+        """{normalised(artist+title): folder}, rebuilt when Songs changes.
 
-        Las carpetas se llaman "<id> <artista> - <titulo>", asi que el id del
-        principio se descarta y el resto se parte en el primer " - ".
+        Folders are named "<id> <artist> - <title>": the leading id is dropped and the rest
+        split at the first " - ".
         """
         try:
             stamp = os.path.getmtime(SONGS_DIR)
@@ -192,7 +174,7 @@ class OsuPlayer:
         return index
 
     def background_in(self, folder):
-        """La imagen de fondo declarada en los [Events] de algun .osu."""
+        """The background image declared in the [Events] of some .osu file."""
         for chart in glob.glob(os.path.join(folder, "*.osu")):
             try:
                 with open(chart, encoding="utf-8", errors="replace") as handle:
@@ -204,11 +186,11 @@ class OsuPlayer:
                             continue
                         if not in_events or not line or line.startswith("//"):
                             continue
-                        # "0,0,"archivo.jpg",0,0" -- el primer 0 es el tipo
-                        # (fondo) y el segundo el tiempo de inicio.
+                        # "0,0,"file.jpg",0,0": the first 0 is the type (background),
+                        # the second the start time.
                         match = re.match(r'^0\s*,\s*0\s*,\s*"?([^",]+)"?', line)
                         if match:
-                            # Las rutas vienen con separador de Windows.
+                            # Paths come with Windows separators.
                             path = os.path.join(
                                 folder, match.group(1).replace("\\", "/"))
                             if os.path.isfile(path):
@@ -227,24 +209,24 @@ class OsuPlayer:
         if folder:
             path = self.background_in(os.path.join(SONGS_DIR, folder))
             if path:
-                # as_uri escapa espacios y todo lo demas; armar la URL a mano
-                # rompe con la mitad de los nombres de mapa.
+                # as_uri escapes spaces and everything else; a hand-built URL
+                # broke on half the map names.
                 found = pathlib.Path(path).as_uri()
         self.art_cache[key] = found
         return found
 
-    # ── D-Bus ────────────────────────────────────────────────────────────
+    # D-Bus
 
     def metadata(self):
-        # mpris:trackid es obligatorio; los clientes lo usan como identidad de
-        # la pista y algunos descartan la metadata entera sin el.
+        # mpris:trackid is required: clients use it as the track identity, and
+        # some drop the metadata without it.
         items = {
             "mpris:trackid": GLib.Variant("o", "/org/mpris/MediaPlayer2/osu/track"),
             "xesam:title": GLib.Variant("s", self.title),
             "xesam:artist": GLib.Variant("as", [self.artist] if self.artist else []),
         }
-        # Solo si hay algo: un artUrl vacio hace que algunos clientes muestren
-        # un hueco roto en vez de su propio marcador.
+        # Only when there is one: an empty artUrl makes some clients show a broken
+        # gap instead of their placeholder.
         if self.art:
             items["mpris:artUrl"] = GLib.Variant("s", self.art)
         return GLib.Variant("a{sv}", items)
@@ -274,9 +256,8 @@ class OsuPlayer:
     def announce(self):
         if self.connection is None:
             return
-        # El a{sv} va como dict de Python, no como Variant ya armado: anidar un
-        # Variant dentro de otro hace que GLib intente iterarlo como diccionario
-        # y reviente con KeyError. Los valores de adentro si son Variant.
+        # The a{sv} goes as a Python dict, not a built Variant: nesting a Variant in another makes
+        # GLib iterate it as a dict and raise KeyError. The inner values are Variants.
         self.connection.emit_signal(
             None, OBJECT_PATH, "org.freedesktop.DBus.Properties",
             "PropertiesChanged",
@@ -307,7 +288,7 @@ class OsuPlayer:
         self.artist = self.title = self.art = ""
         print("osu-mpris: retirado", flush=True)
 
-    # ── Lectura del log ──────────────────────────────────────────────────
+    # Reading the log
 
     def newest_log(self):
         logs = glob.glob(os.path.join(log_directory(), "*.runtime.log"))
@@ -317,14 +298,14 @@ class OsuPlayer:
         newest = self.newest_log()
         if newest is None:
             return
-        # Cada sesion de osu abre un log nuevo. Al cambiar de archivo se empieza
-        # desde el principio, para no perderse el mapa que ya estaba puesto.
+        # Every osu session opens a new log; on a switch read it from the start, so
+        # the current map is not missed.
         if newest != self.path:
             self.path = newest
             self.position = 0
         try:
             size = os.path.getsize(self.path)
-            if size < self.position:  # truncado
+            if size < self.position:  # truncated
                 self.position = 0
             with open(self.path, encoding="utf-8", errors="replace") as handle:
                 handle.seek(self.position)
@@ -333,11 +314,8 @@ class OsuPlayer:
         except OSError:
             return
 
-        # Solo interesa el ultimo mapa del trozo leido, no cada uno por el que
-        # paso. Importa sobre todo al arrancar: ahi el trozo es el log entero, y
-        # anunciar linea por linea disparaba una rafaga de PropertiesChanged
-        # reproduciendo toda la sesion anterior -- setenta y cinco señales para
-        # decir una sola cosa.
+        # Only the last map in the chunk read matters: at startup the chunk is the whole log, and
+        # announcing every line replayed the previous session as a burst of PropertiesChanged.
         latest = None
         for line in chunk.splitlines():
             if MARKER not in line:
@@ -363,8 +341,8 @@ class OsuPlayer:
 
 def main():
     player = OsuPlayer()
-    # 1s: un cambio de mapa en la seleccion de canciones dura mas que eso, y
-    # leer lo nuevo de un archivo abierto no cuesta nada.
+    # 1s: a map change in song select lasts longer than that, and reading new
+    # bytes of an open file is free.
     GLib.timeout_add_seconds(1, player.tick)
     loop = GLib.MainLoop()
     try:

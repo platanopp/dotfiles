@@ -4,14 +4,9 @@ import qs.components
 import qs.config
 import qs.services
 
-// The displays laid out the way Hyprland places them, to scale. Drag one to
-// move it: its edges snap to the edges of the others it comes near, so the
-// arrangement never ends up with a gap the pointer cannot cross. A click
-// without a drag picks that display for the settings below the map.
-//
-// The move is applied on release, not while dragging -- each one reconfigures
-// the output, and doing that per pixel of mouse travel would stutter the
-// whole desktop.
+// The displays laid out as Hyprland places them, to scale. Drag one to move it (edges
+// snap, so no gap the pointer cannot cross); click to pick it. Applied on release:
+// each move reconfigures the output.
 Item {
     id: map
 
@@ -121,9 +116,8 @@ Item {
 
             readonly property color ink: Theme.textPrimary
 
-            // Each display drawn as a small screen showing the wallpaper, so
-            // the map reads as the desk rather than as a diagram of boxes.
-            // The one picked is lit; the others sit back behind a shade.
+            // Each display as a small screen showing the wallpaper; the picked
+            // one is lit, the rest shaded.
             ClippingRectangle {
                 anchors.fill: parent
                 radius: plate.radius

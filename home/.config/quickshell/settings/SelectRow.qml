@@ -3,14 +3,9 @@ import QtQuick.Layouts
 import qs.components
 import qs.config
 
-// A setting with many possible values -- a display's resolutions, its refresh
-// rates -- shown folded: the row carries only the current value, and a tap
-// opens the choices underneath, inside the same card. Picking one folds it
-// again. A long list of chips on permanent display was the noisiest thing on
-// the page.
-//
-// Built like a SettingsRow (same corners, same badge and title) so it sits in
-// a SettingsGroup among them.
+// A setting with many values (resolutions, refresh rates), folded: the row shows the
+// current value and a tap opens the choices in the same card. Built like a
+// SettingsRow so it sits in a SettingsGroup.
 Rectangle {
     id: row
 

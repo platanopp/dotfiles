@@ -2,25 +2,17 @@ import QtQuick
 import QtQuick.Effects
 import qs.config
 
-// A slider for the Settings window: a slim track, the part up to the value
-// filled in the accent, and a round knob. The reading lives on the row's
-// title line (SettingsRow.value); a bubble with it rises over the knob only
-// while it is being dragged.
+// A Settings slider: slim track, accent fill, round knob; a value bubble rises over the knob while
+// dragging. The value shows live (`shown`) but commits on release: every commit runs a process.
 //
-// The value shows live while dragging -- `shown` is there for anything that
-// wants to preview it -- but is committed only on release: every commit runs
-// a process, and a drag would otherwise queue dozens of them.
-//
-//   from, to, value   the range and the current value
-//   step              snap to multiples of this (0: continuous)
-//   neutral           optional: a small mark on the track, and what a
-//                     double-click returns to
-//   format(v)         text for the bubble
-//   gradient          optional Gradient for the track, e.g. colour temperature
-//   moved(v)          on release
-//   live              also emit moved() while dragging -- for something as
-//                     immediate as volume, where the caller rate-limits
-//   compact           a slimmer knob and track, for the bar's panels
+// from, to, value   the range and the current value
+// step              snap to multiples of this (0: continuous)
+// neutral           optional: a small mark on the track, and what a double-click returns to
+// format(v)         text for the bubble
+// gradient          optional Gradient for the track, e.g. colour temperature
+// moved(v)          on release
+// live              also emit moved() while dragging, for volume (the caller rate-limits)
+// compact           a slimmer knob and track, for the bar's panels
 Item {
     id: root
 
@@ -39,21 +31,18 @@ Item {
 
     readonly property bool dragging: area.pressed
     property real dragValue: 0
-    // What was let go of, held until the value comes back changed. Without
-    // it the knob jumped back to the old value the moment it was released
-    // and forward again when the process answered -- which read as the
-    // slider refusing the change.
+    // What was let go of, held until the value comes back changed; without it the knob snapped back
+    // on release and forward again when the process answered.
     property real pending: NaN
     readonly property real shown: root.dragging ? root.dragValue
                                 : !isNaN(root.pending) ? root.pending
                                 : root.value
 
-    // Only when set: NaN is never equal to itself, so writing NaN over NaN
-    // counts as a change and re-evaluated `shown` in a loop.
+    // Only when set: NaN never equals itself, so writing NaN over NaN
+    // re-evaluated `shown` in a loop.
     onValueChanged: { if (!isNaN(root.pending)) root.pending = NaN; settle.stop() }
 
-    // If nothing answers -- the command failed -- the knob goes back to the
-    // real value rather than claiming a change that did not happen.
+    // If nothing answers (the command failed), the knob goes back to the real value.
     Timer {
         id: settle
         interval: 3000
@@ -189,9 +178,8 @@ Item {
             if (root.live) root.moved(v)
         }
         onReleased: root.commit(root.dragValue)
-        // The scrolling page can take the gesture over when the hand drifts
-        // vertically; that arrives as a cancel, not a release, and used to
-        // drop the change on the floor.
+        // The scrolling page can take over a gesture that drifts vertically; that
+        // arrives as a cancel, not a release.
         onCanceled: root.commit(root.dragValue)
         onDoubleClicked: if (!isNaN(root.neutral)) root.commit(root.neutral)
     }

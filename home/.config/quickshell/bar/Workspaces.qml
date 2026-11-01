@@ -4,33 +4,19 @@ import QtQuick
 import qs.components
 import qs.config
 
-// This monitor's workspaces, as a row of slots inside the left pill: a filled
-// pill slides to the active one and carries its number; a workspace with
-// windows is a firmer dot than an empty one; one asking for attention is red
-// and pulses. While the special workspace (Super+S) is showing on this monitor
-// it gets a slot of its own at the end. Click a slot to go there; the wheel
-// steps through them.
-//
-// Each monitor has a block of ten of its own (hyprland.lua: DP-2 has 1-10,
-// HDMI-A-1 11-20), and the slots are numbered within it, the way Super+N
-// counts them: workspace 13 is this monitor's 3. Which block is read off
-// the workspace the monitor shows, as hyprland.lua does.
-//
-// At least five slots, more when a higher workspace is in use, up to ten --
-// Super+6..0 reach them, and a fixed five hid them.
-//
-// Nothing here polls. Occupancy and urgency come from each workspace's own
-// toplevels and urgent flag, which Quickshell keeps current off Hyprland's
-// event stream; only the special workspace needs the monitor re-read, and only
-// when Hyprland says it changed.
+// This monitor's workspaces as slots in the left pill: a filled pill slides to the active one,
+// occupied ones are firmer dots, urgent ones red and pulsing, and the special workspace (Super+S)
+// gets its own slot while shown. Each monitor has its own block of ten (DP-2 1-10, HDMI-A-1 11-20),
+// numbered within it: 13 is this monitor's 3. At least five slots, up to ten as higher ones are
+// used. Nothing polls: Quickshell keeps toplevels and urgency current from Hyprland's events; only
+// the special workspace re-reads the monitor, on its event.
 Item {
     id: root
 
     property var monitor: null
 
-    // Compact: a dot's slot is narrow, the active one wide enough for its
-    // number. The row is laid out arithmetically so the highlight can slide
-    // to where the active slot is going, not chase where it is.
+    // A dot's slot is narrow, the active one wide enough for its number; laid out arithmetically so
+    // the highlight slides to where the active slot is going.
     readonly property int dotSlot: 12
     readonly property int activeSlot: 26
     readonly property int slotGap: 2
@@ -46,8 +32,8 @@ Item {
 
     readonly property int shownId: monitor && monitor.activeWorkspace ? monitor.activeWorkspace.id : 0
 
-    // The id before this monitor's first workspace (0 or 10). Kept, not
-    // bound, so it holds while the monitor's workspace is briefly unknown.
+    // The id before this monitor's first workspace (0 or 10); kept, not bound, so
+    // it holds while briefly unknown.
     property int base: 0
     function readBase() { if (root.shownId > 0) root.base = Math.floor((root.shownId - 1) / 10) * 10 }
     onShownIdChanged: root.readBase()
@@ -79,8 +65,8 @@ Item {
         return Math.min(10, high)
     }
 
-    // The special workspace showing on this monitor, if any: Hyprland reports
-    // it on the monitor ("specialWorkspace": { id, name }).
+    // The special workspace showing on this monitor, if any (the monitor's
+    // "specialWorkspace": { id, name }).
     readonly property string specialName: {
         var ipc = root.monitor ? root.monitor.lastIpcObject : null
         var sw = ipc ? ipc.specialWorkspace : null
@@ -128,8 +114,7 @@ Item {
             Elastic { small: true }
         }
 
-        // The active workspace: one pill that slides, rather than two dots
-        // trading sizes.
+        // The active workspace: one pill that slides, rather than two dots trading sizes.
         Rectangle {
             id: highlight
             readonly property int index: root.activeId - 1
@@ -226,8 +211,7 @@ Item {
         }
     }
 
-    // The special workspace, while it is up on this monitor. Tapping it puts
-    // it away again.
+    // The special workspace while it is up on this monitor; tapping it puts it away.
     Item {
         id: specialSlot
         visible: root.specialName.length > 0

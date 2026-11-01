@@ -4,15 +4,12 @@ import Quickshell
 import Quickshell.Io
 import qs.config
 
-// The Wooting keyboard lit with the wallpaper: scripts/keyboard_rgb.py lays
-// the picture over the keys and stays connected to the keyboard. Settings ->
-// Keyboard turns it on and off and picks brightness and profile.
+// The Wooting keyboard lit with the wallpaper (keyboard_rgb.py lays the picture over the keys);
+// Settings -> Keyboard turns it on and picks brightness and profile.
 Singleton {
     id: root
 
-    // A Wooting keyboard lit with whatever wallpaper is up, the picture laid
-    // over the keys (see scripts/keyboard_rgb.py). Follows wallpaperStill,
-    // so a video wallpaper lights it with its poster frame.
+    // Follows wallpaperStill, so a video wallpaper lights it with its poster frame.
     property var keyboardRgbStatus: ({ connected: false })
     // The colours in use: { keys: { "row,col": hex } }, for the Settings page.
     property var keyboardRgbPalette: null
@@ -38,9 +35,8 @@ Singleton {
 
     function refreshKeyboardRgb() { root.keyboardRgbSend({ cmd: "status" }) }
 
-    // One line of JSON to the script's `serve` loop, which stays connected
-    // to the keyboard: finding it costs two seconds, paid once per session
-    // instead of before every change.
+    // One line of JSON to the script's `serve` loop, which stays connected: finding
+    // the keyboard costs two seconds.
     function keyboardRgbSend(obj) {
         if (!keyboardRgbProc.running) keyboardRgbProc.running = true
         keyboardRgbProc.write(JSON.stringify(obj) + "\n")

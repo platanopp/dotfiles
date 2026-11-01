@@ -8,14 +8,9 @@ import Quickshell.Io
 Singleton {
     id: root
 
-    // opentabletdriver.service reads the tablet as raw HID and publishes a
-    // virtual device of its own. While it runs it is the only thing driving
-    // the pen: a udev rule marks the kernel's device LIBINPUT_IGNORE_DEVICE,
-    // so the compositor does not get two positions at once.
-    //
-    // Turning it off from here leaves the tablet not working at all, rather
-    // than falling back to a basic mode. That is why the tile's detail says
-    // so, instead of an "Off" that would read as harmless and reversible.
+    // opentabletdriver.service reads the tablet as raw HID and publishes its own
+    // virtual device; a udev rule hides the kernel's device, so turning the service off
+    // leaves the pen dead (the tile says so).
     property bool otdRunning: false
 
     function toggleOtd() {

@@ -17,11 +17,9 @@ PanelWindow {
     screen: bar.screen
     visible: true
 
-    // Hidden by cutting input and drawing nothing, never by unmapping the
-    // window. Toggling visible destroys the layer surface, and Hyprland
-    // restacks it on the way back: the full-width bar came back above the
-    // pills and swallowed every click meant for them. The blur rule ignores
-    // pixels below 0.3 alpha, so a surface drawing nothing leaves no band.
+    // Hidden by cutting input and drawing nothing, never by unmapping: a remapped layer is
+    // restacked above the pills and swallowed their clicks. The blur rule ignores pixels
+    // under 0.3 alpha, so nothing shows.
     mask: bar.barHidden ? blankMask : stageMask
 
     Region {
@@ -30,15 +28,14 @@ PanelWindow {
         height: 0
     }
 
-    // Input only where the pill is: the window also holds the room the panel
-    // and Settings grow into (see PillStage).
+    // Input only where the pill is; the window also holds the room the panel and
+    // Settings grow into (PillStage).
     Region {
         id: stageMask
         item: stage
     }
 
-    // Keeps the bar up while the pointer is on it; shell.qml folds these
-    // together with the reveal zone's own hover.
+    // Keeps the bar up while hovered; shell.qml folds these together with the reveal zone's hover.
     readonly property bool barHovered: barHover.hovered
 
     HoverHandler {
@@ -48,12 +45,9 @@ PanelWindow {
 
     WlrLayershell.namespace: "quickshell:bar-blur"
     WlrLayershell.layer: WlrLayer.Overlay
-    // Never the keyboard, Settings included. Asking for it while the panel is
-    // open -- so Escape could step back from Settings -- ends the Hyprland
-    // focus grab below, and the panel shut the instant Settings was opened.
-    // Holding it all the time would work, but then every click on the bar
-    // button would take the keyboard away from the window being typed in.
-    // Back, the close button and a click outside do the job instead.
+    // Never the keyboard: asking for it while open ends the Hyprland focus grab and shuts the
+    // panel, and holding it always would take the keyboard on every bar click. Back, close
+    // and click-outside do the job instead.
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
     exclusionMode: ExclusionMode.Ignore
 
@@ -61,8 +55,8 @@ PanelWindow {
         top: true
         right: true
     }
-    // The content inside insets itself by 12, so the window sits back by
-    // that much and the drawn edge lands exactly on Hyprland's gap.
+    // The content insets by 12, so the window sits back that much and the
+    // drawn edge lands on Hyprland's gap.
     margins.top: Math.max(0, Hypr.gapTop - 12)
 
     // Anchor of the right-hand pill row; the others park off this one.
@@ -81,8 +75,8 @@ PanelWindow {
         target: Panels
         function onDismissRequested() { settingsItem.panelOpen = false; settingsItem.notifOpen = false }
     }
-    // The notification centre, the pill's other face: the bell beside the
-    // logo opens it, in the same glass. One or the other, never both.
+    // The notification centre, the pill's other face: the bell opens it
+    // in the same glass. Never both.
     property bool notifOpen: false
 
     onNotifOpenChanged: {
@@ -93,12 +87,8 @@ PanelWindow {
         }
     }
 
-    // ── Settings ─────────────────────────────────────────────────────────
-    //
-    // The panel grows into the Settings window instead of opening a second
-    // one: the same glass widens and drops from the corner it already hangs
-    // from, and the contents cross over. Back returns to the panel; closing
-    // the panel closes both.
+    // Settings: the panel grows into the Settings window in the same glass. Back returns
+    // to the panel; closing closes both.
     property bool settingsOpen: false
     property string settingsPage: "displays"
 
@@ -107,8 +97,8 @@ PanelWindow {
         else notifOpen = false
     }
 
-    // qs ipc call notifications toggle (see Panels): only the pill on the
-    // screen that asked answers, except to close.
+    // qs ipc call notifications toggle (see Panels): only the pill on the screen
+    // that asked answers, except to close.
     Connections {
         target: Panels
         function onNotificationsRequested(how, screenName) {
@@ -118,12 +108,11 @@ PanelWindow {
         }
     }
 
-    // The bar's own panels link to their page here (Panels.openSettings).
-    // Only the panel on the screen that asked answers.
+    // The bar's panels link to their page here (Panels.openSettings); only
+    // the screen that asked answers.
     Connections {
         target: Panels
-        // An empty page toggles: closes Settings if it is open here, else
-        // opens it at the page it was last left on.
+        // An empty page toggles: closes Settings if open here, else opens it at the last page.
         function onSettingsRequested(page, screenName) {
             if (settingsItem.screen && screenName.length > 0 && settingsItem.screen.name !== screenName) return
             if (page.length === 0 && settingsItem.settingsOpen) {
@@ -142,25 +131,16 @@ PanelWindow {
         Power.refreshPowerProfiles()
     }
 
-    // Wide enough for a list of pages and a page, never so wide that it
-    // reaches the clock: the clock sits in the middle of the bar and is drawn
-    // above this window, so on the 1920px Samsung the width stops short of
-    // the centre. On the 2560px Xiaomi it gets the full thousand.
+    // Never wide enough to reach the clock, which is drawn above this window: shorter on the 1920px
+    // Samsung, the full 1000 on the 2560px Xiaomi.
     readonly property int settingsWidth: Math.min(1000, Math.round(settingsItem.screen.width / 2 - 170))
     readonly property int settingsHeight: Math.min(720, settingsItem.screen.height - 110)
 
-    // What the pills to the left park off (see pillLeftOf in shell.qml). With
-    // Settings open it stays at the panel's width, so the tray and the status
-    // pill hold still under the Settings window instead of being shoved along
-    // into the clock.
-    //
-    // The box as drawn, capped at the panel's width: while Settings closes
-    // the box is still far wider than the panel, and the row would be flung
-    // left and slide back as it shrank.
+    // What the pills to the left park off (pillLeftOf in shell.qml), capped at the panel's width so
+    // the tray and status pill hold still under Settings instead of being flung and sliding back.
     readonly property real rowWidth: Math.min(stage.width, 372)
 
-    // Small heading over a group of controls, in place of the rules
-    // and full-size titles that used to split the panel into strips.
+    // Small heading over a group of controls.
     component SectionLabel: Text {
         color: Theme.textSecondary
         font.pixelSize: 11
@@ -170,26 +150,21 @@ PanelWindow {
 
     function runPowerAction(action) {
         settingsItem.panelOpen = false
-        // Both go through Power so the button gets the same fade the
-        // Super+L bind does; see lockSession() there.
+        // Both go through Power, so the button gets the same fade as Super+L (lockSession()).
         if (action === "lock") Power.lockSession()
         else if (action === "suspend") Power.suspendSession()
         else if (action === "reboot") rebootProc.running = true
         else if (action === "shutdown") shutdownProc.running = true
     }
 
-    // The pill's box, animated inside a window that is not (see PillStage):
-    // the window takes the panel's or Settings' full size at the start of
-    // the move and gives it back at the end, and the glass grows in between.
+    // The pill's box, animated inside a window that is not (see PillStage).
     PillStage {
         id: stage
         collapsed: bar.barHidden
         anchors.top: parent.top
         anchors.right: parent.right
-        // Sized for Settings (and the tallest the panel gets) from the start
-        // and never resized: a window anchored on the right that grows moves
-        // its left edge, and for a frame the compositor showed the old buffer
-        // there -- the pill flicked left before growing.
+        // Sized for Settings from the start and never resized: a right-anchored window that grows
+        // moves its left edge, and for a frame the old buffer showed there.
         minWindowWidth: settingsItem.settingsWidth
         minWindowHeight: Math.max(settingsItem.settingsHeight, settingsItem.screen.height - 48)
         // The spring's room on top of that would run off the screen.
@@ -208,28 +183,17 @@ PanelWindow {
     implicitWidth: stage.windowWidth
     implicitHeight: stage.windowHeight
 
-    // On targetHeight above: content-driven rather than a fixed 664; chrome is the 12px inset plus
-    // the flickable's 16px margins.
-    //
-    // The ceiling is what the screen can actually give, not a number picked by
-    // hand. It was 700, and the panel settles at 661 of content -- 717 with
-    // chrome -- so it was clipped by seventeen pixels and scrolled for them.
-    // Expanding the network list or the audio devices needs far more than that
-    // again.
-    //
-    // 48 is the 8px the panel hangs below the top edge plus a margin off the
-    // bottom, so it stops short of the screen instead of running into it. The
-    // flickable underneath stays: it is the fallback for content that outgrows
-    // even the screen, which an expanded list on a short display still can.
+    // targetHeight above is content-driven; chrome is the 12px inset plus the flickable's
+    // 16px margins. Capped to the screen (48 = the 8px hang plus a bottom margin); the
+    // flickable scrolls anything taller.
 
     Item {
         id: contentArea
         visible: !bar.barHidden
         anchors.fill: stage
         anchors.margins: 12
-        // The Settings view is laid out at its full size from the first frame
-        // and uncovered as the glass grows -- clipped here so the part not yet
-        // uncovered does not draw past the glass's edge.
+        // Settings is laid out at full size from the first frame and uncovered as
+        // the glass grows, so clip it here.
         clip: settingsItem.settingsOpen || settingsLoader.visible
 
     Rectangle {
@@ -256,11 +220,8 @@ PanelWindow {
         autoPaddingEnabled: true
     }
 
-    // ── The pill, closed ─────────────────────────────────────────────────
-    //
-    // Two ways in, side by side in the one glass: the bell for the
-    // notification centre, the CachyOS logo for the panel. Each takes its
-    // own taps and lights up under the pointer, so it reads as two buttons.
+    // The pill, closed: the bell for the notification centre and the CachyOS logo for
+    // the panel, two buttons in one glass.
     Row {
         id: compactRow
         anchors.centerIn: parent
@@ -272,9 +233,8 @@ PanelWindow {
             NumberAnimation { duration: 150 }
         }
 
-        // Recording: the count of three before it starts, then a red dot and
-        // the time while the screen is being recorded -- so it is never
-        // forgotten running. A click calls off the count, or stops it.
+        // Recording: the count of three, then a red dot and the time, so it's never
+        // forgotten. A click cancels or stops.
         Item {
             id: recIndicator
             readonly property bool counting: Recorder.recordCountdown > 0 && !Recorder.recording
@@ -296,9 +256,8 @@ PanelWindow {
                 anchors.centerIn: parent
                 spacing: 6
 
-                // Hollow while counting, filled once it records. Steady, not
-                // breathing: the timer beside it already moves every second,
-                // and a pulse on top of that only competed with it.
+                // Hollow while counting, filled once recording. Steady: the
+                // timer beside it already moves.
                 Rectangle {
                     anchors.verticalCenter: parent.verticalCenter
                     width: 8
@@ -366,11 +325,9 @@ PanelWindow {
 
                 IconGlyph {
                     anchors.centerIn: parent
-                    // The CachyOS logo rather than a gear: the panel is the way
-                    // into the whole machine, not a settings page. Nerd Font's
-                    // linux-cachyos glyph, sized and coloured like every other
-                    // icon on the bar. The bell is struck through under do not
-                    // disturb.
+                    // The CachyOS logo (Nerd Font linux-cachyos) rather than a gear: the
+                    // panel is the way into the whole machine. The bell is struck
+                    // through under do not disturb.
                     text: !compactButton.bell ? "\u{F385}"
                         : Notifications.dnd ? "\u{F009B}"
                         : Notifications.unread > 0 ? "\u{F009E}" : "\u{F009C}"
@@ -412,7 +369,7 @@ PanelWindow {
         }
     }
 
-    // ── The notification centre ──────────────────────────────────────────
+    // The notification centre
     NotificationCentre {
         id: notifCentre
         anchors.fill: parent
@@ -435,8 +392,7 @@ PanelWindow {
         }
     }
 
-    // Host and uptime for the header. Read when the panel opens and once a
-    // minute while it stays open -- nothing else in the shell wants them.
+    // Host and uptime for the header, read on open and once a minute while open.
     property string hostName: ""
     property int uptimeSecs: 0
 
@@ -491,9 +447,8 @@ PanelWindow {
         }
     }
 
-    // Collapsed, this used to keep drawing: the panel shrinks to the 64px
-    // button, and a light accent fill stayed clipped to a sliver at the
-    // centre, reading as a white line struck through the icon.
+    // Not drawn while collapsed: an accent fill stayed clipped to a sliver,
+    // a white line through the icon.
     Flickable {
         visible: settingsItem.panelOpen && opacity > 0
         opacity: settingsItem.panelOpen && !settingsItem.settingsOpen ? 1 : 0
@@ -512,19 +467,15 @@ PanelWindow {
             width: parent.width
             spacing: 16
 
-            // ── Header ───────────────────────────────────────────────────
-            //
-            // Who, where and how long. The power actions are the last row of
-            // the panel; their state lives here because it is this header's
-            // second line that asks for the confirming tap.
+            // Header: who, where and how long. The power buttons' armed state lives here, since its
+            // second line asks for the confirming tap.
             RowLayout {
                 id: powerRow
                 width: parent.width
                 spacing: 8
 
-                // Restart and shut down need a second tap, so a stray click
-                // cannot end the session. While one is waiting, the line under
-                // the name says so.
+                // Restart and shut down need a second tap; while one waits, the
+                // line under the name says so.
                 property string armed: ""
                 readonly property var actions: [
                     { action: "lock",     icon: "\u{F033E}", label: "Lock",      danger: false },
@@ -539,8 +490,7 @@ PanelWindow {
                     onTriggered: powerRow.armed = ""
                 }
 
-                // The user's picture (~/.face and friends, Profile.avatarPath),
-                // or their initial when there is none.
+                // The user's picture (Profile.avatarPath) or their initial.
                 Item {
                     Layout.preferredWidth: 46
                     Layout.preferredHeight: 46
@@ -588,8 +538,7 @@ PanelWindow {
 
                     Text {
                         Layout.fillWidth: true
-                        // Host on the line below: user@host beside four
-                        // buttons ran out of room and was cut to "gone@naruka…".
+                        // Host on the line below: user@host beside four buttons was cut off.
                         text: Profile.username
                         color: Theme.textPrimary
                         font.pixelSize: 14
@@ -627,7 +576,7 @@ PanelWindow {
 
             }
 
-            // ── Quick toggles ────────────────────────────────────────────
+            // Quick toggles
             GridLayout {
                 width: parent.width
                 columns: 2
@@ -690,9 +639,8 @@ PanelWindow {
                             Recorder.stopRecording()
                             return
                         }
-                        // The panel out of the way first, so it is not the
-                        // first thing the recording shows; the count of three
-                        // follows on this screen.
+                        // Close the panel first so the recording doesn't start on it; the
+                        // countdown follows on this screen.
                         settingsItem.panelOpen = false
                         Recorder.countdownRecording(settingsItem.screen ? settingsItem.screen.name : "")
                     }
@@ -703,19 +651,15 @@ PanelWindow {
                     icon: "\u{F0DCB}"
                     label: "Tablet"
                     active: Tablet.otdRunning
-                    // Switching it off leaves the pen dead: a udev rule has the
-                    // compositor ignore the kernel's own device, so there is no
-                    // fallback underneath.
+                    // Switching it off leaves the pen dead: a udev rule hides the kernel's
+                    // own device from the compositor.
                     detail: Tablet.otdRunning ? "Driver on" : "No pen"
                     onTapped: Tablet.toggleOtd()
                 }
             }
 
-            // ── Wallpaper ────────────────────────────────────────────────
-            //
-            // The picture itself, the way the desktop shows it -- the framed
-            // crop, or a video's poster frame -- rather than a file name next
-            // to a stamp-sized thumbnail. Opens the picker.
+            // Wallpaper: the picture as the desktop shows it (framed crop or
+            // video poster); opens the picker.
             Rectangle {
                 id: wallpaperCard
                 width: parent.width
@@ -821,10 +765,7 @@ PanelWindow {
                 }
             }
 
-            // ── Power mode ───────────────────────────────────────────────
-            //
-            // One choice out of three, so one row: a segmented control where
-            // the stack of three full-width rows used to be.
+            // Power mode: one of three, as a segmented control.
             Column {
                 width: parent.width
                 spacing: 8
@@ -909,17 +850,14 @@ PanelWindow {
                 }
             }
 
-            // ── Elsewhere ────────────────────────────────────────────────
-            //
-            // Settings, which the panel grows into, and the shortcut sheet.
+            // Elsewhere: Settings and the shortcut sheet.
             RowLayout {
                 width: parent.width
                 spacing: 8
 
                 Repeater {
                     model: [
-                        // No second line: the name is enough. Only a
-                        // problem earns one -- binds that could not be read.
+                        // No second line unless there's a problem (binds that could not be read).
                         { key: "settings", icon: "\u{F0493}", label: "Settings", detail: "" },
                         { key: "binds", icon: "\u{F030C}", label: "Shortcuts",
                           detail: Keybinds.hyprBindsError.length > 0 ? "Config unread" : "" }
@@ -992,12 +930,8 @@ PanelWindow {
                 }
             }
 
-            // ── Power ────────────────────────────────────────────────────
-            //
-            // Full width and a comfortable size. They sat in the header for a
-            // while as 28px circles, which saved height and made them fiddly to
-            // hit. Restart and shut down carry their red before they are
-            // touched, and ask for a second tap -- the header says so.
+            // Power: full width and easy to hit. Restart and shut down are red from the
+            // start and ask for a second tap.
             RowLayout {
                 width: parent.width
                 spacing: 8

@@ -6,14 +6,9 @@ import QtQuick.Effects
 import qs.config
 import qs.services
 
-// Background apps, in a pill of their own.
-//
-// These used to ride inside the status widget's compact row, behind a divider.
-// That made every tray icon shift whenever the SSID text changed length or the
-// status panel expanded and re-centred the row -- apps that have nothing to do
-// with the shell's own indicators were moving because the shell's indicators
-// did. Its own window keeps them still and lets it disappear entirely when no
-// app is running one.
+// Background apps, in a pill of their own: inside the status pill they shifted
+// whenever the SSID or the panel changed width. Its own window keeps them still and
+// disappears when nothing is in the tray.
 PanelWindow {
     id: trayItem
 
@@ -25,14 +20,10 @@ PanelWindow {
     // Nothing to show means no empty pill floating on the bar.
     visible: SystemTray.items.values.length > 0
 
-    // Hidden by cutting input and drawing nothing, never by unmapping the
-    // window. Toggling visible destroys the layer surface, and Hyprland
-    // restacks it on the way back: the full-width bar came back above the
-    // pills and swallowed every click meant for them. The blur rule ignores
-    // pixels below 0.3 alpha, so a surface drawing nothing leaves no band.
-    // Hidden under the Settings window while it is open: it sits where
-    // Settings grows to, and a layer surface that is re-created (this one is,
-    // whenever its contents come and go) stacks itself above older ones.
+    // Hidden by cutting input and drawing nothing, never by unmapping: a remapped layer is
+    // restacked above the pills and swallowed their clicks. The blur rule ignores pixels
+    // under 0.3 alpha, so nothing shows. Also hidden under the Settings window: a re-created
+    // layer surface stacks above older ones.
     property bool covered: false
 
     mask: bar.barHidden || covered ? blankMask : stageMask
@@ -49,8 +40,7 @@ PanelWindow {
         item: stage
     }
 
-    // Keeps the bar up while the pointer is on it; shell.qml folds these
-    // together with the reveal zone's own hover.
+    // Keeps the bar up while hovered; shell.qml folds these together with the reveal zone's hover.
     readonly property bool barHovered: barHover.hovered
 
     HoverHandler {
@@ -65,15 +55,12 @@ PanelWindow {
         top: true
         right: true
     }
-    // The content inside insets itself by 12, so the window sits back by
-    // that much and the drawn edge lands exactly on Hyprland's gap.
+    // The content insets by 12, so the window sits back that much and the
+    // drawn edge lands on Hyprland's gap.
     margins.top: Math.max(0, Hypr.gapTop - 12)
 
-    // Set by shell.qml, which owns the order of the right-hand pills. It
-    // follows the status pill's live width, so an expanding panel pushes these
-    // icons along instead of appearing underneath them.
-    // Not animated here: the status pill's box it follows already moves
-    // smoothly, and a second animation chasing it made the row lag.
+    // Set by shell.qml from the status pill's live width, so an expanding panel pushes these icons
+    // along. Not animated: a second animation chasing that one made the row lag.
     property int rightMargin: 0
     margins.right: rightMargin
 

@@ -5,10 +5,8 @@ import qs.config
 import qs.desktop
 import qs.services
 
-// The clock panel's calendar, left on the desktop: the same header, weekday
-// row and accent circle on today, and it turns months the same way, by the
-// arrows or the wheel. Days outside the month are left blank, as there.
-// Always six rows, so the card keeps its size from month to month.
+// The clock panel's calendar left on the desktop: same header, weekdays and today's circle, months
+// turned by arrows or wheel. Always six rows, so the card keeps its size.
 WidgetCard {
     id: root
 

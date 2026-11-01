@@ -4,23 +4,19 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
 
-// Hyprland's own settings as the shell sees them: the window gaps the bar
-// lines up with, and the options Settings -> Look and Input change.
+// Hyprland's settings as the shell sees them: the window gaps the bar lines up with, and the
+// options Settings -> Look and Input change.
 Singleton {
     id: root
 
-    // ── Hyprland options ─────────────────────────────────────────────────
-    //
-    // For the Settings window's Look and Input pages. scripts/hypr_settings.py
-    // owns the rules: a fixed list of options, each checked against its type
-    // and range; written to gui-settings.lua, never to hyprland.lua; run live
-    // and put back if Hyprland refuses it; committed to ~/dotfiles when it
-    // took. This side only asks and shows the answer.
+    // Hyprland options: hypr_settings.py owns the rules (a fixed, type-checked list written to
+    // gui-settings.lua, never hyprland.lua; applied live, rolled back if refused, committed to
+    // ~/dotfiles). This side asks and shows.
     property var hyprOptions: ({})
     // { repo, hash, when, subject, unpushed } for the sidebar's footer.
     property var dotfilesGit: ({ repo: false })
-    // The last set/reset: { ok, error?, commit: { committed, hash? } }, with
-    // `at` so the same answer twice still reads as new.
+    // The last set/reset: { ok, error?, commit: { committed, hash? } }, with `at` so
+    // the same answer twice reads as new.
     property var hyprLast: null
 
     readonly property string hyprScript:
@@ -87,15 +83,8 @@ Singleton {
         onExited: root.hyprNext()
     }
 
-    // ── Window gaps ──────────────────────────────────────────────────────
-    //
-    // Asked of Hyprland rather than repeated here. The bar sits at the same
-    // inset as the windows underneath it, and an inset written down in two
-    // configs is one that will eventually disagree with itself -- silently,
-    // as a few pixels of misalignment nobody can place.
-    //
-    // The defaults are Hyprland's own, so the bar is only ever wrong for the
-    // moment before the first answer arrives.
+    // Window gaps, asked of Hyprland rather than repeated here, so the bar can't drift from the
+    // windows' inset. The defaults are Hyprland's own, wrong only until the first answer.
     property int gapTop: 20
     property int gapRight: 30
     property int gapBottom: 30
@@ -105,9 +94,8 @@ Singleton {
         if (!gapsProc.running) gapsProc.running = true
     }
 
-    // hyprctl reports gaps_out as a CSS shorthand string, so it expands the
-    // way CSS margins do: one value for all sides, two for vertical and
-    // horizontal, three for top / sides / bottom, four for each in turn.
+    // gaps_out is a CSS shorthand string: one value for all sides, two for vertical/horizontal,
+    // three for top/sides/bottom, four for each.
     function parseGaps(text) {
         var css = ""
         try {
@@ -145,8 +133,7 @@ Singleton {
         }
     }
 
-    // The gaps can move with a config reload, and the bar is meant to line up
-    // with the windows whatever they are now.
+    // Gaps can change with a config reload.
     Connections {
         target: Hyprland
 

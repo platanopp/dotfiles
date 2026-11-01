@@ -3,14 +3,9 @@ import QtQuick.Layouts
 import qs.components
 import qs.config
 
-// One quick toggle in the control panel.
-//
-// On is a filled tile in the accent with dark text on it, off is the plain
-// surface. The accent here is a near-white grey, and the old version showed
-// "on" as that grey at 16% over dark glass plus a 6px dot -- which read as
-// barely different from off, and the dot cost the label its last few
-// characters ("Do not dist…"). A fill cannot be mistaken, and it is the same
-// on/off language the wallpaper picker's section switch speaks.
+// One quick toggle in the control panel: on is an accent fill with dark text, off
+// the plain surface. A faint tint plus a dot read as barely different from off and
+// cost the label its last characters.
 Rectangle {
     id: root
 

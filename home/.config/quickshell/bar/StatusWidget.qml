@@ -15,14 +15,10 @@ PanelWindow {
     screen: bar.screen
     visible: true
 
-    // Hidden by cutting input and drawing nothing, never by unmapping the
-    // window. Toggling visible destroys the layer surface, and Hyprland
-    // restacks it on the way back: the full-width bar came back above the
-    // pills and swallowed every click meant for them. The blur rule ignores
-    // pixels below 0.3 alpha, so a surface drawing nothing leaves no band.
-    // Hidden under the Settings window while it is open: it sits where
-    // Settings grows to, and a layer surface that is re-created (this one is,
-    // whenever its contents come and go) stacks itself above older ones.
+    // Hidden by cutting input and drawing nothing, never by unmapping: a remapped layer is
+    // restacked above the pills and swallowed their clicks. The blur rule ignores pixels
+    // under 0.3 alpha, so nothing shows. Also hidden under the Settings window: a re-created
+    // layer surface stacks above older ones.
     property bool covered: false
 
     mask: bar.barHidden || covered ? blankMask : stageMask
@@ -33,15 +29,13 @@ PanelWindow {
         height: 0
     }
 
-    // Input only where the pill is: the window also holds the room the pill
-    // grows into (see PillStage).
+    // Input only where the pill is; the window also holds the room it grows into (see PillStage).
     Region {
         id: stageMask
         item: stage
     }
 
-    // Keeps the bar up while the pointer is on it; shell.qml folds these
-    // together with the reveal zone's own hover.
+    // Keeps the bar up while hovered; shell.qml folds these together with the reveal zone's hover.
     readonly property bool barHovered: barHover.hovered
 
     HoverHandler {
@@ -57,14 +51,12 @@ PanelWindow {
         top: true
         right: true
     }
-    // The content inside insets itself by 12, so the window sits back by
-    // that much and the drawn edge lands exactly on Hyprland's gap.
+    // The content insets by 12, so the window sits back that much and the
+    // drawn edge lands on Hyprland's gap.
     margins.top: Math.max(0, Hypr.gapTop - 12)
 
-    // Set by shell.qml, which owns the order of the right-hand pills. Not
-    // animated here: it follows the control pill's box, which already moves
-    // smoothly, and a second animation chasing that one is what made the
-    // row lag and wobble behind an opening panel.
+    // Set by shell.qml, which orders the right-hand pills. Not animated: it follows the control
+    // pill's box, and a second animation made the row lag and wobble.
     property int rightMargin: 50
     margins.right: rightMargin
 
@@ -80,8 +72,7 @@ PanelWindow {
         function onDismissRequested() { statusItem.expandedPanel = "" }
     }
 
-    // A panel's heading: title, one line of state under it, and whatever
-    // controls it carries on the right (a switch, refresh, settings).
+    // A panel's heading: title, a line of state under it, and its controls on the right.
     component PanelHeader: RowLayout {
         id: header
         property string title: ""
@@ -148,10 +139,8 @@ PanelWindow {
         font.family: Theme.fontText
     }
 
-    // A button in the closed pill: its icon (and number), on a disc -- a
-    // capsule when there is text -- that lights under the pointer and a
-    // little more when pressed, like the control pill's bell and logo and
-    // the tray's icons.
+    // A button in the closed pill: icon (and number) on a disc, a capsule with text, lit on hover
+    // and press like the control pill's and the tray's.
     component PillButtonArea: Item {
         id: btn
         default property alias content: btnRow.data
@@ -224,8 +213,8 @@ PanelWindow {
         return "\u{F091F}"
     }
 
-    // What the bar shows for the network: Wi-Fi by strength, a cable when
-    // wired, and the difference between Wi-Fi off and just not connected.
+    // The network icon: Wi-Fi by strength, a cable when wired, and Wi-Fi off
+    // distinct from not connected.
     readonly property string networkIcon: Network.wifiSsid.length > 0
         ? statusItem.signalIcon(Network.wifiSignal < 0 ? 100 : Network.wifiSignal)
         : Network.ethernetUp ? "\u{F0200}"
@@ -251,8 +240,8 @@ PanelWindow {
         return "\u{F00AF}"
     }
 
-    // Less the 8px the first and last buttons carry inside them, so the pill's
-    // own padding is what it was.
+    // Less the 8px the first and last buttons carry inside them, so the
+    // pill's padding stays the same.
     readonly property int compactWidth: compactRow.implicitWidth + 24 + Theme.pillPaddingH * 2 - 16
 
     // The pill's box, animated inside a window that is not (see PillStage).
@@ -261,24 +250,21 @@ PanelWindow {
         collapsed: bar.barHidden
         anchors.top: parent.top
         anchors.right: parent.right
-        // Sized for the open panel from the start and never resized: a
-        // window anchored on the right that grows moves its left edge, and
-        // for the frame the compositor takes to get the new buffer it showed
-        // the old one there -- the pill flicked left over the tray.
+        // Sized for the open panel from the start and never resized: a right-anchored
+        // window that grows moves its left edge, and for a frame the old buffer showed
+        // the pill flicked over the tray.
         minWindowWidth: 324
         minWindowHeight: 620
         targetWidth: statusItem.expandedPanel !== "" ? 324 : statusItem.compactWidth
-        // Follows the content instead of a fixed 524, which left a large empty
-        // box under short lists. Chrome is the 12px inset, the 40px compact row,
-        // and the flickable's margins; past the cap the list scrolls.
+        // Follows the content (a fixed 524 left empty space under short lists). Chrome is the 12px
+        // inset, the 40px row and the flickable's margins; past the cap the list scrolls.
         targetHeight: statusItem.expandedPanel !== "" ? Math.min(expandedColumn.implicitHeight + 84, 620) : 64
     }
 
     implicitWidth: stage.windowWidth
     implicitHeight: stage.windowHeight
 
-    // What the pills beside this one park off: the box as drawn, mid-move
-    // included, not the window around it.
+    // What the neighbouring pills park off: the box as drawn, mid-move included, not the window.
     readonly property real visualWidth: stage.width
 
     Item {
@@ -321,8 +307,7 @@ PanelWindow {
         RowLayout {
             id: compactRow
             anchors.centerIn: parent
-            // The buttons carry their own 8px either side, so the icons still
-            // sit 14 apart as before.
+            // The buttons carry their own 8px either side, so the icons still sit 14 apart.
             spacing: 0
 
             IconGlyph {
@@ -434,8 +419,8 @@ PanelWindow {
         onCleared: statusItem.expandedPanel = ""
     }
 
-    // The media widget reads the same list, so the polling lives in Audio
-    // and each viewer just says whether it is looking.
+    // The media widget reads the same list, so the polling lives in Audio and
+    // each viewer says whether it looks.
     readonly property bool watchingAudioStreams: statusItem.expandedPanel === "audio"
     onWatchingAudioStreamsChanged:
         watchingAudioStreams ? Audio.watchAudioStreams() : Audio.unwatchAudioStreams()
@@ -466,7 +451,7 @@ PanelWindow {
             width: parent.width
             spacing: 14
 
-            // ── Wi-Fi ────────────────────────────────────────────────────
+            // Wi-Fi
             Column {
                 width: parent.width
                 spacing: 10
@@ -495,8 +480,7 @@ PanelWindow {
                             wifiRescan.restart()
                         }
 
-                        // The radio takes a moment to come up before it
-                        // can see anything.
+                        // The radio takes a moment to come up before it can see anything.
                         Timer {
                             id: wifiRescan
                             interval: 2500
@@ -584,9 +568,8 @@ PanelWindow {
                                     }
                                 }
 
-                                // Saved and open networks connect at once;
-                                // a new secured one asks for its password;
-                                // the one in use offers to disconnect.
+                                // Saved and open networks connect at once, a new secured one asks
+                                // for its password, the one in use offers to disconnect.
                                 StateLayer {
                                     tint: networkRow.modelData.inUse ? Theme.accentText : Theme.foreground
                                     interactive: !Network.wifiConnecting
@@ -687,7 +670,7 @@ PanelWindow {
                 }
             }
 
-            // ── Bluetooth ────────────────────────────────────────────────
+            // Bluetooth
             Column {
                 id: btPanel
                 width: parent.width
@@ -770,8 +753,7 @@ PanelWindow {
                                     anchors.leftMargin: 12
                                     anchors.rightMargin: 8
                                     spacing: 10
-                                    // Over the row's StateLayer, so Forget
-                                    // takes its own taps.
+                                    // Over the row's StateLayer, so Forget takes its own taps.
                                     z: 2
 
                                     IconGlyph {
@@ -852,7 +834,7 @@ PanelWindow {
                 }
             }
 
-            // ── Sound ────────────────────────────────────────────────────
+            // Sound
             Column {
                 width: parent.width
                 spacing: 14

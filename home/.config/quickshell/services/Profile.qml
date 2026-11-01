@@ -12,9 +12,8 @@ Singleton {
     // start empty, and the clock's panel showed a hard-coded name meanwhile.
     property string username: Quickshell.env("USER") || ""
 
-    // The logged-in user's picture, from where Linux keeps one: ~/.face (what
-    // display managers read), ~/.face.icon, or AccountsService's copy. Empty
-    // when there is none, and the control panel shows the initial instead.
+    // The user's picture: ~/.face (what display managers read), ~/.face.icon, or
+    // AccountsService's copy; empty when there is none.
     property string avatarPath: ""
     // Bumped on every change: the file keeps its name, so an Image showing it
     // must be told to read it again (see avatarSource).

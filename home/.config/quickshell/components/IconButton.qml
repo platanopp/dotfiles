@@ -1,9 +1,8 @@
 import QtQuick
 import qs.config
 
-// Circular icon button with a hit area sized in place. Bare glyphs relying on
-// StateLayer's negative margins get their target clipped by any parent with
-// clip: true, and crowd the edge of a panel.
+// Circular icon button with its hit area in place: bare glyphs on StateLayer's negative
+// margins got clipped by `clip: true` parents.
 Rectangle {
     id: root
 

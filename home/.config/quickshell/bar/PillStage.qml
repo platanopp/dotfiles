@@ -2,40 +2,18 @@ import QtQuick
 import qs.components
 import qs.config
 
-// The box a bar pill is drawn in, animated inside a window that does not
-// animate.
+// The box a bar pill is drawn in, animated inside a window that does not animate: a layer surface
+// resized every frame reallocated buffers and stuttered. The window resizes at most twice per move
+// (to hold both ends, then to the final size); `Region { item: stage }` keeps input to the box.
 //
-// Every pill is a layer surface of its own. Animating the window's size made
-// the surface resize on every frame, and a Wayland surface that resizes
-// reallocates its buffers and waits on the compositor each time -- the
-// expanding panels stuttered, and the pills beside them jerked along. Here
-// the window changes size at most twice per move: at the start it jumps to
-// hold both where the box was and where it is going, the box grows or
-// shrinks inside it, and when the move has finished the window drops to what
-// the box needs. Put the pill's content inside (or anchor it to this), anchor
-// this to the window's edge the pill hangs from, and size the window with
-// windowWidth / windowHeight.
+// targetWidth, targetHeight   what the box should be: grows on the spring, shrinks on a plain curve
+// animateWidth / Height       off when the change is already animated upstream (the clock's date)
+// minWindowWidth / Height     never less: a window sized for its largest state is never resized
+// maxWindowWidth / Height     never more, when set; a spring past it is cut at the edge
+// elastic                     off for a move that should not bounce
+// evenWidth                   keep the width even, so a centred box sits on whole pixels
 //
-// The window keeps input to this box with `Region { item: stage }`, so the
-// room it holds for the move is not there for the pointer.
-//
-//   targetWidth, targetHeight   what the box should be; it animates there:
-//                               growing on the shell's spring (Elastic),
-//                               shrinking on a plain curve over `duration`
-//   animateWidth / Height       off when the change is already animated
-//                               upstream (the clock's date folding out)
-//   minWindowWidth / Height     never less than this: a window sized for its
-//                               largest state once is not resized at all
-//                               (the spring's reach is added on top)
-//   maxWindowWidth / Height     never more than this, when set; a spring that
-//                               would run past it is cut at the edge
-//   elastic                     off for a move that should not bounce
-//   evenWidth                   keep the width even -- for a box centred in
-//                               its window, so it sits on whole pixels
-//
-// The box is kept to whole pixels while it moves. Fractional sizes left the
-// edge anchored to the window on a pixel and the other one between two, and
-// the glass and its shadow shimmered as they crossed the grid.
+// The box stays on whole pixels while moving: fractional sizes made the glass and shadow shimmer.
 Item {
     id: stage
 
@@ -51,10 +29,8 @@ Item {
     property bool evenWidth: false
     property bool elastic: true
 
-    // The animated values; the box itself is these rounded. Driven by hand
-    // rather than by a Behavior: whether a move grows or shrinks has to be
-    // known when it starts, to pick the spring or the plain curve, and a
-    // Behavior gives no say in which animation it runs.
+    // Driven by hand rather than a Behavior: picking the spring or the plain curve needs to know at
+    // the start whether the move grows or shrinks.
     property real animWidth: 0
     property real animHeight: 0
 
@@ -103,9 +79,8 @@ Item {
         }
     }
 
-    // The largest the box has been since the current move began. Taken when
-    // the target changes -- at that instant `width` is still where the box
-    // was -- and let go once the move is over.
+    // The largest the box has been in the current move, taken when the target changes (while
+    // `width` is still the old size) and let go when the move ends.
     property real heldWidth: 0
     property real heldHeight: 0
 
@@ -131,17 +106,12 @@ Item {
         }
     }
 
-    // Set while the bar is hidden (a fullscreen window): the pill draws
-    // nothing then, so its window drops to a pixel -- these windows are
-    // sized for their largest state (a 790x1032 control panel, a 640-high
-    // media panel) and stay mapped, and Hyprland was compositing all that
-    // transparent area over the game every frame. Shrinking while nothing is
-    // drawn cannot show the one empty frame a resize costs.
+    // Set while the bar is hidden under fullscreen: the window drops to a pixel, since Hyprland
+    // composited the whole transparent area of these large windows over the game every frame.
     property bool collapsed: false
 
-    // A window held at its largest state keeps the spring's reach past that
-    // state too, so opening never resizes it; the others take the reach for
-    // the length of the move, as they take `held`.
+    // A window held at its largest state keeps the spring's reach too, so opening never resizes it;
+    // others take the reach for the move only.
     function windowSize(min, max, target, reach, held) {
         var size = Math.max(min > 0 ? min * (1 + Theme.springReach) : 0, target + reach, held)
         return Math.ceil(max > 0 ? Math.min(max, size) : size)

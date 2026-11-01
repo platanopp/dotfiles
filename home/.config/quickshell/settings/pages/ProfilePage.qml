@@ -8,13 +8,10 @@ import qs.config
 import qs.services
 import qs.settings
 
-// Settings -> Profile: the picture the control panel (and greeters) show for
-// whoever is logged in. Chosen from a small browser of the user's own images,
-// right here -- a separate file dialog would take focus and close the panel.
-// Picking one opens it for framing -- drag to move, wheel or slider to zoom,
-// inside the circle it will be shown in -- and Save has scripts/avatar.py
-// cut that square and write ~/.face. The picture in use can be framed again
-// the same way (Adjust): the script keeps what it was cut from.
+// Settings -> Profile: the picture the control panel (and greeters) show. Picked from a
+// browser of the user's images right here (a file dialog would take focus and close the
+// panel), framed inside the circle, and saved by scripts/avatar.py to ~/.face; Adjust
+// reframes the one in use from its original.
 Column {
     id: page
     spacing: 24
@@ -22,17 +19,13 @@ Column {
     readonly property string home: Quickshell.env("HOME")
     // Where browsing starts: ~/Pictures if there is one, else home.
     property string folder: page.home + "/Pictures"
-    // Thumbnails are cheap, not free: a folder of screenshots can hold
-    // hundreds. More on request.
+    // A folder of screenshots can hold hundreds, so thumbnails come 36 at a time.
     property int limit: 36
-    // ~/.face is a cropped copy, so the file it came from is only known for
-    // a pick made here.
+    // ~/.face is a cropped copy, so the original is only known for a pick made here.
     property string lastPicked: ""
 
-    // ── Framing ──────────────────────────────────────────────────────────
-    // The picture being framed ("" when not), and the framing: zoom 1 is
-    // the largest square the picture holds; x, y the square's centre as
-    // fractions of the picture's width and height.
+    // Framing: the picture being framed ("" when not); zoom 1 is the largest square it holds, x and
+    // y the square's centre as fractions of its size.
     property string editing: ""
     property bool editingCurrent: false
     property real editZoom: 1
@@ -61,7 +54,7 @@ Column {
     function shortPath(p) { return p.indexOf(page.home) === 0 ? "~" + p.slice(page.home.length) : p }
     function parentOf(p) { var i = p.lastIndexOf("/"); return i > 0 ? p.slice(0, i) : "/" }
 
-    // ── Who ──────────────────────────────────────────────────────────────
+    // Who
     Rectangle {
         visible: page.editing.length === 0
         width: parent.width
@@ -162,22 +155,20 @@ Column {
         }
     }
 
-    // ── Framing the picture ──────────────────────────────────────────────
+    // Framing the picture
     Rectangle {
         id: editor
         visible: page.editing.length > 0
         width: parent.width
-        // Side by side when the page has room for the 260px viewport and the
-        // controls; stacked otherwise. Settings is half the screen wide, so on
-        // a 1920px monitor the page is about 470px and the controls, laid out
-        // beside the viewport, ran off the card's right edge.
+        // Side by side when there is room for the 260px viewport and the controls, stacked
+        // otherwise: on a 1920px monitor the page is about 470px wide.
         readonly property bool wide: width >= 600
         height: editor.wide ? 300 : editorGrid.implicitHeight + 40
         radius: Theme.radiusXLarge
         color: Theme.surfaceContainer
 
-        // The picture's size as loaded; the framing is in fractions of it,
-        // so the scaled-down copy shown here frames the same as the file.
+        // The picture's size as loaded; the framing is in fractions, so the scaled
+        // copy frames the same as the file.
         readonly property real iw: shown.implicitWidth
         readonly property real ih: shown.implicitHeight
         readonly property bool ready: shown.status === Image.Ready && iw > 0 && ih > 0
@@ -215,8 +206,8 @@ Column {
 
                 Image {
                     id: shown
-                    // A new name each time, so a picture framed and saved
-                    // before is read again rather than served from cache.
+                    // A new name each time, so a picture saved before is read again
+                    // rather than served from cache.
                     source: page.editing.length > 0 ? "file://" + page.editing + "?v=" + Profile.avatarVersion : ""
                     cache: false
                     asynchronous: true
@@ -277,8 +268,8 @@ Column {
                         startX = mouse.x; startY = mouse.y
                         fromX = page.editX; fromY = page.editY
                     }
-                    // Dragging the picture moves it under the circle: the
-                    // square's centre goes the other way.
+                    // Dragging moves the picture under the circle: the square's
+                    // centre goes the other way.
                     onPositionChanged: mouse => {
                         if (!pressed) return
                         page.editX = editor.clamp(fromX - (mouse.x - startX) / (editor.k * editor.iw), editor.iw)
@@ -365,7 +356,7 @@ Column {
         }
     }
 
-    // ── Browser ──────────────────────────────────────────────────────────
+    // Browser
     SettingsGroup {
         width: parent.width
         title: "Choose a picture"
@@ -464,8 +455,7 @@ Column {
                     HoverHandler { id: hover; cursorShape: Qt.PointingHandCursor }
                 }
 
-                // The picture in use, ringed. Outside the clip so the ring is
-                // not cut in half.
+                // The picture in use, ringed; outside the clip so the ring is not cut in half.
                 Rectangle {
                     anchors.fill: thumb
                     radius: thumb.radius

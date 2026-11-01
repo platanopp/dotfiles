@@ -5,11 +5,8 @@ import qs.config
 import qs.services
 import qs.settings
 
-// Settings -> About: what this machine is, whether its shell is the latest
-// published one, and how current its backup is.
-// The backup is ~/dotfiles, a copy of the live configuration that only
-// changes when it is synced and committed; the rows here do exactly that.
-// Pushing publishes it -- the repo is public -- so that button asks twice.
+// Settings -> About: the machine, whether its shell is the latest published one, and the backup
+// (~/dotfiles, synced and committed from here). The repo is public, so pushing asks twice.
 Column {
     id: page
     spacing: 24
@@ -20,7 +17,7 @@ Column {
 
     Component.onCompleted: System.refreshAbout()
 
-    // ── The machine, as a card of its own ────────────────────────────────
+    // The machine, as a card of its own
     Rectangle {
         width: parent.width
         height: 118
@@ -132,14 +129,9 @@ Column {
         }
     }
 
-    // ── Updates ──────────────────────────────────────────────────────────
-    //
-    // The shell against its latest published version (scripts/
-    // shell_update.py), checked whenever this page opens. Behind it, the row
-    // offers the update -- asking twice, since it replaces the shell and
-    // restarts it -- and lists what changed. Whoever publishes the shell sees
-    // that instead: their copy differing means newer, and it goes out from
-    // Backup below.
+    // Updates: the shell against its latest published version (shell_update.py), checked on
+    // open; the update asks twice since it restarts the shell. The publisher's own copy
+    // reads as newer and goes out from Backup.
     SettingsGroup {
         width: parent.width
         title: "Updates"
@@ -200,8 +192,8 @@ Column {
             }
         }
 
-        // What the update brings: the published commits that touched the
-        // shell since the version installed here, newest first.
+        // What the update brings: the published commits that touched the shell
+        // since this version, newest first.
         SettingsRow {
             visible: page.update.state === "behind" && (page.update.commits || []).length > 0
             icon: "\u{F02DA}"
@@ -249,8 +241,7 @@ Column {
         }
     }
 
-    // What the last update did, when it did not restart the shell: a
-    // failure, or nothing left to change.
+    // What the last update did when it did not restart the shell: a failure, or nothing to change.
     Text {
         width: parent.width
         visible: System.updateLast !== null && !(System.updateLast.ok && System.updateLast.files > 0)
@@ -267,13 +258,9 @@ Column {
         horizontalAlignment: Text.AlignHCenter
     }
 
-    // ── Backup ───────────────────────────────────────────────────────────
-    //
-    // For whoever is logged in: their configuration, copied into a git
-    // repository (see scripts/backup.py). No repository yet, and the page
-    // offers to make one; no remote, and it offers a private GitHub one when
-    // gh is logged in; a remote, and it can push -- asking twice, and saying
-    // so plainly when the repository is public.
+    // Backup: the user's configuration in a git repository (backup.py). Offers to create one,
+    // then a private GitHub remote when gh is logged in, then pushing, asking twice and
+    // saying plainly when the repo is public.
     SettingsGroup {
         width: parent.width
         title: "Backup"

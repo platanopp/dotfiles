@@ -4,11 +4,9 @@ import qs.config
 import qs.services
 import qs.settings
 
-// Settings -> Keyboard: RGB keyboards lit with the wallpaper itself -- a
-// Wooting through its own SDK, any other brand through OpenRGB --
-// the picture laid over the board, each key the colour of the part under it
-// (scripts/keyboard_rgb.py). The board drawn here shows the colours last
-// sent, key for key.
+// Settings -> Keyboard: RGB keyboards lit with the wallpaper laid over the keys
+// (keyboard_rgb.py), a Wooting through its SDK and other brands through OpenRGB. The board
+// drawn here shows the colours last sent.
 Column {
     id: page
     spacing: 24
@@ -34,7 +32,7 @@ Column {
         return page.pal.keys[(rowIndex + 1) + "," + col] || Theme.surfaceContainerHigh
     }
 
-    // ── The board ────────────────────────────────────────────────────────
+    // The board
     Rectangle {
         width: parent.width
         height: board.height + 64
@@ -113,9 +111,8 @@ Column {
             }
         }
 
-        // Only the Wooting SDK reaches a Wooting; OpenRGB reaches the rest.
-        // Said when it is not running, since that is why a keyboard of
-        // another brand would be missing from the list above.
+        // Shown when OpenRGB isn't running, since that is why another brand's
+        // keyboard would be missing above.
         SettingsRow {
             visible: !!(page.status.devices && page.status.devices.length > 0) && page.status.openrgb === false
             icon: "\u{F02FD}"

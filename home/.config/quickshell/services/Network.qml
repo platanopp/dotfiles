@@ -3,17 +3,15 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Wi-Fi and wired state for the bar's icon and the Wi-Fi panel: the
-// connection and its signal, the scan list, connecting and disconnecting.
-// Driven by `nmcli monitor`, with a slow poll behind it.
+// Wi-Fi and wired state for the bar's icon and the Wi-Fi panel, driven by `nmcli
+// monitor` with a slow poll behind it.
 Singleton {
     id: root
 
     property string wifiSsid: ""
     property string wifiIp: ""
     property bool wifiRadioEnabled: true
-    // The connected network's signal (0-100), for the bar's icon; -1 when
-    // not on Wi-Fi. ethernetUp: a wired connection, which the bar shows
+    // The connected network's signal (0-100), -1 when not on Wi-Fi. ethernetUp: wired, shown
     // instead of a crossed-out Wi-Fi icon.
     property int wifiSignal: -1
     property bool ethernetUp: false
@@ -62,9 +60,8 @@ Singleton {
                 secure: parts[3] !== "--" && parts[3].length > 0,
                 saved: savedNames.indexOf(ssid) !== -1
             }
-            // A multi-band AP shows up once per band. Keep the strongest, but
-            // carry the in-use flag across: if the connected band is the
-            // weaker one, dropping it left the network looking disconnected.
+            // A multi-band AP shows once per band: keep the strongest but carry the in-use flag, or
+            // a connected weaker band looked disconnected.
             var existing = byS[ssid]
             if (!existing) {
                 byS[ssid] = entry
@@ -183,14 +180,8 @@ Singleton {
         onTriggered: wifiRadioProc.running = true
     }
 
-    // ── Keeping up ───────────────────────────────────────────────────────
-    //
-    // Read when something says it changed, not on a clock. This was one
-    // timer starting eight processes every 15 seconds -- and one of them,
-    // `nmcli dev wifi`, set off a full Wi-Fi scan each time the last was over
-    // 30 seconds old (see net_status.sh). Now NetworkManager is listened to,
-    // and a slow poll only catches what it does not announce: the signal
-    // drifting.
+    // Keeping up: read when NetworkManager announces a change; the slow poll only catches signal
+    // drift. (The old 15s timer ran eight processes, one of them triggering full Wi-Fi scans.)
     function refreshNetwork() {
         if (!wifiProc.running) wifiProc.running = true
         if (!wifiIpProc.running) wifiIpProc.running = true

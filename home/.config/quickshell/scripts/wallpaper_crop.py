@@ -110,9 +110,8 @@ def cmd_get(path):
         "screenHeight": dst_h,
         "focusX": focus[0],
         "focusY": focus[1],
-        # Fraction of the source the crop spans. Whichever of these is below
-        # 1 is the axis with room to move, and the widget reads them to know
-        # which way it is allowed to drag.
+        # Fraction of the source the crop spans; the axis below 1 is the one with
+        # room, which the editor drags along.
         "coverX": box_w / src_w,
         "coverY": box_h / src_h,
     }))

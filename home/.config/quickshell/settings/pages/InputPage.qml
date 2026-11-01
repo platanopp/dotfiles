@@ -4,13 +4,9 @@ import qs.config
 import qs.services
 import qs.settings
 
-// Settings -> Hyprland -> Input: the pointer, the keyboard's repeat, scrolling
-// and the cursor. Same rules as the Look page (scripts/hypr_settings.py).
-//
-// The keyboard layout is not here on purpose: a wrong one, and the lock
-// screen's password cannot be typed. The tablet is untouched by any of it --
-// OpenTabletDriver drives an absolute device, which pointer speed and
-// acceleration do not apply to.
+// Settings -> Hyprland -> Input: pointer, key repeat, scrolling and cursor, through
+// hypr_settings.py. No keyboard layout here: a wrong one would make the lock's password untypable.
+// The tablet is unaffected (absolute device).
 Column {
     id: page
     spacing: 24
@@ -75,11 +71,8 @@ Column {
             resettable: page.opt("follow_mouse").overridden
             onReset: Hypr.resetHypr("follow_mouse")
 
-            // Click is Hyprland's 2, not its 0. With 0 the pointer itself stays
-            // with the focused window: a wheel over another window scrolled
-            // nothing and hover effects stopped until a click. With 2 only the
-            // keyboard waits for the click -- the pointer still reaches what
-            // it is over, the way click-to-focus works everywhere else.
+            // Click is Hyprland's 2, not 0: with 0 the pointer itself stayed on the focused window,
+            // so the wheel and hover died elsewhere. With 2 only the keyboard waits for the click.
             Segmented {
                 tint: page.tint
                 options: [

@@ -4,37 +4,24 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
 
-// Which of the shell's panels and overlays are open, and on which screen:
-// the bar's pills, Settings, the launcher, the workspace overview, the
-// wallpaper picker and the keybinds sheet. Also what opens and closes them
-// from outside -- the IPC targets, Escape, and Hyprland's "shell-modal"
-// submap while an overlay is up.
+// Which panels and overlays are open, and on which screen, plus what drives them from outside: the
+// IPC targets, the Escape bind and the "shell-modal" submap.
 Singleton {
     id: root
 
-    // Asks the control panel on that screen to open Settings at a page --
-    // for the bar's own panels, which link to their fuller page.
+    // The bar's panels use it to link to their fuller Settings page.
     signal settingsRequested(string page, string screenName)
     function openSettings(page, screenName) { root.settingsRequested(page, screenName) }
-    // Open on the focused monitor at the page last seen, or close if open --
-    // Super+O (the "settings" global shortcut in shell.qml).
+    // Super+O: open on the focused monitor at the last page seen, or close.
     function toggleSettings() { root.settingsRequested("", root.focusedScreenName()) }
 
-    // ── Escape closes the bar's panels ───────────────────────────────────
-    //
-    // The pills never take the keyboard: switching a layer surface's keyboard
-    // mode while it is up clears its focus grab and shuts the panel (see
-    // ControlPanel), and a pill that kept the keyboard would leave it stuck
-    // there after closing. So Escape comes from Hyprland instead: while any
-    // panel is open, a bind for Escape is added that fires the "dismiss"
-    // global shortcut (shell.qml), and it is taken away again when the last
-    // panel closes. The rest of the keyboard and every other bind are left
-    // alone. The bind also removes itself when pressed, so even with the
-    // shell gone it can steal Escape once at most.
+    // Pills never take the keyboard, so while a panel is open a temporary Hyprland
+    // bind sends Escape to "dismiss". It removes itself when pressed, so a dead
+    // shell steals Escape once at most.
     signal dismissRequested()
     function dismissPanels() { root.dismissRequested() }
 
-    // Which panels are open, by "<widget>:<screen>".
+    // Keyed "<widget>:<screen>".
     property var openPanels: ({})
     readonly property bool anyPanelOpen: Object.keys(root.openPanels).length > 0
 
@@ -74,8 +61,7 @@ Singleton {
         onTriggered: escapeBind.sync()
     }
 
-    // The media panel on the focused monitor: qs ipc call media toggle |
-    // open | close -- for a key bind, say.
+    // qs ipc call media toggle | open | close, on the focused monitor.
     signal mediaRequested(string how, string screenName)
 
     IpcHandler {
@@ -85,9 +71,7 @@ Singleton {
         function close(): void { root.mediaRequested("close", "") }
     }
 
-    // The notification centre on the focused monitor's control pill:
-    // qs ipc call notifications toggle | open | close | clear -- for a key
-    // bind, say. `clear` empties the centre without opening it.
+    // qs ipc call notifications toggle | open | close | clear (clear empties it without opening).
     signal notificationsRequested(string how, string screenName)
 
     IpcHandler {
@@ -103,7 +87,7 @@ Singleton {
         return m ? m.name : ""
     }
 
-    // qs ipc call settings open sound -- on the focused monitor.
+    // qs ipc call settings open sound, on the focused monitor.
     IpcHandler {
         target: "settings"
         function open(page: string): void {
@@ -113,16 +97,10 @@ Singleton {
         function toggle(): void { root.toggleSettings() }
     }
 
-    // The cheatsheet overlay. Lives here because two unrelated things open
-    // it: the control panel's button and the Hyprland global shortcut.
+    // Lives here because both the control panel and a global shortcut open it.
     property bool keybindsOpen: false
 
-    // Monitor the cheatsheet was summoned on, latched on the way open.
-    //
-    // The overlay used to just render on whichever monitor was focused, but
-    // focus follows the mouse here (input:follow_mouse = 1), so moving the
-    // pointer to the other screen carried the sheet along with it -- off the
-    // work it was opened to explain. Pinned instead until it closes.
+    // Latched on open, so the sheet stays put when the pointer moves to the other monitor.
     property string keybindsScreen: ""
 
     onKeybindsOpenChanged: {
@@ -130,8 +108,7 @@ Singleton {
         if (!root.keybindsOpen) return
         var monitor = Hyprland.focusedMonitor
         root.keybindsScreen = monitor ? monitor.name : ""
-        // The file watches normally have this covered; re-reading on the way
-        // in is the cheap guarantee that what gets shown is what is on disk.
+        // The file watches usually cover this; re-reading on open is a cheap guarantee.
         Keybinds.refreshHyprBinds()
         Keybinds.refreshYaziBinds()
     }
@@ -140,8 +117,7 @@ Singleton {
         root.keybindsOpen = !root.keybindsOpen
     }
 
-    // qs ipc call keybinds toggle | open | close -- the sheet without the
-    // global shortcut, like the launcher's and the overview's targets.
+    // qs ipc call keybinds toggle | open | close.
     IpcHandler {
         target: "keybinds"
         function toggle(): void { root.toggleKeybinds() }
@@ -149,10 +125,7 @@ Singleton {
         function close(): void { root.keybindsOpen = false }
     }
 
-    // The wallpaper picker. Same two reasons as the cheatsheet for living
-    // here: the control panel opens it, so does a global shortcut, and it
-    // has to stay on the screen it was summoned on rather than follow the
-    // pointer to the other monitor.
+    // Lives here for the same reasons as the cheatsheet: two openers, pinned to its screen.
     property bool wallpapersOpen: false
     property string wallpapersScreen: ""
 
@@ -161,8 +134,7 @@ Singleton {
         if (!root.wallpapersOpen) return
         var monitor = Hyprland.focusedMonitor
         root.wallpapersScreen = monitor ? monitor.name : ""
-        // Cheap, and it means a file dropped into the folder while the shell
-        // was running is there the first time the picker is opened.
+        // Picks up files added while the shell was running.
         Wallpaper.refreshWallpaperList()
         Wallpaper.refreshVideoWallpapers()
     }
@@ -171,10 +143,7 @@ Singleton {
         root.wallpapersOpen = !root.wallpapersOpen
     }
 
-    // The application launcher. Same reason as the two above for living here
-    // rather than in the component: it is opened from a global shortcut, and
-    // it has to stay on the screen it was summoned on rather than follow the
-    // pointer to the other monitor.
+    // Lives here for the same reasons: a global shortcut opens it, and it stays on its screen.
     property bool launcherOpen: false
     property string launcherScreen: ""
 
@@ -189,22 +158,18 @@ Singleton {
         root.launcherOpen = !root.launcherOpen
     }
 
-    // The workspace overview (Super+Tab): every workspace, with its windows,
-    // up on every screen at once. The keyboard goes with the pointer.
+    // Super+Tab: up on every screen at once; the keyboard follows the pointer.
     property bool overviewOpen: false
     property string overviewScreen: ""
-    // Closing to go to another workspace: every screen's is gone at once, and
-    // lets go of the keyboard, wherever the click was.
+    // Closing to go to a workspace: every screen's overview closes and lets go of the keyboard.
     property bool overviewLeaving: false
 
-    // A window being dragged in the overview, for every screen's to see: the
-    // one it was picked up on keeps getting the pointer, and draws it as far
-    // as its edge; the one the pointer is over draws the rest and says where
-    // it would land there.
-    //   overviewDrag     { address, toplevel, cls, from, w, h, fx, fy }
-    //   overviewDragAt   the pointer, in the layout's coordinates
-    //   overviewDropAt   { screen, key, id, isNew, scale }, from that screen
-    //   overviewDropped  { address, screen, key }, once it is let go there
+    // A window dragged in the overview, shared by every screen: the source screen keeps the pointer
+    // grab, the one under the pointer draws it and reports where it would land.
+    // overviewDrag     { address, toplevel, cls, from, w, h, homeW, homeH, fx, fy }
+    // overviewDragAt   the pointer, in layout coordinates
+    // overviewDropAt   { screen, key, id, isNew, scale }, from that screen
+    // overviewDropped  { address, screen, key }, once it is let go there
     property var overviewDrag: null
     property point overviewDragAt: Qt.point(0, 0)
     property var overviewDropAt: null
@@ -218,9 +183,8 @@ Singleton {
         roundingProc.running = true
     }
 
-    // Hyprland's corner rounding, for the overview's windows to leave and
-    // land with. Asked on every opening -- it is a setting (Settings -> Look)
-    // -- with the last answer kept meanwhile; -1 until the first.
+    // Hyprland's corner rounding, for the overview's windows; re-read on each
+    // open, -1 until the first answer.
     property int overviewRounding: -1
 
     Process {
@@ -254,9 +218,7 @@ Singleton {
         function close(): void { root.overviewOpen = false }
     }
 
-    // The widget picker (Super+D): the desktop widgets, put on, moved and
-    // taken off. Pinned to the screen it was opened on, like the others, and
-    // that screen's widgets are the ones it edits.
+    // Super+D. Pinned to the screen it opened on, and edits that screen's widgets.
     property bool widgetsOpen: false
     property string widgetsScreen: ""
 
@@ -282,20 +244,14 @@ Singleton {
         function close(): void { root.widgetsOpen = false }
     }
 
-    // The launcher, the overview, the wallpaper picker, the widget picker
-    // and the shortcut sheet put Hyprland in its "shell-modal" submap while one is up (hyprland.lua), where Super+drag and the
-    // other binds do nothing -- they reached the windows behind the overlay.
-    // Set again on every change of either: Super+Tab or Super+Space drop
-    // the submap themselves, and one may be opening as the other closes.
-    // Reset once as the shell starts, in case one died with it set.
+    // While one is up Hyprland sits in its "shell-modal" submap (hyprland.lua), so binds
+    // can't reach the windows behind. Re-synced on every change (Super+Tab/Space drop the
+    // submap themselves) and reset at startup.
     readonly property bool modalOpen: root.overviewOpen || root.launcherOpen || root.wallpapersOpen
                                       || root.keybindsOpen || root.widgetsOpen
 
-    // One call, with where things ended up, a moment after they settle --
-    // not one per change: two changes close together (the launcher closing
-    // as the overview opens, an overview opened and closed at once) sent two
-    // hyprctl processes that could land in either order, and the submap was
-    // left set with nothing open. Serialised too: the next waits for the last.
+    // Debounced and serialised: two hyprctl calls close together could land in either order and
+    // leave the submap set with nothing open.
     function syncSubmap() {
         submapSync.restart()
     }
@@ -317,7 +273,7 @@ Singleton {
     Process {
         id: submapProc
         running: false
-        // Once it has run, the state may have moved on again meanwhile.
+        // The state may have changed while it ran.
         onExited: {
             var want = root.modalOpen ? "shell-modal" : "default"
             submapCheck.command = ["hyprctl", "submap"]
@@ -326,8 +282,7 @@ Singleton {
         }
     }
 
-    // And checked: if Hyprland's submap is not what the shell's state says,
-    // it is set again.
+    // Verify: if Hyprland's submap disagrees with the shell's state, set it again.
     Process {
         id: submapCheck
         property string want: "default"

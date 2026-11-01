@@ -9,9 +9,7 @@ import qs.lock
 Singleton {
     id: root
 
-    // ── Battery ──────────────────────────────────────────────────────────
-    //
-    // Read from /sys: whether there is one, and its charge.
+    // Battery, read from /sys: whether there is one, and its charge.
     property bool batteryPresent: false
     property real batteryPercent: 0
 
@@ -35,8 +33,7 @@ Singleton {
         }
     }
 
-    // Once, and then only while a battery exists: a desktop answers "none"
-    // and there is nothing to keep asking about.
+    // Once, then only while a battery exists: a desktop answers "none".
     Timer {
         interval: 60000
         running: true
@@ -49,11 +46,8 @@ Singleton {
         }
     }
 
-    // ── Idle and lock timing ─────────────────────────────────────────────
-    //
-    // For the Settings window's Power & idle page. The numbers live in
-    // hypridle.conf and idle-screens.sh, where they always did; the script
-    // only reads and rewrites them.
+    // Idle and lock timing, for Settings -> Power & idle. The numbers live in hypridle.conf and
+    // idle-screens.sh; the script only reads and rewrites them.
     property var idleSettings: ({ screensOff: 900, lock: 1200, xiaomiMode: "ddc-off" })
 
     readonly property string idleScript:
@@ -76,9 +70,8 @@ Singleton {
 
     function refreshIdle() { root.idleCmd(["get"]) }
 
-    // The lock is set as a delay after the screens go off, but hypridle times
-    // every listener from the last input -- so it is stored as their sum, and
-    // moving the screens-off time carries the lock along with it.
+    // The lock is a delay after the screens go off, but hypridle times every listener from the last
+    // input, so it is stored as their sum and moves with the screens-off time.
     function setScreensOff(seconds) {
         var delay = Math.max(0, root.idleSettings.lock - root.idleSettings.screensOff)
         root.idleCmd(["set-screens-off", String(seconds)])
@@ -105,15 +98,9 @@ Singleton {
         onExited: root.idleNext()
     }
 
-    // ── Power profile ────────────────────────────────────────────────────
-    //
-    // power-profiles-daemon is the counterpart of Windows' power plans, but it
-    // comes up on "balanced" every boot. The script next door remembers the
-    // choice and re-applies it; this side only reads and asks.
-    //
-    // The active profile is read back from the daemon rather than assumed to
-    // be whatever the bar last asked for: powerprofilesctl is also used from a
-    // terminal, and the daemon can degrade the profile on its own.
+    // Power profile: power-profiles-daemon starts on "balanced" every boot, so the script
+    // remembers the choice and re-applies it. Read back from the daemon, which can also change
+    // from a terminal or degrade on its own.
     property string powerProfile: ""
     property string powerProfileLabel: ""
     property string powerProfileIcon: "\uf0fc5"
@@ -133,8 +120,8 @@ Singleton {
         powerProfilesProc.running = true
     }
 
-    // On shell start: re-apply the last choice and pick the state up in one
-    // pass, since "restore" returns the listing too.
+    // On shell start: re-apply the last choice and read the state in one pass
+    // ("restore" returns the listing).
     function restorePowerProfile() {
         powerProfilesProc.command = ["python3", root.powerProfileScript, "restore"]
         powerProfilesProc.running = true
@@ -160,9 +147,8 @@ Singleton {
         }
     }
 
-    // Once, on shell start. Delayed because the daemon may not be on the bus
-    // yet when quickshell comes up with the session, and a set against an
-    // absent bus fails silently.
+    // Once, delayed: the daemon may not be on the bus yet at session start, and a
+    // set against it fails silently.
     Timer {
         running: true
         interval: 1500
@@ -170,36 +156,19 @@ Singleton {
         onTriggered: root.restorePowerProfile()
     }
 
-    // ── Lock ─────────────────────────────────────────────────────────────
-    //
-    // The lock is a surface this shell draws itself now -- see LockEngine and
-    // LockScreen -- so there is nothing left to fade around it.
-    //
-    // What used to be here was a curtain and a script. veila's lock came up
-    // through ext-session-lock, which the compositor swaps in whole and draws
-    // above every layer quickshell can reach: there was no frame with both the
-    // desktop and the lock on screen, so the change was a hard cut in both
-    // directions and veila had no setting that softened it. LockOverlay covered
-    // the cut with a black window, and scripts/lock_session.sh watched logind's
-    // LockedHint to find the two edges of a lock it could not see. A surface
-    // this shell owns animates itself, and reports its own edges, so the
-    // curtain, the script, the phase machine and their three timers all went.
-    //
-    // Everything that locks still comes through here rather than calling
-    // LockEngine straight: the Hyprland bind, the control panel's button and
-    // its suspend all want one entry point.
+    // Lock: the lock is this shell's own surface (LockEngine, LockScreen), which animates
+    // itself. Everything that locks (the Hyprland bind, the control panel and its suspend) still
+    // comes through here, as one entry point.
     function lockSession() {
         LockEngine.lock()
     }
 
-    // Screens under a black cover instead of powered off -- see BlankOverlay.
-    // Written by the `screens` ipc target in shell.qml.
+    // Screens under a black cover instead of powered off (BlankOverlay),
+    // written by the `screens` ipc target.
     property var blankedScreens: []
 
-    // Set while a lock is on its way to a suspend, so the machine only goes
-    // down once the screen is actually covered -- otherwise a moment of the
-    // desktop is the last thing on the panels, and on the way back up the lock
-    // arrives late over a session that is already visible.
+    // Set while a lock leads to a suspend, so the machine goes down only once the screen is
+    // covered: otherwise the desktop shows on wake before the lock arrives.
     property bool suspendAfterLock: false
 
     function suspendSession() {
@@ -212,10 +181,8 @@ Singleton {
         LockEngine.lock()
     }
 
-    // `secured` and not `locked`: the second is only the request this shell
-    // made, while the first is the compositor answering that the surface is
-    // really in front of the session. Suspending on the request would race the
-    // frame the lock is drawn on.
+    // `secured`, not `locked`: the compositor's answer that the surface is in
+    // front, not just this shell's request.
     Connections {
         target: LockEngine
 
@@ -226,8 +193,7 @@ Singleton {
             suspendProc.running = true
         }
 
-        // A lock that let go without ever suspending must not leave the flag
-        // set -- it would put the machine down the next time anything locked.
+        // A lock released without suspending must clear the flag, or the next lock would suspend.
         function onLockedChanged() {
             if (!LockEngine.locked) root.suspendAfterLock = false
         }

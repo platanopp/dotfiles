@@ -6,10 +6,8 @@ import qs.config
 import qs.services
 import qs.settings
 
-// Settings -> Recording: how the screen is recorded -- the Record tile in
-// the control panel, the red dot on the control pill, Super+Shift+R. Kept in
-// ShellSettings, read by Recorder.startRecording as each recording starts,
-// so a change here applies to the next one (not to one already running).
+// Settings -> Recording: how the screen is recorded. Kept in ShellSettings and read by
+// Recorder.startRecording, so a change applies to the next recording.
 Column {
     id: page
     spacing: 24

@@ -1,9 +1,7 @@
 import QtQuick
 import qs.config
 
-// Hover and press feedback for anything clickable. Overlays its parent and
-// tints it on interaction, so rows and buttons stop being dead glyphs.
-// Replaces the bare TapHandlers the panels used to carry.
+// Hover and press feedback for anything clickable: overlays its parent and tints it on interaction.
 Rectangle {
     id: root
 
@@ -13,10 +11,8 @@ Rectangle {
     // Extra reach for small targets like icon glyphs.
     property int hitMargin: 0
 
-    // How the press is held; see the TapHandler below for why the default is
-    // what it is. Something that sits on a surface the user also drags -- a
-    // carousel panel -- sets DragThreshold instead, so a press that turns into
-    // a drag is let go to the view underneath rather than kept as a tap.
+    // How the press is held (see the TapHandler below). Items on a draggable surface (a carousel
+    // panel) set DragThreshold, so a press that becomes a drag goes to the view.
     property int gesturePolicy: TapHandler.ReleaseWithinBounds
 
     // Exposed so callers can drive their own press/hover animations.
@@ -50,14 +46,9 @@ Rectangle {
         id: tap
         enabled: root.interactive
 
-        // Without this the default policy is DragThreshold, which does not
-        // take an exclusive grab: a Flickable ancestor steals the press the
-        // moment the pointer shifts a pixel or two between press and
-        // release, and the tap is dropped. A mouse jitters like that
-        // constantly, so clicks failed at random -- which reads as dead
-        // spots rather than as a timing problem. Press and release inside
-        // the item is a click here, whatever the pointer did in between.
-        // TrayItems already does this for its right and middle buttons.
+        // Not DragThreshold by default: its non-exclusive grab let a Flickable ancestor steal
+        // the press when the mouse jittered a pixel, so clicks failed at random. Press and
+        // release inside the item is a click.
         gesturePolicy: root.gesturePolicy
 
         onTapped: root.tapped()

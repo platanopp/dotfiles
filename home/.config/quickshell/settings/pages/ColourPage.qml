@@ -4,10 +4,9 @@ import qs.config
 import qs.services
 import qs.settings
 
-// Settings -> Colour: saturation per display, and the tone of the whole
-// picture. Saturation is NVIDIA's digital vibrance, per connector through
-// nvibrant; temperature and brightness go through hyprsunset's colour matrix
-// and gamma through a screen shader -- all three for every display at once.
+// Settings -> Colour: saturation per display (NVIDIA digital vibrance via nvibrant) and the
+// tone of the whole picture (hyprsunset's matrix for temperature and brightness, a shader
+// for gamma), for every display at once.
 Column {
     id: page
     spacing: 24

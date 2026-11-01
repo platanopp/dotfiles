@@ -4,14 +4,9 @@ import Quickshell
 import Quickshell.Io
 import QtQuick
 
-// The shell's own preferences, in one JSON file beside the config:
-// ~/.config/quickshell/shell-settings.json. The Settings window's Shell page
-// writes it; the pieces that used to have these choices hard-coded read it.
-//
-// Loaded before anything asks (blockLoading), because the lock that runs
-// once per boot reads lockAtBoot at the very start of the session -- a value
-// arriving a moment later would have been a lock the user switched off.
-// A file edited by hand is picked up too (watchChanges).
+// The shell's own preferences, in shell-settings.json beside the config, written by
+// Settings -> Shell. Loaded before anything asks (blockLoading): the boot lock reads
+// lockAtBoot at once. Hand edits are picked up.
 Singleton {
     id: root
 

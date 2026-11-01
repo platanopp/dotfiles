@@ -3,12 +3,9 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Frequency bands for whatever the speakers are playing, fed by spectrum.py.
-//
-// Capturing audio costs CPU, so the helper only runs while something is
-// actually looking at it. Consumers call subscribe()/unsubscribe() rather than
-// binding `running` directly: with one bar per monitor there can be several
-// media widgets, and they would otherwise fight over the same property.
+// Frequency bands for whatever the speakers play, from spectrum.py, which runs
+// only while subscribed: subscribe()/unsubscribe(), since several media widgets
+// would fight over a `running` binding.
 Singleton {
     id: root
 
@@ -40,10 +37,9 @@ Singleton {
         }
     }
 
-    // The helper outlives its last watcher by a few seconds: a watcher that
-    // looks away for a moment -- the desktop's visualizer while the overview
-    // is up -- would otherwise quit it and start it again, Python and numpy
-    // and the audio capture, every time. Its frames are dropped meanwhile.
+    // The helper outlives its last watcher by a few seconds, so a brief look away
+    // (the overview over the visualizer) doesn't restart Python, numpy and the
+    // capture. Frames are dropped meanwhile.
     Timer {
         id: linger
         interval: 10000

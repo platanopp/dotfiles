@@ -1,16 +1,12 @@
 #!/usr/bin/env bash
 # Sound out of every output at once (Settings -> Sound -> All outputs).
 #
-#   audio_all_outputs.sh on | off | status
+# audio_all_outputs.sh on | off | status
 #
-# A combined sink: PipeWire's module-combine-sink, given no list of outputs,
-# feeds every output device there is, and picks up one plugged in later. It
-# lives only as long as PipeWire does, so the shell loads it again at start
-# and after PipeWire restarts (services/Audio.qml) -- nothing is written to
-# PipeWire's own configuration.
-#
-# "on" makes it the default output; the one it replaced is remembered, and
-# "off" goes back to it.
+# PipeWire's module-combine-sink with no output list feeds every device, including ones
+# plugged in later. It lives only as long as PipeWire, so the shell reloads it
+# (services/Audio.qml); nothing is written to PipeWire's config. "on" makes it the default and
+# remembers the one it replaced; "off" goes back.
 set -u
 
 NAME=all_outputs

@@ -3,10 +3,8 @@ import qs.config
 import qs.services
 import qs.settings
 
-// Settings -> Power & idle: how hard the CPU works, and what happens when the
-// desk is left alone. The timing lives in hypridle.conf and the side
-// display's mode in idle-screens.sh; scripts/idle_settings.py reads and
-// rewrites both.
+// Settings -> Power & idle: the CPU profile and what happens when the desk is left alone.
+// idle_settings.py reads and rewrites hypridle.conf and idle-screens.sh.
 Column {
     id: page
     spacing: 24

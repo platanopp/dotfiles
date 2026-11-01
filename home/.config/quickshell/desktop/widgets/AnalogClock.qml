@@ -3,9 +3,8 @@ import qs.config
 import qs.desktop
 import qs.services
 
-// Hands on a dial. No second hand: it would redraw the widget every second
-// for a desktop that is mostly under windows, and the minute is what is read.
-// The hands step once a minute, settling like a real one.
+// Hands on a dial, stepping once a minute. No second hand: it would redraw every
+// second for a mostly covered desktop.
 WidgetCard {
     id: root
 

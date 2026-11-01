@@ -4,18 +4,13 @@ import Quickshell
 import Quickshell.Io
 import qs.config
 
-// Screen recording with gpu-screen-recorder: the control panel's Record
-// tile, the count and the timer on the control pill, Super+Shift+R and
-// `qs ipc call record`. Settings -> Recording picks how it records.
+// Screen recording with gpu-screen-recorder: the Record tile, the countdown and timer on the
+// control pill, Super+Shift+R and `qs ipc call record`. Settings -> Recording picks how.
 Singleton {
     id: root
 
-    // One monitor at a time, as Settings -> Recording says (by default 1080p
-    // 60 fps H.264 MP4 with the computer's sound), encoded on the GPU
-    // (scripts/screen_record.sh). Started and stopped from the control
-    // panel's Record tile, the red dot the control
-    // pill shows while it runs, Super+Shift+R, or `qs ipc call record ...`.
-    // Stopped with SIGINT, which is what makes the recorder finish the file.
+    // One monitor at a time, encoded on the GPU (scripts/screen_record.sh); stopped with SIGINT,
+    // which makes the recorder finish the file.
     readonly property bool recording: recordProc.running
     property string recordingFile: ""
     property string recordingMonitor: ""
@@ -68,11 +63,8 @@ Singleton {
         if (recordProc.running) recordProc.signal(2)
     }
 
-    // Record, with a count of three first, shown on the control pill where
-    // the recording's time then runs -- nothing over the screen, so the
-    // three seconds are there to get to what is to be recorded. Pressing
-    // record again during the count, or the pill, calls it off. Stop, if
-    // recording already.
+    // Record after a count of three on the control pill (nothing over the screen); pressing again
+    // or the pill cancels the count. Stops if already recording.
     function toggleRecording(monitor) {
         if (recordProc.running) root.stopRecording()
         else if (root.recordCountdown > 0) root.cancelRecordingCountdown()

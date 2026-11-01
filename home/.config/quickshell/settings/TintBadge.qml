@@ -2,9 +2,7 @@ import QtQuick
 import qs.components
 import qs.config
 
-// An icon on a rounded square of its own colour -- the Settings window's way
-// of telling pages and settings apart at a glance, the way a phone's settings
-// list does, without a line of text to do it.
+// An icon on a rounded square of its own colour, telling pages and settings apart at a glance.
 Rectangle {
     id: root
 

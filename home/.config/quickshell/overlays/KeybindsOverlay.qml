@@ -7,23 +7,14 @@ import qs.components
 import qs.config
 import qs.services
 
-// The keyboard shortcut sheet: every Hyprland bind, read out of the live
-// config, and Yazi's, out of its keymap (see Keybinds). Opened from the
-// control panel or from the bind the config points at "quickshell:keybinds".
-//
-// Laid out like the launcher -- a search field across the top of one glass
-// panel, the list under it, the keys along the bottom -- because it is used
-// the same way: open it, type a few letters of what you want to do, read the
-// keys. The two sources stay apart, a tab each: `d` is a different key in
-// Yazi than in Hyprland, and one merged list would leave the reader working
-// out which one they are looking at.
+// The keyboard shortcut sheet: every Hyprland bind from the live config, and Yazi's
+// from its keymap (Keybinds). Laid out like the launcher; a tab per source, since
+// `d` means different things in each.
 PanelWindow {
     id: overlay
 
     property var bar: null
     screen: bar.screen
-
-    // ── Pieces ───────────────────────────────────────────────────────────
 
     // A group's name over its rows: the launcher's section label.
     component SectionLabel: Text {
@@ -33,10 +24,8 @@ PanelWindow {
         font.family: Theme.fontText
     }
 
-    // One bind's keys, as caps (see capsOf): "Super + Shift + R" is three
-    // keys held together, joined by a small plus; "g g" is one key pressed
-    // twice, two caps side by side; "or" joins two binds that do the same
-    // (see prepare).
+    // One bind's keys as caps (capsOf): "Super + Shift + R" is held together, "g g" pressed twice,
+    // and "or" joins two binds that do the same (prepare).
     component KeyCombo: Row {
         id: combo
         property var caps: []
@@ -70,8 +59,7 @@ PanelWindow {
                     color: Theme.textMuted
                     font.pixelSize: 10
                     font.family: Theme.fontMono
-                    // "or" stands between two whole combinations, so it gets
-                    // more room than the plus inside one.
+                    // "or" stands between whole combinations, so it gets more room than the plus.
                     leftPadding: part.modelData.kind === "or" ? 5 : 1
                     rightPadding: part.modelData.kind === "or" ? 5 : 1
                 }
@@ -79,39 +67,32 @@ PanelWindow {
         }
     }
 
-    // ── Type and geometry ────────────────────────────────────────────────
-    //
-    // The launcher's: a proportional face for what the binds do, which is
-    // the content here, and the monospace only on the keys.
+    // Type and geometry: the launcher's; proportional for what binds do,
+    // monospace only on the keys.
     readonly property string fontDisplay: Theme.fontDisplay
     readonly property string fontText: Theme.fontText
 
-    // Never below a sane floor. The window is 0x0 until Hyprland first sizes
-    // it, and a panel worked out from that came to -120px wide -- with a
-    // layer-rendered shadow on it, the sheet drew nothing on its first open.
+    // Never below a sane floor: the window is 0x0 until first sized, and a -120px
+    // panel drew nothing on first open.
     readonly property int cardWidth: Math.max(480, Math.min(overlay.width - 120, 1320))
-    // The top stays put and the panel grows and shrinks below it, so the
-    // field does not slide around under the text being typed into it.
+    // The top stays put and the panel grows below it, so the field doesn't slide under the typing.
     readonly property int cardTop: Math.round(overlay.height * 0.12)
     readonly property int searchHeight: 62
     readonly property int footerHeight: 44
     readonly property int bodyPad: 24
     readonly property int columnGap: 32
 
-    // As many columns of at least 380px as fit, up to three: past that a row
-    // is a long way for the eye to travel from what a bind does to its keys.
+    // As many 380px+ columns as fit, up to three: wider rows are a long
+    // way from a bind to its keys.
     readonly property int maxColumns: Math.max(1, Math.min(3,
         Math.floor((overlay.cardWidth - 2 * overlay.bodyPad + overlay.columnGap) / (380 + overlay.columnGap))))
-    // Fixed whatever the count in use, so typing never re-flows a row that
-    // is still showing into a different width.
+    // Fixed whatever the column count, so typing never re-flows a visible row.
     readonly property int columnWidth: Math.floor(
         (overlay.cardWidth - 2 * overlay.bodyPad - (overlay.maxColumns - 1) * overlay.columnGap) / overlay.maxColumns)
 
-    // ── Visibility ───────────────────────────────────────────────────────
+    // Visibility
 
-    // One copy exists per monitor, and only the one it was opened on shows.
-    // Matched against the screen latched when it opened, not live focus,
-    // which follows the mouse and used to drag the sheet along with it.
+    // Pinned to the screen latched on open, not live focus, which follows the mouse.
     readonly property bool onOpeningScreen: {
         if (!bar.monitor) return true
         if (Panels.keybindsScreen === "") return bar.monitor.focused
@@ -120,33 +101,26 @@ PanelWindow {
 
     readonly property bool open: Panels.keybindsOpen && overlay.onOpeningScreen
 
-    // Unmapped while closed, not merely drawn empty: a mapped full-screen
-    // layer is composited every frame whether or not it shows anything.
-    //
-    // `shown` keeps it mapped until the fade out has played. Not `open ||
-    // unmapDelay.running`, which is false for the moment between `open`
-    // going false and the timer starting -- a two-frame blink before the fade
-    // (see AppLauncher).
+    // Unmapped while closed: a mapped full-screen layer is composited every frame. A `shown` flag,
+    // not `open || unmapDelay.running`, which blinked on close (see AppLauncher).
     property bool shown: false
     visible: overlay.shown
 
     Timer {
         id: unmapDelay
-        // The inner fades run on durMedium; the margin covers the frame the
-        // Behavior needs to get going.
+        // The inner fades run on durMedium; the margin covers the frame
+        // the Behavior needs to start.
         interval: Theme.durMedium + 80
         onTriggered: overlay.shown = false
     }
 
-    // Connections rather than an `onOpenChanged`, which the object may
-    // declare only once.
+    // Connections rather than `onOpenChanged`, which the object may declare only once.
     Connections {
         target: overlay
         function onOpenChanged() {
             if (overlay.open) {
                 unmapDelay.stop()
-                // Always from the top with an empty field: the sheet is looked
-                // up in, not left half-read.
+                // Always from the top with an empty field.
                 overlay.query = ""
                 overlay.viewSection = overlay.section
                 flick.contentY = 0
@@ -166,9 +140,8 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Overlay
     exclusionMode: ExclusionMode.Ignore
 
-    // Exclusive while up, so the keys reach the field; held through the fade
-    // out, since changing it on a surface that stays mapped drops that
-    // surface for two frames (see AppLauncher).
+    // Exclusive while up, held through the fade out: changing it on a
+    // visible surface drops two frames.
     WlrLayershell.keyboardFocus: overlay.shown ? WlrKeyboardFocus.Exclusive
                                                : WlrKeyboardFocus.None
 
@@ -191,16 +164,15 @@ PanelWindow {
         Panels.keybindsOpen = false
     }
 
-    // ── Sections ─────────────────────────────────────────────────────────
+    // Sections
 
     readonly property var sections: [
         { id: "hyprland", name: "Hyprland", glyph: "\u{F056E}" },
         { id: "yazi", name: "Yazi", glyph: "\u{F024B}" }
     ]
 
-    // The tab selected, and the one the body is showing. The second follows
-    // the first once the old list has faded out (see showSection), so a tab
-    // change never swaps the rows in mid-fade.
+    // The tab selected, and the one shown; the second follows once the old
+    // list has faded (showSection).
     property string section: "hyprland"
     property string viewSection: "hyprland"
 
@@ -225,10 +197,8 @@ PanelWindow {
         }
     }
 
-    // ── The binds, ready to show ─────────────────────────────────────────
-    //
-    // Keys split into caps, and one lower-case string to search, worked out
-    // once each time a config is re-read rather than on every keystroke.
+    // The binds, ready to show: caps and a lower-case search string,
+    // worked out once per config read.
     readonly property var keyNames: ({
         "Up": "↑", "Down": "↓", "Left": "←", "Right": "→",
         "Enter": "↵", "Return": "↵", "Backspace": "⌫"
@@ -240,8 +210,8 @@ PanelWindow {
         for (var i = 0; i < parts.length; i++) {
             if (i > 0) out.push({ kind: "plus", text: "" })
             var p = parts[i]
-            // "g g" and "1 … 0" are a sequence of keys; "Vol +" is one key
-            // with a space in its name. Short pieces are the tell.
+            // "g g" and "1 … 0" are key sequences; "Vol +" is one key with a
+            // space. Short pieces are the tell.
             var seq = p.split(" ")
             if (seq.length > 1 && seq.every(s => s.length > 0 && s.length <= 2)) {
                 for (var j = 0; j < seq.length; j++) {
@@ -262,9 +232,8 @@ PanelWindow {
         "Selecting": "\u{F0138}", "Looking around": "\u{F0208}", "Commands": "\u{F07B7}"
     })
 
-    // Two binds in a group that do the same thing are one row with both
-    // keys ("Media play or Media pause"): the sheet is read by what you want
-    // done, and the same line twice reads as a mistake.
+    // Two binds in a group that do the same are one row with both keys
+    // ("Media play or Media pause").
     function prepare(groups) {
         var home = Quickshell.env("HOME")
         return (groups || []).map(g => {
@@ -296,11 +265,8 @@ PanelWindow {
     readonly property var hyprGroups: overlay.prepare(Keybinds.hyprBindGroups)
     readonly property var yaziGroups: overlay.prepare(Keybinds.yaziBindGroups)
 
-    // ── Search ───────────────────────────────────────────────────────────
-    //
-    // Every word typed has to appear somewhere in the bind -- what it does,
-    // its keys, the command behind it or its group -- so "move work" finds
-    // "Move to workspace" and "super shift" finds every bind on those two.
+    // Search: every typed word must appear in the bind (label, keys, command or group), so
+    // "move work" finds "Move to workspace".
     property string query: ""
     readonly property var terms: overlay.query.toLowerCase().split(/\s+/).filter(t => t.length > 0)
 
@@ -331,9 +297,8 @@ PanelWindow {
     readonly property string viewError: overlay.viewSection === "yazi" ? Keybinds.yaziBindsError
                                                                        : Keybinds.hyprBindsError
 
-    // What was typed, marked in the text it matched. The accent alone, not
-    // bold as well: bold is wider, and the row would shift under the eye as
-    // each letter lands.
+    // The typed text, marked in the accent only: bold is wider and the row
+    // would shift as each letter lands.
     function escaped(s) {
         return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
     }
@@ -362,16 +327,8 @@ PanelWindow {
         return on ? out + "</font>" : out
     }
 
-    // ── Columns ──────────────────────────────────────────────────────────
-    //
-    // Groups poured into columns in the order the config declares them,
-    // each column filled to about an even share. A group that crosses the
-    // line carries on at the top of the next column under its name again --
-    // Yazi's own binds alone are sixty rows, and whole groups only would
-    // leave one column that long beside two short ones.
-    //
-    // Only as many columns as the rows need: a handful of search results
-    // reads as a list, not three stubs.
+    // Columns: groups in config order, each column filled to an even share; a group crossing the
+    // line continues under its name again. Only as many columns as the rows need.
     readonly property int columnCount: {
         var rows = overlay.countOf(overlay.viewGroups) + 2 * overlay.viewGroups.length
         return Math.max(1, Math.min(overlay.maxColumns, Math.ceil(rows / 12)))
@@ -393,8 +350,8 @@ PanelWindow {
             for (var bi = 0; bi < g.binds.length; bi++) {
                 var b = g.binds[bi], u = units(b)
                 var left = g.binds.length - bi
-                // Break before this row if the column is full -- unless it is
-                // the last column, or the break would strand a single row.
+                // Break before this row if the column is full, unless it's the last column or
+                // the break strands a single row.
                 if (h + u > target && cols.length < n - 1 && h > 2 && (left >= 2 || block.binds.length === 0)) {
                     if (block.binds.length >= 2 || (block.cont && block.binds.length > 0)) {
                         col.push(block)
@@ -417,11 +374,8 @@ PanelWindow {
 
     readonly property var columns: overlay.packColumns(overlay.viewGroups, overlay.columnCount)
 
-    // ── The body's entrance ──────────────────────────────────────────────
-    //
-    // The columns come in one after another, rising a few pixels, and leave
-    // all at once. `stagger` is set before `bodyIn` changes, so the delays
-    // bound to it are already right when the Behaviors read them.
+    // The body's entrance: columns come in one after another and leave together. `stagger` is set
+    // before `bodyIn` changes, so the bound delays are right when the Behaviors read them.
     property bool bodyIn: false
     property bool stagger: false
 
@@ -435,7 +389,7 @@ PanelWindow {
         overlay.bodyIn = false
     }
 
-    // ── Scrolling from the keyboard ──────────────────────────────────────
+    // Scrolling from the keyboard
     function scrollBy(dy) {
         var max = Math.max(0, flick.contentHeight - flick.height)
         scrollAnim.to = Math.max(0, Math.min(max, (scrollAnim.running ? scrollAnim.to : flick.contentY) + dy))
@@ -450,10 +404,8 @@ PanelWindow {
         easing.type: Easing.OutCubic
     }
 
-    // ── Backdrop ─────────────────────────────────────────────────────────
-
-    // The overlays' scrim. There is no compositor blur under it any more, so
-    // it is what keeps the windows behind from competing with the sheet.
+    // The overlays' scrim: with no compositor blur under it, it keeps the
+    // windows behind from competing.
     Rectangle {
         anchors.fill: parent
         color: Theme.scrim
@@ -469,7 +421,7 @@ PanelWindow {
         }
     }
 
-    // ── Panel ────────────────────────────────────────────────────────────
+    // Panel
 
     Item {
         id: cardArea
@@ -533,7 +485,7 @@ PanelWindow {
         // Swallows clicks on the panel, so only outside closes.
         TapHandler {}
 
-        // ── Search field and tabs ────────────────────────────────────────
+        // Search field and tabs
         Item {
             id: searchRow
             width: parent.width
@@ -545,8 +497,7 @@ PanelWindow {
                 anchors.rightMargin: 13
                 spacing: 14
 
-                // In the accent while there is a search running: the field is
-                // what is active here. Muted while it is empty.
+                // Accent while searching, muted while empty.
                 IconGlyph {
                     text: "\u{F0349}"
                     color: searchInput.text.length > 0 ? Theme.accent : Theme.textMuted
@@ -606,8 +557,7 @@ PanelWindow {
                     }
                 }
 
-                // Clears the field without closing, when there is something
-                // in it.
+                // Clears the field without closing, when there is something in it.
                 Item {
                     implicitWidth: 26
                     implicitHeight: 26
@@ -634,10 +584,8 @@ PanelWindow {
                     }
                 }
 
-                // Hyprland | Yazi: two segments in one pill with the fill
-                // sliding between them -- the wallpaper picker's switch. With
-                // a search going, each counts its matches, so a miss here and
-                // a hit there shows before switching.
+                // Hyprland | Yazi, the wallpaper picker's switch; while searching,
+                // each tab counts its matches.
                 Rectangle {
                     id: sectionSwitch
                     implicitWidth: tabsRow.implicitWidth + 8
@@ -737,8 +685,8 @@ PanelWindow {
                         }
                     }
 
-                    // Widths of the two segments, for the sliding fill; a
-                    // Repeater's items are not reachable by id from outside.
+                    // Segment widths for the sliding fill: a Repeater's items
+                    // aren't reachable by id.
                     QtObject { id: hyprTab; property real width: 0 }
                     QtObject { id: yaziTab; property real width: 0 }
                 }
@@ -754,7 +702,7 @@ PanelWindow {
             color: Theme.outline
         }
 
-        // ── Binds ────────────────────────────────────────────────────────
+        // Binds
         Flickable {
             id: flick
             y: searchRow.height + 1
@@ -853,8 +801,8 @@ PanelWindow {
                                         width: block.width
                                         height: Math.max(32, rowText.implicitHeight + 12)
 
-                                        // Only a highlight: the sheet shows keys,
-                                        // it does not run them.
+                                        // Only a highlight: the sheet shows keys, it
+                                        // doesn't run them.
                                         Rectangle {
                                             anchors.fill: parent
                                             anchors.leftMargin: -10
@@ -888,9 +836,8 @@ PanelWindow {
                                                 elide: Text.ElideRight
                                             }
 
-                                            // What actually runs, for the binds
-                                            // whose label names a command rather
-                                            // than being one.
+                                            // What actually runs, for binds whose label names a
+                                            // command rather than being one.
                                             Text {
                                                 visible: row.modelData.command.length > 0
                                                 width: parent.width
@@ -916,9 +863,8 @@ PanelWindow {
                 }
             }
 
-            // Nothing to show: the reader error, no binds at all, or a search
-            // that found nothing here -- and, when the other tab has matches,
-            // how many and how to get there.
+            // Nothing to show: the reader error, no binds, or no matches here (with
+            // the other tab's count, if any).
             Column {
                 id: emptyState
                 visible: overlay.viewGroups.length === 0
@@ -958,8 +904,7 @@ PanelWindow {
             }
         }
 
-        // Where in a long list the view is: a thin thumb at the right edge,
-        // only when there is more than fits.
+        // A thin scroll thumb at the right edge, only when there is more than fits.
         Rectangle {
             visible: flick.interactive
             x: parent.width - 9
@@ -976,7 +921,7 @@ PanelWindow {
             }
         }
 
-        // ── Footer ───────────────────────────────────────────────────────
+        // Footer
         Rectangle {
             y: flick.y + flick.height
             x: 1

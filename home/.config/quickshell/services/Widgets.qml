@@ -4,26 +4,14 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
 
-// The desktop widgets: which kinds there are, which are on which monitor
-// and where, and whether a monitor's desktop can be seen at all.
-//
-// They took the place of four kitty windows parked on the side monitor
-// (fastfetch, tty-clock, cava, btop): as windows they tiled and floated with
-// everything else, took focus, and had to be pinned in place by rules. These
-// live under the windows, in the shell, and are placed by dragging them in
-// the widget picker (overlays/WidgetPicker.qml, Super + D).
-//
-// The layout is kept in desktop-widgets.json beside the config, written when
-// a widget is added, dropped or removed -- never while one is being dragged.
+// The desktop widgets: the kinds, which are on which monitor and where, and whether a desktop can
+// be seen. They live under the windows and are placed in the widget picker (Super+D); the layout is
+// in desktop-widgets.json, written when a widget is added, moved or removed, never mid-drag.
 Singleton {
     id: root
 
-    // ── The kinds ────────────────────────────────────────────────────────
-    //
-    // `file` is the component under desktop/widgets/. Each kind is laid out
-    // for its own w and h, and a widget that stretched would only be the same
-    // thing with more empty space in it -- so a widget is made bigger or
-    // smaller whole, scaled as one (its `size`, below), and keeps its layout.
+    // The kinds: `file` is the component under desktop/widgets/. Each is laid out for its own w and
+    // h, so resizing scales the whole widget (its `size`) instead of stretching it.
     readonly property var categories: ["Clock", "Calendar", "Weather", "Media", "System"]
 
     readonly property var catalog: [
@@ -57,16 +45,12 @@ Singleton {
         return null
     }
 
-    // ── The layout ───────────────────────────────────────────────────────
-
-    // [{ id, kind, screen, x, y, size }]; x and y in the monitor's own
-    // logical pixels, from its top-left corner. `size` scales the kind's w and
-    // h; widgets placed before there was one have none, and are drawn at 1.
+    // [{ id, kind, screen, x, y, size }]: x and y in the monitor's logical pixels from its
+    // top-left. `size` scales the kind's w and h; older widgets without one draw at 1.
     readonly property var placed: adapter.widgets
 
-    // How small and how big a widget can be made. The smallest text in any
-    // of them is 10px, 8px at the low end; at the high end the covers and the
-    // avatar, loaded at 512 and 128 px, are still drawn from enough pixels.
+    // How small and big a widget can get: the smallest text is 10px (8px at the low end), and
+    // covers and avatars loaded at 512 and 128px still have enough pixels at the high end.
     readonly property real minSize: 0.8
     readonly property real maxSize: 2
 
@@ -93,8 +77,7 @@ Singleton {
             ? Object.assign({}, w, { x: Math.round(x), y: Math.round(y) }) : w)
     }
 
-    // In twentieths, so the sizes a widget can have are a short list and two
-    // made "the same size" by hand are.
+    // In twentieths, so sizes form a short list and two made "the same size" by hand are.
     function resize(id, size) {
         var s = Math.round(Math.max(root.minSize, Math.min(root.maxSize, size)) * 20) / 20
         adapter.widgets = root.placed.map(w => w.id === id ? Object.assign({}, w, { size: s }) : w)
@@ -104,10 +87,8 @@ Singleton {
         adapter.widgets = root.placed.filter(w => w.id !== id)
     }
 
-    // Where a widget clicked (rather than dragged) in goes: the first gap it
-    // fits, searched from the top right, above `areaH` -- the picker passes
-    // the top of its shelf, since a widget that landed under the shelf would
-    // seem not to have arrived.
+    // Where a clicked-in widget goes: the first gap it fits, from the top right,
+    // above `areaH` (the shelf's top).
     function freeSpot(screenName, w, h, areaW, areaH, top) {
         var margin = 24
         var gap = 16
@@ -147,14 +128,9 @@ Singleton {
         }
     }
 
-    // ── Whether a monitor's desktop shows ────────────────────────────────
-    //
-    // The widgets sit under every window, so most of the time on a monitor
-    // in use they are covered. The ones that redraw all the time -- the
-    // spectrum, the resource meters -- stop while a tiled window is over the
-    // desktop and start again when it is bare (floating windows rarely cover
-    // all of it, and are let be). Read off Hyprland's events, a moment after
-    // they settle, the way the video wallpaper's pause is.
+    // Whether a monitor's desktop shows: widgets that redraw all the time (spectrum, meters)
+    // stop while a tiled window covers the desktop; floating ones are let be. Read off
+    // Hyprland's events once they settle.
     property var covered: ({})
 
     function isCovered(screenName) { return root.covered[screenName] === true }

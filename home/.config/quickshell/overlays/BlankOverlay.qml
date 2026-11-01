@@ -3,20 +3,10 @@ import Quickshell.Wayland
 import QtQuick
 import qs.services
 
-// A black cover for a screen that must not be powered off.
-//
-// The Xiaomi on HDMI-A-1 drops its link whenever it falls into standby -- with
-// its own power-saving options off as well -- and when it comes back Hyprland
-// has to set the output up from scratch. That reshuffle left the DRM state
-// stuck on a pending page flip: first frozen-looking terminals, then a wake-up
-// where neither panel came back at all and the machine had to be switched off
-// at the button. So that monitor is never put to sleep. It is covered instead,
-// and stays awake behind the cover.
-//
-// The Samsung on DP-2 never dropped its link in any test, so it is powered off
-// for real. Which screens get the cover rather than the power-off is decided
-// in ~/.config/hypr/scripts/idle-screens.sh, which drives this through
-// `qs ipc call screens`.
+// A black cover for a screen that must not be powered off. The Xiaomi on HDMI-A-1 drops its link in
+// standby, and Hyprland re-setting it up left DRM stuck on a pending page flip (once neither panel
+// came back), so it is covered and kept awake. The Samsung on DP-2 is powered off for real.
+// idle-screens.sh decides, via `qs ipc call screens`.
 PanelWindow {
     id: cover
 

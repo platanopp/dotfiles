@@ -9,9 +9,8 @@ local anyMonitor = {
 hl.monitor(anyMonitor)
 
 local terminal = "kitty"
--- Thunar, themed after the shell (~/.config/gtk-3.0/gtk.css). Yazi is still
--- there for the terminal; its kitty profile (kitty/yazi.conf) keeps kitty's
--- shortcuts off the Dolphin keys it is set up with, should it be run that way.
+-- Thunar, themed after the shell (~/.config/gtk-3.0/gtk.css). Yazi stays for the terminal; its
+-- kitty profile (kitty/yazi.conf) keeps kitty's shortcuts off the Dolphin keys.
 local kittyDir = os.getenv("HOME") .. "/.config/kitty/"
 local fileManager = "thunar"
 local mainMod = "SUPER"
@@ -21,40 +20,14 @@ hl.env("GTK_THEME", "Adwaita-dark")
 hl.env("XCURSOR_SIZE", "24")
 hl.env("HYPRCURSOR_SIZE", "24")
 
--- ── The monitors as X programs see them ──────────────────────────────
---
--- X programs do not see the monitors as they are here. XWayland lays them
--- out side by side at y=0, in the order Hyprland added them
--- (`DISPLAY=:0 xrandr --listmonitors`). That is Hyprland's doing and has no
--- setting; it translates each window's position monitor by monitor, so a
--- window inside one monitor lands where it should. A monitor set higher or
--- lower than its neighbour (here the Samsung, 360 px lower) is lost to X;
--- that much is harmless.
---
--- The order is not. It is the order the monitors were found in, and one that
--- drops its link and comes back -- here the Xiaomi, powered off over DDC for
--- idle -- is found again last. So X's left and right had nothing to do with
--- the desk, and changed under running programs: the Xiaomi at +0+0 at login,
--- where on the desk it is on the right, then swapped with the Samsung at
--- every idle, 27 times in one day. Anything that read the layout before a
--- swap and placed a window after it (Steam, read once at login; a game
--- started before the panels went off) placed it by a map no longer true.
---
--- So the order is put right: left to right as the monitors stand, and of
--- two at the same left edge, the higher first. When it is wrong -- at login,
--- or when a monitor comes back -- the monitors out of place are turned off
--- and back on one at a time, which lines them up at the end. A second or two
--- of black on those, at login behind the lock. Nothing here names a monitor,
--- so it holds for any set of them.
---
--- And which monitor counts as the main one is not translated either: with
--- no primary set, whatever asks for it -- Wine, for Proton games; Steam and
--- other X programs sizing a new window -- got the first one listed. The
--- primary is the fastest monitor, the one games are played on (here the
--- Samsung, 240 Hz to the Xiaomi's 120); of two as fast, the one further
--- left. Set at login, retried until XWayland knows the output, and again
--- when a monitor is added: a monitor coming back is a new output to
--- XWayland, and a primary goes with the output it was set on.
+-- The monitors as X programs see them. XWayland lays them out at y=0 in the order Hyprland added
+-- them, and a monitor that drops its link (the Xiaomi, off over DDC at idle) is re-added last, so
+-- X's left and right swapped under running programs (27 times in one day) and Steam placed windows
+-- by a stale map. So the order is put right, left to right as the monitors stand (the higher first
+-- at the same left edge): the ones out of place are turned off and on one at a time, at login and
+-- when a monitor comes back. X also gets a primary, which Wine and Steam use: the fastest monitor
+-- (the 240 Hz Samsung), the leftmost on a tie. Set at login, retried until XWayland knows the
+-- output, and again on every monitor added.
 
 -- The monitors in the order the desk has them. Mirrors are not outputs of
 -- their own to X.
@@ -88,10 +61,8 @@ end
 -- written, near the end of the file. Run again to bring a monitor back on.
 local applyMonitorRules
 
--- The monitors to turn off and on so that Hyprland's list -- the order they
--- were added in, which is the order XWayland lays them out in -- is in desk
--- order. Kept: the longest run from the left already in order. Everything
--- after it goes, to come back in turn at the end of the list.
+-- The monitors to turn off and on so Hyprland's list (XWayland's order) is in desk order: keep the
+-- longest in-order run from the left, cycle the rest.
 local function xOutOfPlace()
     local listed = {}
     for i, m in ipairs(hl.get_monitors()) do listed[m.name] = i end
@@ -117,11 +88,8 @@ local function runAfterXOrder()
     for _, fn in ipairs(waiting) do fn() end
 end
 
--- Puts the monitors in desk order, then runs `after`. A monitor coming back
--- on is itself a monitor being added, which lands here again while
--- `xOrdering` is set and leaves it alone; so does login, when a monitor
--- being added may have started the reordering already, and Steam waits for
--- it to end.
+-- Puts the monitors in desk order, then runs `after`. Re-adding a monitor lands here again while
+-- `xOrdering` is set and is left alone; Steam waits for the reordering to end.
 local function orderXMonitors(after)
     if after then table.insert(afterXOrder, after) end
     if xOrdering then return end
@@ -134,11 +102,9 @@ local function orderXMonitors(after)
     for _, name in ipairs(out) do
         hl.monitor({ output = name, disabled = true })
     end
-    -- Back on one at a time, so each is added in its turn. A monitor gets
-    -- the last rule that matches it, and only a rule of the same name undoes
-    -- the one that turned it off: the catch-all's settings go in under its
-    -- name, and the file's own rules back on top of that -- then the
-    -- monitors still waiting are turned off again.
+    -- Back on one at a time, so each is added in its turn. Only a rule of the same
+    -- name undoes the one that turned it off: the catch-all's settings go in under its
+    -- name, the file's own rules on top.
     local function bringBack(i)
         local rule = {}
         for k, v in pairs(anyMonitor) do rule[k] = v end
@@ -169,75 +135,40 @@ hl.on("monitor.added", function()
 end)
 
 hl.on("hyprland.start", function()
-    -- Un solo arranque para toda la sesion grafica.
-    --
-    -- Antes esto decia `start graphical-session.target`, y fallaba en silencio
-    -- en cada login: ese target tiene RefuseManualStart=yes. sunshine y
-    -- gamepad-mode quedaban enabled y nunca active. hyprland-session.target
-    -- existe solo para arrastrarlo como dependencia, que si esta permitido --
-    -- ver el comentario en ese archivo.
+    -- One start for the whole graphical session. `start graphical-session.target` failed silently
+    -- at every login (RefuseManualStart=yes), leaving sunshine and gamepad-mode enabled but never
+    -- active; hyprland-session.target exists to pull it in as a dependency, which is allowed.
     hl.exec_cmd("systemctl --user start hyprland-session.target")
     hl.timer(function()
      hl.exec_cmd("nvibrant 300 0 0 600")
       end, { timeout = 2000, type = "oneshot" })
-    -- First of the lot, and for one reason: on a cold boot the shell puts the
-    -- lock up on the first frame it can, and nothing has asked for a password
-    -- before that -- greetd hands the seat over already logged in. Everything
-    -- below takes a second or two to draw, and every one of those seconds
-    -- would be desktop on screen with no lock over it. Behind the lock they
-    -- can take as long as they like.
-    --
-    -- On Qt's basic render loop, which draws every window in one pass (set
-    -- by the shell itself, a pragma at the top of shell.qml; Qt used to pick
-    -- it here on its own): the pills are separate surfaces that move
-    -- together, and the threaded loop (QSG_RENDER_LOOP=threaded, animations
-    -- at the monitor's refresh instead of 60 fps) presents each window on
-    -- its own thread -- neighbours landed a frame apart and the gaps between
-    -- the pills shook by up to 12px mid-animation.
+    -- First of the lot: on a cold boot the shell puts the lock up on its first frame (greetd hands
+    -- the seat over logged in), and everything below would otherwise draw an unlocked desktop. The
+    -- basic render loop is set by shell.qml's pragma: the threaded one presents each window on its
+    -- own thread and the pills shook by up to 12px.
     hl.exec_cmd("quickshell")
-    -- Before Steam, which reads the monitors when it starts: the primary,
-    -- and the monitors in desk order (see "The monitors as X programs see
-    -- them").
+    -- Before Steam, which reads the monitors when it starts (see "The
+    -- monitors as X programs see them").
     setXPrimary()
     -- Chat and the game client.
     hl.exec_cmd("discord")
     orderXMonitors(function() hl.exec_cmd("steam") end)
     hl.exec_cmd("hyprpaper")
-    -- The desktop widgets are the shell's own now (Super + D), on a layer
-    -- under the windows; the four kitty windows that stood in for them --
-    -- fastfetch, tty-clock, cava, btop on workspace 11 -- are gone.
-    -- Panels off after fifteen idle minutes and a lock at twenty; rules in
-    -- hypridle.conf next door. Its output goes to a log rather than nowhere:
-    -- when the timeout does not fire, what it says about inhibits is the only
-    -- account of why, and it used to be thrown away.
+    -- Panels off after fifteen idle minutes and a lock at twenty (hypridle.conf). Logged: when a
+    -- timeout does not fire, what it says about inhibits is the only account of why.
     hl.exec_cmd("hypridle > $HOME/.local/state/hypridle.log 2>&1")
-    -- No OpenRGB server here: scripts/keyboard_rgb.py starts one when a USB
-    -- device comes in and keeps it only while it has a keyboard to light.
-    -- Started for the whole session it cost a steady 0.25% CPU lighting
-    -- nothing, the Wooting being driven through its own SDK.
+    -- No OpenRGB server here: keyboard_rgb.py starts one when a USB device comes in
+    -- and keeps it only while it has a keyboard to light (a session-long server
+    -- cost 0.25% CPU lighting nothing).
     hl.exec_cmd("systemctl --user start hyprpolkitagent")
     hl.exec_cmd("gsettings set org.gnome.desktop.interface color-scheme prefer-dark")
-    -- Tailscale's tray icon: tailnet state and a connect/disconnect toggle
-    -- without a terminal.
-    --
-    -- Delayed because it needs somewhere to appear. The tray host is
-    -- quickshell, started a few lines up, and a StatusNotifierItem that
-    -- registers before the watcher exists has nothing to attach to. Whether
-    -- this one retries or gives up was not established -- finding out means
-    -- killing the shell out from under a live session -- so it waits instead.
-    -- If the icon is ever missing at login, that delay is the first thing to
-    -- raise.
-    --
-    -- dark:nobg, not the default dark: the default paints the glyph on an
-    -- opaque black square, which sits as a hard-edged box among the
-    -- transparent icons already in the tray. Compared side by side before
-    -- choosing.
+    -- Tailscale's tray icon. Delayed so quickshell's tray host exists first: an item registered
+    -- before the watcher has nothing to attach to. If the icon is ever missing at login, raise the
+    -- delay. dark:nobg: the default dark paints the glyph on an opaque black square.
     hl.timer(function()
         hl.exec_cmd("tailscale systray --theme=dark:nobg")
-        -- Wooting's background service (the AppImage, installed to
-        -- ~/.local/bin): app linking -- switching keyboard profiles by the
-        -- focused app -- and Wootility's helpers. Same wait as above, for the
-        -- same tray. Its log is kept: it says which keyboard it found.
+        -- Wooting's background service (~/.local/bin AppImage): app-linked profiles and Wootility's
+        -- helpers. Same wait, for the same tray; the log says which keyboard it found.
         hl.exec_cmd("wooting-bg-service > $HOME/.local/state/wooting-bg-service.log 2>&1")
     end, { timeout = 4000, type = "oneshot" })
 end)
@@ -285,11 +216,9 @@ hl.curve("linear",         { type = "bezier", points = { {0, 0},       {1, 1}   
 hl.curve("almostLinear",   { type = "bezier", points = { {0.5, 0.5},   {0.75, 1}    } })
 hl.curve("quick",          { type = "bezier", points = { {0.15, 0},    {0.1, 1}     } })
 hl.curve("easy",           { type = "spring", mass = 1, stiffness = 238.1191, dampening = 24.21279333 })
--- The shell's spring (Theme.springOvershoot in quickshell): the same
--- stiffness as "easy", damped to a ratio of 0.68 instead of 0.78, so it runs
--- about 5% past and settles -- what the bar's panels and overlays do, so a
--- window opening and a panel opening move alike. Arrivals only; leaving and
--- fading stay on the plain curves.
+-- The shell's spring (Theme.springOvershoot): "easy"'s stiffness damped to 0.68 instead
+-- of 0.78, so it runs ~5% past and settles, like the bar's panels. Arrivals only; leaving
+-- and fading stay on the plain curves.
 hl.curve("soft",           { type = "spring", mass = 1, stiffness = 238.1191, dampening = 21 })
 
 hl.animation({ leaf = "global",        enabled = true,  speed = 10,   bezier = "default" })
@@ -344,11 +273,8 @@ hl.config({
         kb_model   = "",
         kb_options = "",
         kb_rules   = "",
-        -- Repeticion de tecla: tras repeat_delay ms aguantando, repite
-        -- repeat_rate veces por segundo. Los defaults de Hyprland (600/25)
-        -- se sienten lentos al borrar. Afecta a todas las aplicaciones,
-        -- no solo al terminal: lo fija el compositor y lo reparte por
-        -- wl_keyboard.repeat_info.
+        -- Key repeat: after repeat_delay ms held, repeat_rate per second. Hyprland's 600/25 felt
+        -- slow when deleting. Set by the compositor for every app (wl_keyboard.repeat_info).
         repeat_delay = 400,
         repeat_rate  = 40,
         follow_mouse = 1,
@@ -375,31 +301,19 @@ local closeWindowBind = hl.bind(mainMod .. " + Q", hl.dsp.window.close())
 hl.bind(mainMod .. " + C", hl.dsp.exec_cmd(terminal .. " --directory $HOME claude --continue"))
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager))
 hl.bind(mainMod .. " + V", hl.dsp.window.float({ action = "toggle" }))
--- Handled inside the shell, which registers the name over Hyprland's
--- global-shortcuts protocol -- see the GlobalShortcut in shell.qml.
--- Locking is in there too, because the lock surface is one quickshell draws
--- itself: LockEngine and LockScreen. Nothing outside the shell to run.
+-- Handled inside the shell over Hyprland's global-shortcuts protocol (the GlobalShortcut in
+-- shell.qml), locking included: the lock surface is the shell's own.
 hl.bind(mainMod .. " + L", hl.dsp.global("quickshell:lock"))
 hl.bind(mainMod .. " + space", hl.dsp.global("quickshell:launcher"))
 hl.bind(mainMod .. " + Tab", hl.dsp.global("quickshell:overview"))
 hl.bind(mainMod .. " + SHIFT + R", hl.dsp.global("quickshell:record"))
 
--- ── While the shell's launcher, overview, wallpapers or shortcuts are up ─
---
--- Quickshell switches to this submap as one opens and back as it closes
--- (Panels.modalOpen). In it only the keys that close them do anything: the rest -- above all Super+drag, which moved and resized the
--- windows behind the overview -- waits until they are gone. Keys the
--- overlays handle themselves (Esc, arrows, typing) reach them as usual.
---
--- Each of them drops back to the normal binds itself before asking the
--- shell, so the way out never depends on Quickshell answering: a shell
--- that died with the overview up cannot leave the keyboard stuck here.
---
--- The screenshot key is in it too, and leaves the overlay up, so a menu can
--- be captured as well. The name is dated by the shell when the key is
--- pressed. It used to be built with os.date() here, which runs once, when
--- this file is loaded: every screenshot between two reloads got the same name
--- and overwrote the last.
+-- While the shell's launcher, overview, wallpapers or shortcuts are up, Quickshell switches
+-- to this submap (Panels.modalOpen): only the keys that close them work, so Super+drag can't
+-- move the windows behind. Each drops back to the normal binds before asking the shell, so a
+-- dead shell can't leave the keyboard here. The screenshot key works too and keeps the
+-- overlay up; its name is dated when pressed (os.date() here ran once per load, and every
+-- shot between reloads overwrote the last).
 local screenshot =
     'grimblast --notify copysave area "$HOME/Pictures/Screenshots/screenshot_$(date +%Y-%m-%d_%H-%M-%S).png"'
 
@@ -439,17 +353,10 @@ hl.bind(mainMod .. " + right", hl.dsp.focus({ direction = "right" }))
 hl.bind(mainMod .. " + up",    hl.dsp.focus({ direction = "up" }))
 hl.bind(mainMod .. " + down",  hl.dsp.focus({ direction = "down" }))
 
--- ── Workspaces: ten per monitor ──────────────────────────────────────────
---
--- Each monitor has its own block of ten: DP-2 has 1-10, HDMI-A-1 11-20 (the
--- rules that pin them are at the end of the file). Super+N and
--- Super+Shift+N work on the Nth of the focused monitor's block, so each
--- monitor has a 1 to 10 of its own, and the shell's pill and overview number
--- them the same way: 13 reads as HDMI's 3.
---
--- The block comes from the workspace the monitor is showing, not from its
--- name, so the shell can work it out the same way, and a monitor with no
--- rule still gets a block of whatever it landed on.
+-- Workspaces: ten per monitor. DP-2 has 1-10, HDMI-A-1 11-20 (pinned at the end of the
+-- file); Super+N and Super+Shift+N use the Nth of the focused monitor's block, numbered the
+-- same in the shell (13 reads as 3). The block comes from the workspace the monitor shows,
+-- so a monitor with no rule still gets one.
 local workspaceBlocks = { ["DP-2"] = 0, ["HDMI-A-1"] = 10 }
 
 local function focusedBlock()
@@ -512,9 +419,7 @@ hl.window_rule({
 
 hl.layer_rule({
     name  = "quickshell-xray",
-    -- ".*": rules match the whole namespace, and "quickshell" alone matched
-    -- none of the shell's ("quickshell:bar-blur", ...). Harmless while
-    -- decoration.blur.xray is on globally, but this is what it meant.
+    -- ".*": rules match the whole namespace, so "quickshell" alone matched none of the shell's.
     match = { namespace = "^quickshell.*" },
     xray  = true,
 })
@@ -531,31 +436,17 @@ hl.window_rule({
     no_focus = true,
 })
 
--- ── World of Warcraft fullscreen ──────────────────────────────────
---
--- The gxWindow "0" CVar in Config.wtf is not enough: under XWayland the
--- client asks, Hyprland tiles it anyway, and the window lands inset by the
--- gaps and the bar. Forcing it here wins regardless of what the game asks.
---
--- Matched on title as well as class, because everything umu launches shares
--- the class "steam_app_default" -- on class alone this would also catch
--- every other Battle.net and Lutris game.
+-- World of Warcraft fullscreen: gxWindow "0" is not enough under XWayland, where Hyprland tiles it
+-- anyway. Matched on title too, since everything umu launches shares the class "steam_app_default".
 hl.window_rule({
     name       = "wow-fullscreen",
     match      = { class = "^steam_app_default$", title = "^World of Warcraft$" },
     fullscreen = true,
 })
 
--- ── Desktop widgets ───────────────────────────────────────────────────
---
--- Drawn by the shell on its own layers: "quickshell:desktop" under the
--- windows (one per monitor, unmapped when empty or under a fullscreen
--- window) and "quickshell:widgets", the picker, over everything. The
--- widgets are the bar panels' glass, blurred like the bar: same threshold,
--- so the card is blurred and the transparent space around it is not, and
--- the catch-all xray rule keeps it to the wallpaper, which is cached. The
--- picker dims with its own scrim, like the other overlays. Both animate
--- themselves.
+-- Desktop widgets: "quickshell:desktop" under the windows (one per monitor) and
+-- "quickshell:widgets", the picker, over everything. Blurred like the bar's glass (same threshold,
+-- xray to the cached wallpaper); both animate themselves.
 hl.layer_rule({
     name         = "quickshell-desktop",
     match        = { namespace = "^quickshell:desktop$" },
@@ -573,15 +464,8 @@ hl.layer_rule({
     no_anim      = true,
 })
 
--- ── Steam's notification toasts ─────────────────────────────────────
---
--- "A friend is now playing..." is a small X window, kept floating, pinned to
--- whatever workspace you are on and never taking focus from the game or the
--- window you are typing in.
---
--- The `.*` matters: Hyprland matches a rule's regex against the whole title,
--- not a prefix of it, so "^notificationtoasts" alone matched no toast
--- ("notificationtoasts_6_desktop") and they went on as tiles on workspace 2.
+-- Steam's notification toasts: small X windows, floating, pinned to the current workspace and never
+-- taking focus. The `.*` matters: regexes match the whole title ("notificationtoasts_6_desktop").
 hl.window_rule({
     name     = "steam-toasts",
     match    = { class = "^steam$", title = "^notificationtoasts.*" },
@@ -590,26 +474,12 @@ hl.window_rule({
     no_focus = true,
 })
 
--- Where it goes is not up to a rule. Steam moves the toast itself right
--- after it maps -- it slides it up into what it takes for the bottom-right
--- corner, over about a third of a second -- and a floating X window gets the
--- moves it asks for, so a rule's `move` held for 60ms. Steam works that
--- corner out in X coordinates, where both monitors sit at y=0; here the
--- Samsung was 240px lower and the Xiaomi 242px higher, so the slide ended in
--- the middle of the right edge. Mapped with a rule's `move`, the Xiaomi's
--- corner came out off-screen as well (monitor_h, without its offset).
---
--- Since 2026-10-18 the Xiaomi is at 0,0 and the Samsung at -1920,360 (bottoms
--- level, as before), so X and Hyprland agree on the Xiaomi at least. Not only
--- for this: a monitor with a y offset lost it when it came back from being
--- switched off -- Hyprland put its floating windows back as if it were at
--- y=0, 120px low every night (see ~/.config/hypr/scripts/float-keep.py).
--- Keep the Xiaomi, the one that drops its link, at 0,0.
---
--- So: into the bottom-right corner of the monitor in use, 13px in like the
--- windows, and back there every 10ms for as long as the toast is up -- a
--- check that moves nothing once Steam has stopped. One timer per toast, and
--- it ends with the toast.
+-- Placement is not up to a rule: Steam slides the toast into what it takes for the bottom-right
+-- corner, in X coordinates where every monitor sits at y=0, and a floating X window gets the
+-- moves it asks for. Keep the Xiaomi, the one that drops its link, at 0,0: a monitor with a y
+-- offset came back from being off with its floating windows 120px low (see
+-- scripts/float-keep.py). So the toast is put in the current monitor's bottom-right corner, 13px
+-- in, and checked every 10ms while it is up (one timer per toast).
 local function pinToastToCorner(win)
     local mon = hl.get_active_monitor()
     if not mon then return end
@@ -635,20 +505,10 @@ local function pinToastToCorner(win)
     end, { timeout = 10, type = "repeat" })
 end
 
--- ── Floating windows bigger than their monitor ──────────────────────
---
--- A floating window that still opens too big for its monitor, or outside
--- it, is brought in: shrunk to the monitor's free area (the bar's space
--- off, 13px in like the windows) and centred there. The case it was written
--- for: an X dialog asking for 2400x1300 opened at 0,0 -- the Xiaomi's
--- corner -- while it belonged to a Samsung workspace, and ran off both.
---
--- Checked when the window maps and once more a moment later, for the X
--- programs (Steam among them) that resize themselves just after. Windows
--- that already fit are not touched. Left out: Proton games (steam_app_*),
--- which render at the size they chose whatever their window is resized to
--- -- the primary monitor above is what gives them the right one; Steam's
--- toasts, placed above; and the nameless surfaces of X drags.
+-- Floating windows bigger than their monitor, or outside it, are shrunk to its free area (13px in,
+-- minus the bar) and centred; an X dialog once opened at 2400x1300 on the Xiaomi's corner. Checked
+-- on map and once more after, for X programs that resize themselves. Left out: Proton games
+-- (steam_app_*), Steam's toasts, X drags.
 local function fitToMonitor(sel)
     local w = hl.get_window(sel)
     if not w or not w.mapped or not w.floating or w.fullscreen ~= 0 or w.pinned then return end
@@ -695,39 +555,26 @@ hl.layer_rule({
     name  = "quickshell-bar-blur",
     match = { namespace = "^quickshell:bar-blur$" },
     blur  = true,
-    -- Blur covers the whole rectangular surface, so without this the
-    -- transparent margin around each rounded widget renders as a blurred
-    -- square. Pixels below this alpha are left unblurred.
+    -- Blur covers the whole rectangular surface, so pixels below this alpha stay unblurred, or the
+    -- transparent margin around each rounded widget would blur as a square.
     ignore_alpha = 0.3,
-    -- No compositor animation for these surfaces. The "layers" animation
-    -- above slides a layer from its old geometry to its new one whenever it
-    -- moves or resizes -- and the shell moves and resizes the pills itself,
-    -- frame by frame, with its own animations. The two fought: every pill
-    -- that followed a neighbour was also being eased by Hyprland a beat
-    -- behind, and when a pill's window shrank at the end of a close,
-    -- Hyprland slid it across from where the larger window had been, so it
-    -- jumped over its neighbour and crept back. These are never mapped or
-    -- unmapped in use (hidden by input mask), so nothing else is lost.
+    -- No compositor animation: the shell animates the pills itself, and Hyprland
+    -- easing them a beat behind made a shrinking pill jump over its neighbour. They
+    -- are never mapped or unmapped in use.
     no_anim = true,
 })
 
--- The full-screen overlays draw an opaque card over a scrim (Theme.surface,
--- Theme.scrim), so they ask for no blur: the compositor's blur is kept for
--- the bar's glass, and a blurred full-screen layer was the costliest frame
--- the shell could ask for.
+-- The full-screen overlays draw an opaque card over a scrim, so no blur: a blurred full-screen
+-- layer was the costliest frame the shell could ask for.
 hl.layer_rule({
     name  = "quickshell-keybinds-blur",
     match = { namespace = "^quickshell:keybinds$" },
     blur  = false,
-    -- The cheatsheet's own dim is what gets blurred through, so the
-    -- threshold sits below it: at the bar's 0.3 the blur would snap in
-    -- partway through the fade instead of coming up with it. Closed, the
-    -- surface draws nothing at all and no pixel clears this.
+    -- The cheatsheet's dim is what gets blurred through, so the threshold sits below it (at 0.3 the
+    -- blur snapped in mid-fade). Closed, the surface draws nothing.
     ignore_alpha = 0.02,
-    -- Overrides the catch-all quickshell xray rule above. Xray blurs to the
-    -- wallpaper and ignores the windows in between, which is right for the
-    -- bar sitting over a workspace but not for a sheet thrown over the work
-    -- itself -- the point is to see that this is on top of something.
+    -- Overrides the catch-all xray rule: a sheet over the work should show the
+    -- windows under it, not the wallpaper.
     xray = false,
     -- The sheet fades and drops in by itself, like the launcher; Hyprland's
     -- layer fade on top only made it arrive later.
@@ -738,23 +585,16 @@ hl.layer_rule({
     name  = "quickshell-wallpapers-blur",
     match = { namespace = "^quickshell:wallpapers$" },
     blur  = false,
-    -- Same reasoning as the cheatsheet above: the picker's own dim is what
-    -- gets blurred through, so the threshold sits under it rather than at
-    -- the bar's 0.3.
+    -- Same as the cheatsheet: the picker's own dim is what gets blurred through.
     ignore_alpha = 0.02,
-    -- And the same override of the catch-all xray rule, for a sharper
-    -- reason here: xray blurs to the wallpaper. A wallpaper picker that
-    -- shows the old wallpaper through itself is judging every candidate
-    -- against the thing it is meant to replace.
+    -- And no xray: a wallpaper picker showing the old wallpaper through itself
+    -- judges every candidate against it.
     xray = false,
 })
 
--- The launcher fades itself in (100ms). Hyprland's own layer fade on top of
--- that stretched its arrival to about 230ms from the keypress -- the slowest
--- part of Super+Space.
--- The workspace overview dims the desktop and has it blurred behind: the
--- real windows (xray off, as for the cheatsheet), under a threshold low
--- enough for the dim. It fades itself, so no layer animation on top.
+-- The launcher fades itself in (100ms); Hyprland's layer fade on top stretched it to
+-- ~230ms. The overview dims the desktop with the real windows blurred behind (xray off),
+-- under a low threshold; it fades itself too.
 hl.layer_rule({
     name         = "quickshell-overview",
     match        = { namespace = "^quickshell:overview$" },
@@ -774,56 +614,26 @@ hl.layer_rule({
     name  = "quickshell-launcher-blur",
     match = { namespace = "^quickshell:launcher$" },
     blur  = false,
-    -- The bar's threshold, not the cheatsheet's, because the launcher does
-    -- not dim the screen: everything outside the panel is fully transparent
-    -- and must stay unblurred, so only the panel itself clears this. At the
-    -- 0.02 the overlays use, the whole screen would blur the moment the
-    -- launcher opened -- which is the thing that was asked to stop.
+    -- The bar's threshold: the launcher doesn't dim the screen, so only the panel may clear it (at
+    -- 0.02 the whole screen blurred on open).
     ignore_alpha = 0.3,
-    -- Overrides the catch-all quickshell xray rule. Xray blurs to the
-    -- wallpaper and ignores the windows in between; the panel is meant to
-    -- take its frosting from whatever it was opened on top of.
+    -- Overrides the catch-all xray rule: the panel takes its frosting from whatever it opened over.
     xray = false,
 })
 
--- ── Was hyprland-gui.lua ─────────────────────────────────────────────────
---
--- HyprMod kept its settings in a generated hyprland-gui.lua that this file
--- pulled in with require(). That file is gone from the load path now and
--- everything lives here, so there is one config to read and one to edit.
---
--- Do not point HyprMod's config-path at this file to get the same effect:
--- it rewrites its managed file wholesale from its own state, so it would
--- replace everything above with the handful of settings its UI knows about.
--- Editing here means not running HyprMod (or treating whatever it writes as
--- something to merge in by hand).
---
--- Kept as a layer rather than folded into the blocks above, because that is
--- the order the settings were resolved in before: where a key appears twice,
--- the one down here is the one that was winning.
+-- Was hyprland-gui.lua: HyprMod's generated settings now live here, one config to read and edit.
+-- Don't point HyprMod's config-path at this file: it rewrites its managed file wholesale. Kept as a
+-- layer in the order the settings resolved before: where a key appears twice, this one was winning.
 
--- Posy's Improved Cursor, the white set. rose-pine's was a muted rose-grey
--- that went missing against the wallpapers this desktop runs.
---
--- The white one of the eight in the set, measured rather than taken from the
--- name: 59% white pixels against 40% black. That black is the outline, and it
--- is the whole point of the design -- the pointer stays readable on a white
--- page and on a dark one. Posy_Cursor_Strokeless is whiter still, at 93%, but
--- only because the outline is gone.
---
--- From github.com/simtrami/posy-improved-cursor-linux, which ships XCursor
--- only, so this is `hyprcursor-util --extract` then `--create` over it. 17
--- real shapes and 133 aliases, and the aliases survive the conversion as
--- define_override entries -- checked, because a lost alias means an app asking
--- for `left_ptr` silently falls back.
---
--- Under ~/.local/share/icons, so nothing in /usr is touched.
+-- Posy's Improved Cursor, the white set (59% white with a black outline, readable on light and
+-- dark pages). From simtrami/posy-improved-cursor-linux (XCursor only), converted with
+-- `hyprcursor-util --extract` then `--create`; the 133 aliases survive as define_override
+-- entries. Installed under ~/.local/share/icons.
 hl.env("HYPRCURSOR_THEME", "Posy_Cursor-hyprcursor")
 hl.env("HYPRCURSOR_SIZE", "28")
 
--- The XCursor half, for XWayland and anything that does not speak hyprcursor.
--- It was never set at all until now, which left those apps on the default --
--- so half the screen would have gone on showing a different pointer.
+-- The XCursor half, for XWayland and apps without hyprcursor; unset,
+-- those showed a different pointer.
 hl.env("XCURSOR_THEME", "Posy_Cursor")
 
 hl.config({
@@ -878,53 +688,33 @@ hl.config({
         disable_hyprland_logo = true,
         disable_splash_rendering = true,
 
-        -- If the lock client dies while it is holding the screen, Hyprland
-        -- keeps the session locked and there is no client left to type into:
-        -- the only way back is killing the compositor from a TTY, which takes
-        -- the whole session with it. With this on, a freshly started locker is
-        -- allowed to adopt the orphaned lock instead, so `quickshell` coming
-        -- back up puts a field back on the screen.
+        -- If the lock client dies holding the screen, a restarted locker may adopt the orphaned
+        -- lock, so `quickshell` coming back puts a field up again instead of needing a TTY.
         allow_session_lock_restore = true,
 
-        -- What fills the gap at boot between Hyprland taking the display and
-        -- quickshell drawing the lock over it -- the moment of "monitor sin
-        -- nada". The default is black; this is the shell's own background, so
-        -- the handover reads as one screen rather than two.
+        -- What fills the gap at boot between Hyprland taking the display and quickshell's lock: the
+        -- shell's own background, so the handover reads as one screen.
         background_color = "rgb(101014)",
 
-        -- A window that asks to be activated gets focus, and its workspace
-        -- with it. Opening a link from Discord or the terminal hands the URL
-        -- to the browser already running, which asks exactly that; with this
-        -- off Hyprland only marked it urgent (the pulse on the workspaces
-        -- pill) and you stayed where you were.
+        -- A window asking to be activated gets focus and its workspace: a link from Discord goes to
+        -- the running browser, which Hyprland only marked urgent before.
         focus_on_activate = true,
 
-        -- Variable refresh (FreeSync / G-Sync compatible), for fullscreen
-        -- windows only -- games. Off, a game running below the monitor's
-        -- refresh (240 Hz on the Samsung) showed every dip as judder; with
-        -- it the monitor follows the frame rate, as it did under Windows.
-        -- Not on the desktop, where some panels flicker at low refresh.
+        -- Variable refresh for fullscreen windows only (games): without it a game below 240 Hz
+        -- judders. Not on the desktop, where some panels flicker at low refresh.
         vrr = 2,
     },
 
     render = {
-        -- A fullscreen game's frames go straight to the screen instead of
-        -- being composited first: less GPU work and less latency. 1 (any
-        -- fullscreen window) rather than 2 (content type "game"): games under
-        -- Proton report no content type, and 2 never applied to them.
-        --
-        -- It only engages with nothing to draw over the game, and the
-        -- shell's pill surfaces stay mapped (transparent) over fullscreen --
-        -- hyprctl monitors says "blockedBy: CANDIDATE" while they do. Set so
-        -- it applies the moment that is no longer so.
+        -- Direct scanout for any fullscreen window (1), not content type "game" (2), which Proton
+        -- games never report. It only engages with nothing drawn over the game; while the shell's
+        -- pill surfaces are mapped hyprctl monitors says "blockedBy: CANDIDATE".
         direct_scanout = 1,
     },
 })
 
--- After the catch-all monitor rule at the top of the file, so these win for
--- the two outputs actually attached. A function, because putting the
--- monitors in order for X (near the top) turns monitors off and needs them
--- back on as they were.
+-- After the catch-all monitor rule at the top, so these win for the attached outputs. A function,
+-- because putting the monitors in order for X turns them off and needs them back as they were.
 applyMonitorRules = function()
     hl.monitor({
         output = "DP-2",
@@ -943,12 +733,9 @@ applyMonitorRules = function()
         cm = "srgb",
     })
 
-    -- The layout picked in the shell's Settings (Displays page) -- mode,
-    -- position and scale per monitor -- written to monitors.lua by
-    -- display_control.py. Run after the rules above, so it wins: at login,
-    -- and at every config reload, which used to put the monitors back where
-    -- this file had them. The two rules above stay as the defaults for a
-    -- machine with nothing saved yet.
+    -- The layout picked in Settings -> Displays (monitors.lua, from display_control.py), run
+    -- after the rules above so it wins at login and on every reload; those rules stay as
+    -- defaults for a machine with nothing saved.
     local path = os.getenv("HOME") .. "/.config/hypr/monitors.lua"
     local f = io.open(path, "r")
     if f then
@@ -959,64 +746,32 @@ end
 
 applyMonitorRules()
 
--- Each monitor's block of ten (see `workspaceBlocks` by the binds), pinned
--- so a workspace opens on its own monitor whichever one asked for it.
--- `default` has each monitor come up on the first of its block: left alone,
--- Hyprland hands the 1 to whichever monitor it enumerates first (HDMI-A-1),
--- and the work screen, DP-2, got the 2.
+-- Each monitor's block of ten (`workspaceBlocks`), pinned so a workspace opens on its own monitor.
+-- `default` puts each monitor on its block's first; left alone, HDMI-A-1 got the 1 and DP-2 the 2.
 for name, base in pairs(workspaceBlocks) do
     for i = 1, 10 do
         hl.workspace_rule({ workspace = tostring(base + i), monitor = name, default = i == 1 })
     end
 end
 
--- ── Shell fit-up ─────────────────────────────────────────────────────────
---
--- Last, so it wins over the block above. The bar already reserves 51px at
--- the top, and a full outer gap on top of that left a wide empty band under
--- it; the other edges keep the value from above.
+-- Shell fit-up. Last, so it wins: the bar already reserves 51px at the
+-- top, so the top gap is smaller.
 hl.config({
     general = {
         gaps_out = { top = 20, bottom = 30, left = 30, right = 30 },
     },
     decoration = {
-        -- Same tone the shell's widgets use (Theme.glass is the background
-        -- at 0.8), so the focused window and the panels read as the same
-        -- material. Inactive windows stay opaque, as before.
+        -- Focused windows at 0.8; inactive ones keep the 0.7 from the block above.
         active_opacity = 0.8,
     },
 })
 
--- ── Zen: the page is not a decoration ────────────────────────────────────
---
--- The global opacity above dims every window, and a compositor has no way to
--- dim only the browser's chrome: the tab strip and the page it frames are one
--- surface, so 0.8 opacity puts the wallpaper through the article as well.
---
--- Focused, the window is therefore forced fully opaque and the translucency
--- is put back inside Zen, where chrome and content *are* separable
--- (zen.widget.linux.transparency, in the profile's user.js). Unfocused, Zen
--- goes back to behaving like any other window and dims whole.
---
--- The value has to be the rule string, not a number. `opacity = 1.0` parses
--- fine and does nothing: without `override` a number is a *factor* on the
--- global opacity, so 1.0 x 0.8 is still 0.8. Which is exactly why the second
--- value here is left un-overridden -- 1.0 x inactive_opacity is whatever
--- that global says, today and after it changes, rather than a copy of 0.7
--- that would quietly stop matching. And the per-field spellings
--- (opacity_override, opacity_inactive) are not keys this schema knows: they
--- land in `hyprctl configerrors` instead of stopping the reload.
--- ── NIKKE: a game is not a decoration either ─────────────────────────────
---
--- Same reasoning as Zen below, with one difference: both states are
--- overridden here. Zen deliberately leaves the inactive value as a factor so
--- it tracks the global, but a game showing the wallpaper through it while
--- unfocused is just as wrong as while focused -- and it is watched unfocused
--- often, in the background of something else.
---
--- Matched on the Steam appid class, which is specific to this game. The
--- generic "steam_app_default" that umu hands out would catch every other
--- Lutris and Battle.net title too.
+-- Zen and NIKKE, opaque while focused: global opacity would put the wallpaper through the page or
+-- the game. Zen's translucency is redone inside Zen (zen.widget.linux.transparency in user.js), and
+-- its inactive value stays a factor so it tracks the global; NIKKE overrides both, often watched
+-- unfocused. NIKKE is matched on its appid class, not umu's generic one. The value must be the rule
+-- string: a bare number is a factor on the global opacity (1.0 x 0.8 is 0.8), and
+-- opacity_override/opacity_inactive are not keys of this schema.
 hl.window_rule({
     name = "nikke-opaque",
     match = { class = "^steam_app_3741011882$" },
@@ -1031,12 +786,9 @@ hl.window_rule({
     opacity = "1.0 override 1.0",
 })
 
--- ── Settings made in the shell ───────────────────────────────────────────
---
--- The Settings window's Hyprland page writes its choices to gui-settings.lua
--- (see ~/.config/quickshell/scripts/hypr_settings.py) and never touches this
--- file. Run last, so what was picked there wins over the blocks above; with
--- no such file -- a fresh machine, or every choice reset -- nothing happens.
+-- Settings made in the shell: the Settings window's Hyprland page writes
+-- gui-settings.lua (hypr_settings.py), never this file. Run last so those choices win;
+-- with no such file nothing happens.
 do
     local path = os.getenv("HOME") .. "/.config/hypr/gui-settings.lua"
     local f = io.open(path, "r")

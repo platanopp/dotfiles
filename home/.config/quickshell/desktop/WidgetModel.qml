@@ -1,12 +1,9 @@
 import QtQuick
 import qs.services
 
-// One monitor's widgets as a ListModel, kept in step with Widgets.placed by
-// id. A Repeater over the plain array rebuilt every widget whenever any one
-// moved -- the covers reloaded, the spectrum dropped to nothing and came
-// back -- where this only touches the rows that changed: moved widgets get
-// new wx and wy (not x and y, which every delegate already has), resized ones
-// a new ws, gone ones are removed, new ones appended.
+// One monitor's widgets as a ListModel kept in step with Widgets.placed by id,
+// touching only rows that changed: a Repeater over the array rebuilt every widget on
+// any move. Moves set wx/wy, resizes ws.
 ListModel {
     id: model
 

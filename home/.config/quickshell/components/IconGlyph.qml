@@ -1,19 +1,9 @@
 import QtQuick
 import qs.config
 
-// One icon glyph, sized by the box its ink actually fills.
-//
-// Setting font.pixelSize on a Text sets the em box, and the Material Design
-// glyphs in a Nerd Font fill wildly different fractions of it: at the same
-// pixel size the wifi fan inks 0.62 em, the battery 0.88 em. Asking for one
-// "icon size" therefore still produced icons that disagreed by ~40% side by
-// side. Measuring each glyph and dividing back down to Theme's reference box
-// makes `size` mean the same thing for every icon, and any glyph added later
-// corrects itself without a lookup table.
-//
-// The ink sits at the centre of the line box in this font (offset -0.0008 em,
-// i.e. nothing), so ordinary vertical centring keeps corrected icons aligned
-// with their neighbours; no baseline nudging is needed.
+// One icon glyph, sized by the box its ink fills: Nerd Font Material glyphs fill the em box
+// unevenly (wifi 0.62, battery 0.88), so each is measured and scaled to Theme's reference box. The
+// ink is centred in the line box, so ordinary vertical centring aligns corrected icons.
 Text {
     id: root
 

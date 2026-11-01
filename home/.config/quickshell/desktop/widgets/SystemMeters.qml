@@ -5,10 +5,8 @@ import qs.config
 import qs.desktop
 import qs.services
 
-// CPU, memory, GPU and its memory, as four tiles shaped like the control
-// panel's: what btop's window was kept open for. The number is the point,
-// large; the bar under it stays neutral and turns amber, then red, as a meter
-// nears full, the number saying the same in words.
+// CPU, memory, GPU and its memory as four tiles like the control panel's: the number large, the bar
+// under it neutral, turning amber then red as it nears full.
 WidgetCard {
     id: root
 

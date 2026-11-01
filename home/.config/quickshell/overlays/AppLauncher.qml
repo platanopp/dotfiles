@@ -9,37 +9,28 @@ import qs.components
 import qs.config
 import qs.services
 
-// The launcher, opened from the bind the config points at
-// "quickshell:launcher" (Super+Space). Replaces `rofi -show drun`.
+// The launcher (Super+Space, the "quickshell:launcher" bind), shaped after Spotlight by request: SF
+// Pro names, no dimming behind it. It finds more than apps, each kind under its own label:
 //
-// Shaped after macOS Spotlight by request, which is why the names are in SF
-// Pro, and why it does not dim the desktop behind it. The rest is the
-// shell's: the overlays' solid card and its shadow, the panels' section
-// labels, the keycap hints.
+// Frequent      on an empty field, what you open most (LauncherHistory)
+// Applications  ranked by how well the name matches, then by use
+// Games         installed Steam games and non-Steam shortcuts (SteamGames)
+// Windows       open windows, to switch to (focus follows to its workspace)
+// Settings      the shell's Settings pages, by name or by what is on them
+// Actions       lock, suspend, wallpapers, keybinds, notifications
+// Calculator    "12*7" or "=2^10": the result, Enter copies it
+// Web           the query in the browser, always last
 //
-// It finds more than applications, each kind under its own label:
-//   Frequent      on an empty field, what you open most (LauncherHistory)
-//   Applications  ranked by how well the name matches, then by use
-//   Games         installed Steam games and non-Steam shortcuts (SteamGames)
-//   Windows       open windows, to switch to (focus follows to its workspace)
-//   Settings      the shell's Settings pages, by name or by what is on them
-//   Actions       lock, suspend, wallpapers, keybinds, notifications
-//   Calculator    "12*7" or "=2^10": the result, Enter copies it
-//   Web           the query in the browser, always last
-// The kinds come in the order of their best match, so "disp" puts the
-// Displays page above an application that only mentions displays.
-//
-// Structurally the house pattern -- mapped only while open, exclusive
-// keyboard focus while open, pinned to the screen it was summoned on.
+// Kinds are ordered by their best match, so "disp" puts the Displays page
+// above an app that only mentions it.
 PanelWindow {
     id: overlay
 
     property var bar: null
     screen: bar.screen
 
-    // One copy per monitor and only the one it was opened on shows. Focus
-    // follows the mouse here, so matching against live focus would drag the
-    // launcher to whichever screen the pointer wandered onto.
+    // Pinned to the screen it was opened on, so it does not follow the
+    // pointer to the other monitor.
     readonly property bool onOpeningScreen: {
         if (!bar.monitor) return true
         if (Panels.launcherScreen === "") return bar.monitor.focused
@@ -48,15 +39,9 @@ PanelWindow {
 
     readonly property bool open: Panels.launcherOpen && overlay.onOpeningScreen
 
-    // Unmapped while closed, not merely drawn empty: a mapped full-screen
-    // layer is composited every frame whether or not it draws anything.
-    // `shown` keeps it mapped until the fade out has played, and is the only
-    // thing `visible` reads. It read `open || unmapDelay.running`, and
-    // between `open` going false and the handler starting the timer that
-    // was false: the launcher unmapped, came back, and only then faded --
-    // a two-frame blink that looked like no animation at all.
-    // Connections rather than an `onOpenChanged` here: the root already has
-    // one, and a second on the same object is an error.
+    // Unmapped while closed: a mapped full-screen layer is composited every frame, even when empty.
+    // `visible` reads only `shown`: `open || unmapDelay.running` was briefly false on close and
+    // blinked. Connections instead of `onOpenChanged`: the root already has one.
     property bool shown: false
     visible: overlay.shown
 
@@ -84,12 +69,9 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Overlay
     exclusionMode: ExclusionMode.Ignore
 
-    // Held through the fade out when dismissed, let go at once when
-    // something is launched. Changing it mid-fade drops the surface for two
-    // frames -- the panel blinked out and came back before fading -- so a
-    // dismissal keeps it until the end. A launch cannot: the new window has
-    // to get the keyboard, so the panel hides at once instead (`launching`)
-    // and there is nothing left on screen to blink.
+    // Held through the fade out when dismissed: changing it on a visible surface
+    // drops two frames. Released at once on a launch, so the new window gets the
+    // keyboard; the panel hides at once then.
     WlrLayershell.keyboardFocus: overlay.open || (overlay.shown && !overlay.launching)
                                  ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
@@ -110,10 +92,7 @@ PanelWindow {
         height: 0
     }
 
-    // ── Pieces ───────────────────────────────────────────────────────────
-
-    // A section's name over its rows: the panels' label (StatusWidget's
-    // PanelLabel), so the launcher reads as part of the same shell.
+    // A section's name over its rows, in the panels' PanelLabel style.
     component SectionLabel: Text {
         color: Theme.textSecondary
         font.pixelSize: 11
@@ -121,21 +100,16 @@ PanelWindow {
         font.family: Theme.fontText
     }
 
-    // ── Type ─────────────────────────────────────────────────────────────
-    //
-    // Spotlight is a proportional-set panel and reads wrong in a monospace --
-    // the names are the content here, not tabular data. Display is the
-    // optical size cut for the large field, Text for the rows.
+    // Type: proportional, as in Spotlight. Display for the large field, Text for the rows.
     readonly property string fontDisplay: Theme.fontDisplay
     readonly property string fontText: Theme.fontText
 
-    // ── Geometry ─────────────────────────────────────────────────────────
+    // Geometry
     readonly property int cardWidth: 680
     readonly property int searchHeight: 62
     readonly property int rowHeight: 46
     readonly property int headerHeight: 28
-    // How far one notch of the mouse wheel moves the results: two and a
-    // half rows. Three was a little too far, two the old crawl's neighbour.
+    // One wheel notch moves the results two and a half rows.
     readonly property int wheelStep: Math.round(overlay.rowHeight * 2.5)
     readonly property int maxListHeight: 440
     readonly property int listPad: 6
@@ -159,25 +133,23 @@ PanelWindow {
            ? 1 + overlay.listPad * 2 + overlay.listHeight + 1 + overlay.footerHeight
            : 0)
 
-    // Spotlight sits high rather than centred, and the field stays put while
-    // the list grows and shrinks underneath it.
+    // Sits high rather than centred; the field stays put while the list grows under it.
     readonly property int cardTop: Math.round(overlay.height * 0.22)
 
     function startsSection(i) {
         return i === 0 || overlay.results[i - 1].section !== overlay.results[i].section
     }
 
-    // ── State ────────────────────────────────────────────────────────────
+    // State
     property string query: ""
     property int selected: 0
 
     readonly property string q: overlay.query.trim().toLowerCase()
 
-    // ── What there is to find ────────────────────────────────────────────
+    // What there is to find
 
-    // The Settings pages (SettingsView's nav), with the words someone would
-    // type looking for what is on them -- in English and in Spanish, since
-    // the desktop entries are Spanish and the shell is English.
+    // The Settings pages (SettingsView's nav) with search words in English and Spanish,
+    // since the desktop entries are Spanish.
     readonly property var settingsPages: [
         { id: "displays", name: "Displays", glyph: "\u{F037A}",
           keywords: ["monitor", "screen", "resolution", "refresh", "hz", "scale", "vrr", "pantalla", "resolucion"] },
@@ -226,9 +198,8 @@ PanelWindow {
           run: function() { Panels.openSettings("", Panels.launcherScreen) } }
     ]
 
-    // An arithmetic expression, or null. Only digits, operators, brackets
-    // and spaces get anywhere near evaluation, and it must have an operator
-    // -- a bare number is a search, not a sum.
+    // An arithmetic expression, or null. Only digits, operators, brackets and spaces are evaluated,
+    // and it needs an operator: a bare number is a search.
     function calculate(text) {
         var t = text.trim().replace(/^=/, "")
         if (!/^[\d\s+\-*/().,%^x×÷]+$/.test(t)) return null
@@ -243,13 +214,10 @@ PanelWindow {
         }
     }
 
-    // ── Ranking ──────────────────────────────────────────────────────────
+    // Ranking
 
-    // Higher wins; zero drops the item. The tiers are in the order someone
-    // would think of them, and each one subtracts a little for length or
-    // distance so that within a tier the tighter match comes first. Works on
-    // anything with a name, and optionally id, genericName, keywords and
-    // comment -- desktop entries have them all, the rest what they can.
+    // Higher wins; zero drops the item. Each tier subtracts a little for length or distance, so the
+    // tighter match comes first. Uses name, and id, genericName, keywords and comment when present.
     function score(item, q) {
         var name = (item.name || "").toLowerCase()
 
@@ -265,14 +233,12 @@ PanelWindow {
         var at = name.indexOf(q)
         if (at !== -1) return 700 - Math.min(90, at)
 
-        // The desktop id catches the binary a user knows the app by rather
-        // than its display name: "nvim" for Neovim, "dolphin" for
-        // org.kde.dolphin -- and an English query against Spanish entries.
+        // The desktop id catches the binary name ("nvim", "dolphin") and English
+        // queries against Spanish entries.
         if ((item.id || "").toLowerCase().indexOf(q) !== -1) return 600
 
-        // genericName is the curated "what this is" line and beats keywords,
-        // which are a grab bag: the other way round, "term" put a text editor
-        // that keywords itself "terminal" above both installed terminals.
+        // genericName beats keywords: the other way round, "term" put a text
+        // editor above both terminals.
         if ((item.genericName || "").toLowerCase().indexOf(q) !== -1) return 500
 
         var kw = item.keywords || []
@@ -281,14 +247,13 @@ PanelWindow {
         }
         if ((item.comment || "").toLowerCase().indexOf(q) !== -1) return 400
 
-        // Last resort: the letters in order but not adjacent -- "gmp" for
-        // Gimp, and a typo landing somewhere instead of on an empty list.
+        // Last resort: the letters in order but not adjacent ("gmp" for Gimp), so
+        // a typo still lands somewhere.
         return overlay.subsequenceScore(name, q)
     }
 
-    // How tightly the letters of q are packed where they appear in order in
-    // text. Zero when they are not all there, and zero when they are strewn:
-    // without that ceiling "code" came back with the Avahi Zeroconf browser.
+    // How tightly the letters of q are packed in text; zero when missing or strewn (else "code"
+    // matched the Avahi Zeroconf browser).
     function subsequenceScore(text, q) {
         if (q.length < 3) return 0
 
@@ -310,8 +275,7 @@ PanelWindow {
         return Math.max(1, 300 - slack * 8 - Math.min(50, first))
     }
 
-    // What you open most, as a nudge inside a tier: up to 90, never enough
-    // to lift a looser kind of match over a tighter one.
+    // Usage nudges within a tier, up to 90: never enough to lift a looser match over a tighter one.
     function useBonus(id) {
         return Math.min(90, Math.round(LauncherHistory.frecency(id) * 12))
     }
@@ -338,23 +302,19 @@ PanelWindow {
     }
 
     readonly property var results: {
-        // Nothing to rank while unmapped: the copies on the other screens,
-        // and this one between uses, would otherwise re-rank on every window
-        // title that changes. `visible` and not `open`, so the list stays
-        // through the fade out instead of emptying on its first frame.
+        // Nothing to rank while unmapped, or every copy re-ranks on each title change. `visible`,
+        // not `open`, so the list stays through the fade out.
         if (!overlay.visible) return []
 
         var apps = DesktopEntries.applications.values.filter(function(e) {
-            // NoDisplay is the entry asking not to be listed: mime handlers,
-            // per-app settings panels, the halves of a split package.
-            // And the shortcuts Steam writes for a game: every game is under
-            // Games already, and some had one, some not, and some two.
+            // NoDisplay entries (mime handlers, per-app settings, split packages) and Steam's
+            // per-game shortcuts, since every game is under Games already.
             return !e.noDisplay && (e.execString || "").indexOf("steam://rungameid/") === -1
         })
         var games = SteamGames.games.map(overlay.gameItem)
         var q = overlay.q
 
-        // ── Empty: what you use, then everything ──
+        // Empty field: what you use, then everything
         if (q.length === 0) {
             var usage = LauncherHistory.usage   // for the binding
             var frequent = []
@@ -375,8 +335,7 @@ PanelWindow {
             }).map(function(it) {
                 return Object.assign({}, it, { section: "Applications", score: 0 })
             }))
-            // Then the games, all of them -- a short list, and the reason to
-            // open the launcher as often as any app -- then the apps.
+            // Then all the games, then the apps.
             var top = frequent.slice(0, 6)
             var shownGames = top.filter(function(it) { return it.kind === "game" })
                                 .map(function(it) { return it.key })
@@ -384,7 +343,7 @@ PanelWindow {
             return top.concat(overlay.sortByScore(gameList), overlay.sortByScore(rest))
         }
 
-        // ── Typing: every kind, each ranked, the kinds by their best ──
+        // Typing: every kind ranked, the kinds by their best match
         var groups = []
 
         var sum = overlay.calculate(overlay.query)
@@ -397,8 +356,7 @@ PanelWindow {
             var s = overlay.score(apps[a], q)
             if (s > 0) appHits.push(overlay.appItem(apps[a], "Applications", s + overlay.useBonus(apps[a].id)))
         }
-        // A handful, so the other kinds still show without scrolling; the
-        // rest are one more letter away.
+        // A handful, so the other kinds still show without scrolling.
         groups.push(overlay.sortByScore(appHits).slice(0, 8))
 
         var gameHits = []
@@ -415,10 +373,8 @@ PanelWindow {
             var o = tops[t].lastIpcObject || {}
             var title = tops[t].title || o.title || ""
             var cls = o.class || ""
-            // No class, or not mapped: a window Hyprland has not reported on
-            // since it opened -- Steam's hidden helpers ("Steam Client
-            // Service", "SteamVR Status") -- which hyprctl does not list
-            // and there is nothing to switch to.
+            // No class or not mapped: Steam's hidden helpers, which hyprctl
+            // doesn't list; nothing to switch to.
             if (cls.length === 0 || o.mapped === false || o.hidden === true) continue
             var owner = cls.length > 0 ? DesktopEntries.heuristicLookup(cls) : null
             var appName = owner ? owner.name : cls
@@ -469,18 +425,14 @@ PanelWindow {
         return out
     }
 
-    // Every keystroke reorders the list, and the selection has to come back
-    // to the top with it -- left where it was it points at whatever happens
-    // to be in that slot now.
+    // Every keystroke reorders the list, so the selection goes back to the top.
     onResultsChanged: {
         overlay.selected = 0
         overlay.pointerSteers = false
     }
 
-    // Whether the pointer has moved since the list last changed. Only then
-    // does it pick the row: a list rebuilt under a pointer that sat still
-    // put the selection on whatever row landed beneath it -- type "ste" with
-    // the pointer resting over the fifth row and Enter ran the fifth match.
+    // Hover picks a row only once the pointer has moved: with a still pointer, typing "ste" over
+    // the fifth row made Enter run the fifth match.
     property bool pointerSteers: false
     property point lastPointer: Qt.point(-1, -1)
 
@@ -508,7 +460,7 @@ PanelWindow {
         }
     }
 
-    // ── Running things ───────────────────────────────────────────────────
+    // Running things
 
     function close() {
         Panels.launcherOpen = false
@@ -518,9 +470,8 @@ PanelWindow {
 
     function run(item) {
         if (!item) return
-        // Closed first, and at once (see `launching`): the launcher holds
-        // the keyboard exclusively while it is up, and a window that maps
-        // into that grab comes up without focus.
+        // Closed first and at once (see `launching`): a window that maps into the exclusive
+        // keyboard grab comes up without focus.
         overlay.launching = true
         overlay.close()
 
@@ -531,10 +482,8 @@ PanelWindow {
         case "app":
             overlay.launchedAt = Date.now()
             LauncherHistory.record(item.entry.id)
-            // Point the focus at the monitor the pointer is on, so the window
-            // opens there: follow_mouse cannot while the grab is held. Then
-            // straight away: the dispatch lands in a few ms, and no app maps
-            // a window that fast -- it waited 90ms here for nothing.
+            // Focus the pointer's monitor so the window opens there (follow_mouse can't while the
+            // grab is held). No delay needed: the dispatch lands long before any app maps a window.
             Display.focusCursorMonitor()
             item.entry.execute()
             return
@@ -542,8 +491,7 @@ PanelWindow {
             overlay.launchedAt = Date.now()
             LauncherHistory.record(item.historyId)
             Display.focusCursorMonitor()
-            // Handed to the Steam already running, which starts the game --
-            // or starts Steam first, if it is not.
+            // Handed to the running Steam, which starts the game (or starts Steam first).
             Quickshell.execDetached(["steam", item.run])
             return
         case "web":
@@ -553,8 +501,8 @@ PanelWindow {
                 "https://www.google.com/search?q=" + encodeURIComponent(overlay.query.trim())])
             return
         case "window":
-            // `hyprctl eval` and not `dispatch`: this Hyprland is configured
-            // in Lua (see LockEngine). Focusing follows to its workspace.
+            // `hyprctl eval`, not `dispatch`: this Hyprland is configured in Lua.
+            // Focusing follows to its workspace.
             var sel = "address:0x" + item.address
             overlay.pending = function() {
                 Quickshell.execDetached(["hyprctl", "eval",
@@ -571,16 +519,10 @@ PanelWindow {
         spawnTimer.restart()
     }
 
-    // ── Following what was launched ──────────────────────────────────────
-    //
-    // A launch that lands in something already running -- a search handed
-    // to the open browser, Discord or Steam asked to come up -- does not map
-    // a window: the app asks for its existing one to be activated. That
-    // request arrived while this layer was still up, and Hyprland turned it
-    // down and only marked the window urgent: the search opened on another
-    // workspace and you stayed where you were. So for a few seconds after a
-    // launch, the window that turns urgent is the one launched, and it gets
-    // focus -- once this layer is gone, or it would be refused again.
+    // Following what was launched: a launch into a running app (a search to the open
+    // browser, Steam) asks to activate an existing window, which Hyprland refuses while this
+    // layer is up and only marks urgent. So for a few seconds after a launch, the window
+    // that turns urgent gets focus once we're gone.
     property real launchedAt: 0
     property string urgentAddress: ""
 
@@ -608,9 +550,8 @@ PanelWindow {
             "hl.dispatch(hl.dsp.focus({ window = '" + sel + "' }))"])
     }
 
-    // For what acts on the shell or on a window rather than starting a
-    // process: a frame or two, for the launcher's keyboard grab to be let go
-    // before focus is asked to move.
+    // For actions on the shell or a window: wait a frame or two for the
+    // keyboard grab to be released.
     Timer {
         id: spawnTimer
         interval: 30
@@ -627,8 +568,7 @@ PanelWindow {
         var n = overlay.results.length
         if (n === 0) return
         overlay.pointerSteers = false
-        // Wraps, so Up from the first row reaches the last without a trip
-        // through the whole list.
+        // Wraps, so Up from the first row reaches the last.
         overlay.selected = ((overlay.selected + delta) % n + n) % n
     }
 
@@ -640,8 +580,7 @@ PanelWindow {
         overlay.selected = Math.max(0, Math.min(n - 1, overlay.selected + delta))
     }
 
-    // Cleared on the way in, not the way out: emptied on closing, the list
-    // and the field went blank before the fade out could show them leaving.
+    // Cleared on the way in, not out, so the fade out still shows the list.
     onOpenChanged: {
         if (!overlay.open) return
         overlay.launching = false
@@ -654,10 +593,8 @@ PanelWindow {
         searchInput.cursorPosition = searchInput.text.length
     }
 
-    // ── Click-away ───────────────────────────────────────────────────────
-    //
-    // Draws nothing: the desktop keeps its own contrast while this is open.
-    // It exists so a click outside the panel still closes it.
+    // Click-away: draws nothing, so the desktop keeps its contrast; a click
+    // outside the panel closes it.
     Item {
         anchors.fill: parent
 
@@ -666,7 +603,7 @@ PanelWindow {
         }
     }
 
-    // ── Panel ────────────────────────────────────────────────────────────
+    // Panel
     Item {
         id: cardArea
 
@@ -679,8 +616,7 @@ PanelWindow {
         visible: opacity > 0
         scale: overlay.open ? 1 : 0.94
 
-        // Drops in a few pixels as it appears, the way the bar's panels
-        // unfold from the pill.
+        // Drops in a few pixels as it appears, like the bar's panels unfold.
         transform: Translate {
             y: overlay.open ? 0 : -8
             Behavior on y {
@@ -692,10 +628,8 @@ PanelWindow {
             Elastic {}
         }
 
-        // Long enough both ways for leaving to read as a fade and not a cut:
-        // at 100ms OutCubic the panel was gone in about two frames. One
-        // duration for both directions -- one picked by `open` would be read
-        // in the same instant `open` flips, and could be the old one.
+        // Long enough both ways to read as a fade (100ms was about two frames). One duration for
+        // both: one picked by `open` would be read as `open` flips.
         Behavior on opacity {
             // Not when launching: the app's window is the animation then.
             enabled: !overlay.launching
@@ -706,16 +640,15 @@ PanelWindow {
             Elastic { small: true }
         }
 
-        // The overlays' solid card and its shadow. Solid rather than the
-        // pills' glass: the glass belongs to the bar, and an opaque card reads
-        // the same over any window it opens on.
+        // The overlays' solid card: an opaque card reads the same over any
+        // window; glass belongs to the bar.
         Rectangle {
             id: card
             anchors.fill: parent
             radius: Theme.radiusXLarge
             color: Theme.surface
-            // No outline: none of the shell's glass has one, and this one's
-            // bottom edge read as a light rim over the shadow.
+            // No outline: none of the shell's glass has one, and the bottom edge
+            // read as a rim over the shadow.
             visible: false
             layer.enabled: true
         }
@@ -734,9 +667,8 @@ PanelWindow {
         // Swallows clicks that land on the panel, so only outside closes.
         TapHandler {}
 
-        // The row under the pointer becomes the selection, once the pointer
-        // has actually moved (see pointerSteers) -- one highlight, never a
-        // hovered row and a different row for Enter.
+        // The row under the pointer becomes the selection once the pointer
+        // moves (see pointerSteers).
         HoverHandler {
             onPointChanged: {
                 var p = point.position
@@ -751,10 +683,8 @@ PanelWindow {
             }
         }
 
-        // ── Search field ─────────────────────────────────────────────────
-        //
-        // No box of its own: the field is the top of the panel, and a
-        // rounded well inside a rounded panel reads as two things.
+        // Search field: no box of its own; a rounded well inside a rounded
+        // panel reads as two things.
         Item {
             id: searchRow
             width: parent.width
@@ -766,8 +696,7 @@ PanelWindow {
                 anchors.rightMargin: 20
                 spacing: 14
 
-                // In the accent while there is a search running: the field is
-                // what is active here. Muted while it is empty.
+                // Accent while searching, muted while empty.
                 IconGlyph {
                     text: "\u{F0349}"
                     color: searchInput.text.length > 0 ? Theme.accent : Theme.textMuted
@@ -822,8 +751,7 @@ PanelWindow {
                     }
                 }
 
-                // Clears the field without closing, when there is something
-                // in it.
+                // Clears the field without closing, when there is something in it.
                 Item {
                     implicitWidth: 26
                     implicitHeight: 26
@@ -862,7 +790,7 @@ PanelWindow {
             visible: overlay.hasResults
         }
 
-        // ── Results ──────────────────────────────────────────────────────
+        // Results
         ListView {
             id: list
             y: searchRow.height + 1 + overlay.listPad
@@ -874,8 +802,8 @@ PanelWindow {
             boundsBehavior: Flickable.StopAtBounds
             visible: overlay.hasResults
 
-            // Keeps the keyboard selection on screen without dragging the
-            // view along behind every step, which is what Beginning would do.
+            // Keeps the selection on screen without dragging the view along on
+            // every step (as Beginning would).
             onCurrentIndexChanged: list.positionViewAtIndex(currentIndex, ListView.Contain)
 
             delegate: Item {
@@ -919,8 +847,8 @@ PanelWindow {
                         anchors.rightMargin: 14
                         spacing: 12
 
-                        // Applications and windows by their app's icon; the
-                        // shell's own things by a glyph on a small tile.
+                        // Apps and windows show their app's icon; the shell's own
+                        // things a glyph on a small tile.
                         Item {
                             implicitWidth: 30
                             implicitHeight: 30
@@ -954,8 +882,7 @@ PanelWindow {
                             }
                         }
 
-                        // One line, not two: the name on the left and what
-                        // the thing is on the right, as Spotlight does.
+                        // One line: the name on the left, what it is on the right, as in Spotlight.
                         Text {
                             Layout.fillWidth: true
                             text: overlay.highlight(row.modelData)
@@ -992,8 +919,8 @@ PanelWindow {
 
                     StateLayer {
                         radius: Theme.radiusMedium
-                        // No hover tint of its own: the pointer moves the
-                        // selection instead (the HoverHandler on the panel).
+                        // No hover tint: the pointer moves the selection instead (the
+                        // HoverHandler on the panel).
                         tint: "transparent"
                         onTapped: overlay.run(row.modelData)
                     }
@@ -1001,14 +928,9 @@ PanelWindow {
             }
         }
 
-        // The wheel moves the list a fixed distance per notch, eased there.
-        // Left to the ListView, a wheel flicks it by velocity: one notch went
-        // a short and different way each time, and a high-resolution wheel's
-        // many small events added up to a crawl. Deltas are taken as they
-        // come, so a high-resolution wheel moves the same per notch, only
-        // more finely. Every wheel event is taken, pixel deltas included: the
-        // Logitech's high-resolution wheel sends them too, and leaving those
-        // to the ListView left the wheel as slow as before.
+        // The wheel moves the list a fixed distance per notch, eased. ListView's own velocity
+        // flick went a different way each notch and crawled on high-resolution wheels, so
+        // every event is taken, pixel deltas too.
         MouseArea {
             anchors.fill: list
             visible: list.visible
@@ -1036,7 +958,7 @@ PanelWindow {
             easing.type: Easing.OutCubic
         }
 
-        // ── Footer ───────────────────────────────────────────────────────
+        // Footer
         Rectangle {
             y: list.y + list.height + overlay.listPad
             x: 1

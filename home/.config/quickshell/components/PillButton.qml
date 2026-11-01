@@ -1,9 +1,8 @@
 import QtQuick
 import qs.config
 
-// A plain action in the Settings window -- "Reset", "Keep", "Revert".
-// `emphasis` fills it in the accent for the one action a card is asking for;
-// `danger` tints it red.
+// A plain Settings action ("Reset", "Keep", "Revert"): `emphasis` fills it in
+// the accent, `danger` tints it red.
 Rectangle {
     id: root
 

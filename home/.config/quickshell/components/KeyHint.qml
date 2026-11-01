@@ -1,11 +1,8 @@
 import QtQuick
 import qs.config
 
-// A key and what it does, for an overlay's footer: the keycap, then the
-// action in muted text. Every overlay uses this one, set the way the widget
-// picker set it first, so the hints read the same wherever they are. Rows
-// of them are spaced 14px apart; arrow pairs are written with a space
-// between the arrows ("← →").
+// A key and what it does, for an overlay's footer; every overlay uses it. Rows are spaced 14px
+// apart, and arrow pairs are written with a space ("← →").
 Row {
     id: hint
 

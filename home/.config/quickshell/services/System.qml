@@ -20,12 +20,8 @@ Singleton {
         }
     }
 
-    // ── About: the machine, and its backup ───────────────────────────────
-    //
-    // scripts/about.py for the facts about this machine; scripts/backup.py
-    // for the backup of its configuration, in whatever repository Settings ->
-    // Shell's backupRepo names (~/dotfiles unless changed) -- made on request
-    // if this user has none yet.
+    // About: about.py for the machine's facts, backup.py for the configuration's backup in
+    // ShellSettings.backupRepo (~/dotfiles unless changed), created on request.
     property var aboutInfo: ({})
     property var backupStatus: ({ repo: false })
     property bool backupBusy: false
@@ -85,13 +81,9 @@ Singleton {
         onExited: root.backupBusy = false
     }
 
-    // ── Updates: the shell, from where it is published ───────────────────
-    //
-    // scripts/shell_update.py compares ~/.config/quickshell with the latest
-    // published version (ShellSettings.updateSource) and, asked to, replaces
-    // it -- the shell only, keeping this user's settings and widget layout,
-    // with a copy of what was there. After an update the shell restarts:
-    // reloading file by file leaves widgets loaded by URL on their old code.
+    // Updates: shell_update.py compares the shell with its latest published version and
+    // replaces it on request, keeping settings and layout. The shell restarts after: widgets
+    // loaded by URL keep old code across a reload.
     property var updateStatus: ({ state: "unknown" })
     property bool updateChecking: false
     property bool updateBusy: false

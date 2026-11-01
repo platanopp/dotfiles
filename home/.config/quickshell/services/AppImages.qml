@@ -3,21 +3,15 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// The AppImages in ~/Applications, put in the launcher each time it opens
-// (scripts/appimage_sync.py) -- the way SteamGames reads the Steam library.
-//
-// The script writes each new AppImage a .desktop file and icon, and removes
-// them when the file goes; DesktopEntries notices those files by itself, so
-// a new app joins the list a moment after the launcher opens. Nothing is
-// read back here.
+// The AppImages in ~/Applications, synced into the launcher each time it opens
+// (appimage_sync.py writes and removes their .desktop files and icons; DesktopEntries
+// notices). Nothing is read back here.
 Singleton {
     id: root
 
     property real syncedAt: 0
 
-    // At most every few seconds, against opening and closing in a burst. A
-    // run with nothing new is about 30ms in its own process, so there is no
-    // reason for Steam's minute.
+    // At most every few seconds against bursts; a run with nothing new is ~30ms.
     function refresh() {
         if (sync.running || Date.now() - root.syncedAt < 5000) return
         root.syncedAt = Date.now()

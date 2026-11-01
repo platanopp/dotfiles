@@ -3,12 +3,9 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Bluetooth for the bar's icon and its panel: power, connected devices, the
-// scan, pairing, connecting and forgetting. bluetoothctl does the work; BlueZ's
-// D-Bus signals say when to look again.
-//
-// Not Quickshell.Bluetooth's singleton of the same name: a file that needs
-// that one imports it qualified (see lock/LockEngine.qml).
+// Bluetooth for the bar's icon and panel through bluetoothctl; BlueZ's D-Bus signals say
+// when to look again. Not Quickshell.Bluetooth's singleton: files needing that one import
+// it qualified (lock/LockEngine.qml).
 Singleton {
     id: root
 
@@ -59,9 +56,8 @@ Singleton {
         if (paired) {
             btActionProc.command = ["bash", "-c", "bluetoothctl connect \"$1\" 2>&1", "_", mac]
         } else {
-            // Through scripts/bt_pair.py, which holds an agent open for the
-            // pairing: plain `bluetoothctl pair` has none to answer the device,
-            // and an encrypted-link device (an Xbox controller) is dropped.
+            // Through bt_pair.py, which holds an agent for the pairing: plain `bluetoothctl pair`
+            // has none, and an encrypted-link device (an Xbox controller) is dropped.
             btActionProc.command = ["python3", Quickshell.env("HOME") + "/.config/quickshell/scripts/bt_pair.py", mac]
         }
         btActionProc.running = true
@@ -138,10 +134,7 @@ Singleton {
         onTriggered: btPoweredProc.running = true
     }
 
-    // ── Keeping up ───────────────────────────────────────────────────────
-    //
-    // Read when BlueZ says something changed (below), not on a clock; the
-    // slow poll only catches an event that went missing.
+    // Keeping up: read when BlueZ announces a change; the slow poll only catches a missed event.
     function refreshBluetooth() {
         if (!btPoweredProc.running) btPoweredProc.running = true
         if (!btConnectedProc.running) btConnectedProc.running = true
@@ -155,9 +148,7 @@ Singleton {
         onTriggered: root.refreshBluetooth()
     }
 
-    // BlueZ over D-Bus: powered on and off, devices connecting. A scan in
-    // progress streams signal updates, which the throttle holds to a read
-    // every 400ms rather than one per signal.
+    // BlueZ over D-Bus. A running scan streams updates, throttled to one read every 400ms.
     Process {
         id: bluetoothEvents
         running: true

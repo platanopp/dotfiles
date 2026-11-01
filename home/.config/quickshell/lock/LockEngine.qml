@@ -12,34 +12,30 @@ import Quickshell.Services.UPower
 import qs.config
 import qs.services
 
-// the lock session's brain: pam, the attempt ledger, the keyboard's locks and
-// the two faces the surface can wear. lucidlock/ only draws what it reads here
+// the lock session's brain: pam, the attempt ledger, the keyboard's locks and the two faces the
+// surface can wear. LockScreen only draws what it reads here
 Singleton {
     id: root
 
-    // ── session ────────────────────────────────────────────────────────────
+    // session
     property bool locked: false
     // the surface is playing its exit and must not accept anything more
     property bool leaving: false
     // glance shows the day; focus shows the field. typing crosses over
     property bool focused: false
-    // ── surfaces ───────────────────────────────────────────────────────────
-    // the lock draws over a blurred wallpaper, so its cards stay translucent
-    // and let the colour of the day through instead of sitting on flat black
+    // surfaces: translucent cards over the blurred wallpaper, so the
+    // colour of the day shows through
     readonly property color card: Theme.alpha(Theme.background, 0.52)
     readonly property color hairline: Theme.alpha(Theme.outline, 0.45)
 
-    // ── who is being asked ─────────────────────────────────────────────────
-    // read lazily: touching Users spawns its probe, and nothing wants that
-    // at shell start — only once a lock is actually up
+    // who is being asked: read lazily, since touching Users spawns its probe
     readonly property var account: null
     readonly property string userName: root.account ? root.account.name : (Quickshell.env("USER") || "")
     readonly property string displayName: root.userName
     readonly property string initials: root.userName.length > 0 ? root.userName.charAt(0).toUpperCase() : "?"
     readonly property string avatar: ""
 
-    // ── pam ────────────────────────────────────────────────────────────────
-    // /etc/pam.d/login is the one service every distro ships for a local seat
+    // pam: /etc/pam.d/login is the one service every distro ships for a local seat
     property string pamConfig: "login"
     // idle | prompting | checking | failed | error | granted
     property string phase: "idle"
@@ -62,7 +58,7 @@ Singleton {
     // nothing may be typed while pam owns the turn or the account is barred
     readonly property bool acceptsInput: !root.busy && !root.granted && !root.leaving && !root.lockedOut
 
-    // ── keyboard ───────────────────────────────────────────────────────────
+    // keyboard
     property bool capsLock: false
     property string layout: ""
     // "English (US)" is too much for a 20px chip; keep the short half
@@ -75,8 +71,7 @@ Singleton {
         return t.substring(0, 6).toUpperCase();
     }
 
-    // ── the one line under the field ───────────────────────────────────────
-    // kind drives its colour: error | good | info | none
+    // the one line under the field; kind drives its colour: error | good | info | none
     readonly property string statusKind: {
         if (root.granted)
             return "good";
@@ -130,13 +125,13 @@ Singleton {
         return Math.max(1, s) + " seconds";
     }
 
-    // ── session control ────────────────────────────────────────────────────
+    // session control
     function lock() {
         root.beginLock(true);
     }
 
-    // `photograph` is false only for the boot lock: there is no desktop yet
-    // worth starting from, and that lock wants to be up as early as it can.
+    // `photograph` is false only for the boot lock: no desktop worth starting
+    // from, and it wants to be up early.
     function beginLock(photograph) {
         if (root.locked || root.raising)
             return ;
@@ -150,13 +145,11 @@ Singleton {
         root.shotStamp = "";
         root.takingStamp = "";
         root.shotSettled = true;
-        // Armed before anything that could go wrong below: whatever happens
-        // to the pictures, the lock goes up.
+        // Armed first: whatever happens to the pictures, the lock goes up.
         lockAfterFocus.restart();
         raiseCap.restart();
-        // A capture still hanging from an earlier lock (an output that never
-        // delivered a frame) is not waited on, and not used: its pictures
-        // would be of some other moment.
+        // A capture still hanging from an earlier lock is neither waited on nor used:
+        // its pictures are of another moment.
         if (photograph && root.shotDir !== "" && !shotProc.running) {
             try {
                 var names = [];
@@ -172,23 +165,15 @@ Singleton {
                 root.shotSettled = true;
             }
         }
-        // Move the focus before the lock, not after. Hyprland hands the
-        // keyboard to the lock surface of whichever monitor has focus, so
-        // without this the field can be drawn on one screen and typed into on
-        // another -- which is exactly what a cold boot did, focus sitting on
-        // the monitor Hyprland enumerates first.
-        //
-        // `hyprctl eval` and not `hyprctl dispatch`: this Hyprland config is
-        // Lua, so a dispatch argument is parsed as Lua and the hyphen in a
-        // monitor name is a syntax error. Same idiom as focus_cursor_monitor()
-        // in scripts/display_control.py.
+        // Move focus before locking: Hyprland gives the keyboard to the focused
+        // monitor's lock surface. `hyprctl eval`, not dispatch: a hyphen in a monitor
+        // name is a Lua syntax error in a dispatch.
         if (root.fieldMonitor !== "")
             Quickshell.execDetached(["hyprctl", "eval", "hl.dispatch(hl.dsp.focus({ monitor = \"" + root.fieldMonitor + "\" }))"]);
 
     }
 
-    // Between the ask and the lock being up: the focus is moving and the
-    // screens are being photographed.
+    // Between the ask and the lock being up: focus moving, screens being photographed.
     property bool raising: false
     property bool focusSettled: false
     property bool shotSettled: true
@@ -207,9 +192,7 @@ Singleton {
         root.locked = true;
     }
 
-    // A beat for that dispatch to land -- short enough not to be felt. The
-    // lock goes up whether or not the focus actually moved: a dispatch that
-    // failed must not be able to hold the screen open.
+    // A beat for the dispatch to land; the lock goes up whether or not focus moved.
     Timer {
         id: lockAfterFocus
 
@@ -220,8 +203,7 @@ Singleton {
         }
     }
 
-    // Nothing may hold the lock down for long -- not a capture that is slow,
-    // not one that hangs. Past this it goes up without the pictures.
+    // Nothing may hold the lock down for long: past this it goes up without the pictures.
     Timer {
         id: raiseCap
 
@@ -233,29 +215,18 @@ Singleton {
         }
     }
 
-    // ── The desktop, as it was ─────────────────────────────────────────────
-    //
-    // Each screen is photographed just before the lock goes up -- grim, raw
-    // PPM into the runtime tmpfs, both screens at once: 36 ms here on
-    // 2026-10-23, inside the beat the focus already waits. The surface starts
-    // on that picture, so the desktop itself seems to step back into the blur
-    // rather than being cut away; on the way out it comes forward again, so
-    // the lock's last frame is the desktop the session is about to show.
-    //
-    // Only the surfaces raised with the lock open on it. One that arrives
-    // later -- the Xiaomi re-plugging itself when the screens wake -- must not
-    // open on a sharp picture of the session, so it comes up out of black.
+    // The desktop, as it was: each screen is photographed just before locking (grim, raw PPM to
+    // tmpfs, ~36 ms) so the desktop steps back into the blur. A surface that arrives later (the
+    // Xiaomi re-plugging) comes up out of black.
     readonly property string shotDir: {
         var r = Quickshell.env("XDG_RUNTIME_DIR");
         return r ? r + "/quickshell" : "";
     }
-    // Set while this lock's pictures exist; part of every file name, so a
-    // later lock can never be handed an earlier one's.
+    // Part of every file name, so a later lock is never handed an earlier one's pictures.
     property string shotStamp: ""
     property string takingStamp: ""
     property bool arriving: false
-    // `timeout`: grim waits for the output's next frame, and an output that
-    // is powered down never draws one.
+    // `timeout`: grim waits for the next frame, and a powered-down output never draws one.
     readonly property string shotScript: "d=$1; s=$2; shift 2; mkdir -p \"$d\" || exit 1; " + "rm -f \"$d\"/lockshot-*.ppm; " + "for n; do timeout 1 grim -o \"$n\" -t ppm \"$d/lockshot-$s-$n.ppm\" & done; wait; " + "ls \"$d\"/lockshot-\"$s\"-*.ppm >/dev/null 2>&1"
 
     function shotFor(name) {
@@ -270,8 +241,8 @@ Singleton {
 
         running: false
         onExited: (code) => {
-            // Only for the lock that asked, and only while it still waits:
-            // once the cap has raised it without them, they stay unused.
+            // Only for the lock that asked, while it still waits; once the cap raised it
+            // without them, they stay unused.
             if (!root.raising || root.takingStamp === "")
                 return ;
 
@@ -291,8 +262,7 @@ Singleton {
         onTriggered: root.arriving = false
     }
 
-    // The pictures go once the surfaces that showed them have; until then
-    // the last frame of the way out is still drawing from them.
+    // Deleted once the surfaces showing them are gone: the exit's last frame still draws from them.
     property string staleStamp: ""
 
     Timer {
@@ -307,22 +277,12 @@ Singleton {
         }
     }
 
-    // ── Which screen the field belongs on ──────────────────────────────────
-    //
-    // Hyprland has no notion of a primary output, and the one it enumerates
-    // first here is HDMI-A-1 -- the side monitor, the one sitting at 0,0. At a
-    // cold boot that is also the one holding focus, so the card came up there.
-    //
-    // So the screen is named, the same way the workspace rules and hypridle's
-    // wlopm lines in the Hyprland config name it. One place to change if the
-    // desk ever changes.
-    // Chosen in Settings -> Shell; see ShellSettings.
+    // Which screen the field belongs on: Hyprland has no primary output and lists the side monitor
+    // first, so the screen is named in Settings -> Shell (ShellSettings.lockMonitor).
     readonly property string mainMonitor: ShellSettings.lockMonitor
 
-    // What the field lands on in the end: the named screen while it is plugged
-    // in, and whatever holds focus when it is not -- unplugging the main
-    // monitor should leave a lock that can still be typed into, not a field
-    // drawn on an output that is no longer there.
+    // The named screen while plugged in, else whatever holds focus, so
+    // unplugging it leaves a usable lock.
     readonly property string fieldMonitor: {
         for (const m of Hyprland.monitors.values) {
             if (m.name === root.mainMonitor)
@@ -333,8 +293,7 @@ Singleton {
         return f ? f.name : "";
     }
 
-    // if the surface never reports back — it failed to draw, or the screen it
-    // was on went away — let go anyway rather than stranding the session
+    // if the surface never reports back (it failed to draw, or its screen went away), let go anyway
     Timer {
         id: deadman
 
@@ -390,7 +349,7 @@ Singleton {
         idleBack.restart();
     }
 
-    // ── authentication ─────────────────────────────────────────────────────
+    // authentication
     property string pending: ""
 
     function submit(text) {
@@ -433,8 +392,8 @@ Singleton {
         graceOut.restart();
     }
 
-    // Long enough for the field's own "opened" beat (two durMedium steps in
-    // LockScreen) to finish before the cards lift off.
+    // Lets the field's "opened" beat (two durMedium steps in LockScreen)
+    // finish before the cards lift off.
     Timer {
         id: graceOut
 
@@ -513,7 +472,7 @@ Singleton {
         }
     }
 
-    // ── faillock ───────────────────────────────────────────────────────────
+    // faillock
     FileView {
         path: "/etc/security/faillock.conf"
         onLoaded: {
@@ -572,9 +531,7 @@ Singleton {
         }
     }
 
-    // ── keyboard locks ─────────────────────────────────────────────────────
-    // hyprland has no event for the lock keys, so the field polls while it is
-    // the thing being used
+    // keyboard locks: hyprland has no event for the lock keys, so the field polls while in use
     Timer {
         running: root.locked && root.focused
         interval: 400
@@ -614,9 +571,8 @@ Singleton {
         }
     }
 
-    // ── glance ─────────────────────────────────────────────────────────────
-    // read straight off the platform services rather than the shell's settings
-    // singletons: the lock must not drag nmcli/rfkill probes into shell startup
+    // glance: read straight off the platform services, not the shell's singletons, so the lock
+    // pulls no nmcli/rfkill probes into shell startup
     readonly property var battery: UPower.displayDevice
     readonly property bool hasBattery: root.battery ? root.battery.isPresent : false
     readonly property int batteryPercent: root.hasBattery ? Math.round(root.battery.percentage * 100) : 0
@@ -700,8 +656,7 @@ Singleton {
         return "Bluetooth on";
     }
 
-    // ── the day ────────────────────────────────────────────────────────────
-    // one tick a second so the clock and the greeting stay honest
+    // the day: one tick a second keeps the clock and the greeting current
     property int tick: 0
 
     Timer {
@@ -743,16 +698,11 @@ Singleton {
         return "Good night";
     }
 
-    // ── wallpaper ──────────────────────────────────────────────────────────
-    // The shell already tracks which wallpaper is up -- wallpaper_crop.py
-    // records the original in its state file and Wallpaper publishes it, so the
-    // lock shows the same picture the desktop has rather than a second guess.
-    // wallpaperStill rather than selectedWallpaper: with a video up, that is
-    // the video's poster frame instead of the image sitting underneath it.
+    // wallpaper: the desktop's own picture (Wallpaper.wallpaperStill: with
+    // a video up, its poster frame)
     readonly property string wallpaper: Wallpaper.wallpaperStill
 
-    // ── power ──────────────────────────────────────────────────────────────
-    // the same five the dock offers, with the same commands behind them
+    // power: the same five the dock offers, with the same commands behind them
     readonly property var powerActions: [
         {
             "id": "suspend",
@@ -801,16 +751,9 @@ Singleton {
 
     }
 
-    // ── logind ─────────────────────────────────────────────────────────────
-    // `loginctl lock-session` is how anything off-shell asks for a lock, and
-    // logind answers it by emitting Lock on our own session object. hypridle
-    // relays that too, but only while it is running, and Idle can be turned
-    // off entirely — then nothing would be listening
-    //
-    // quickshell has no dbus binding, so gdbus does the listening (glib2 rides
-    // in under qt6-base, so it is always here). the path has to come from
-    // logind: the `auto` alias only resolves for calls, while signals arrive on
-    // the real, escaped one. exit 3 is ours, and means no session to watch
+    // logind: `loginctl lock-session` arrives as Lock on our session object (hypridle relays it
+    // only while running). gdbus listens, as quickshell has no dbus binding; signals come on the
+    // real escaped path, not `auto`. exit 3: no session
     Process {
         id: logindWatch
 
@@ -847,9 +790,8 @@ Singleton {
         onTriggered: logindWatch.running = true
     }
 
-    // LockedHint is what loginctl and anything else reading the session go by,
-    // so it has to follow the surface. pushed at startup as well: a shell that
-    // died while locked would otherwise leave the hint stuck on
+    // LockedHint is what loginctl and others read, so it follows the surface; pushed at startup
+    // too, in case a shell died while locked
     function pushLockedHint() {
         Quickshell.execDetached(["busctl", "--system", "call", "org.freedesktop.login1", "/org/freedesktop/login1/session/auto", "org.freedesktop.login1.Session", "SetLockedHint", "b", root.locked ? "true" : "false"]);
     }
@@ -863,46 +805,26 @@ Singleton {
 
     }
 
-    // ── Confirmed by the compositor ────────────────────────────────────────
-    // `locked` is only this shell's side of the ask. This one is true once the
-    // compositor has answered that the lock surface is actually in front of
-    // the session -- LockScreen writes it off WlSessionLock.secure. Anything
-    // that must not happen over a visible desktop, suspending most of all,
-    // waits on this rather than on `locked`.
+    // Confirmed by the compositor: true once the lock surface is in front
+    // (WlSessionLock.secure, set by LockScreen). Anything that must not happen over a visible
+    // desktop, suspend most of all, waits on this, not `locked`.
     property bool secured: false
 
-    // ── The lock that stands in for a greeter ──────────────────────────────
-    //
-    // The seat is handed over already logged in, so by the time the desktop is
-    // up nothing has asked for a password. This is what asks.
-    //
-    // Raised from in here rather than by an exec-once in the Hyprland config,
-    // because an exec-once would have to poll until this shell's ipc existed
-    // and the desktop would be on the panels for those frames. From here the
-    // surface goes up on the first frame the shell is able to put one there.
-    //
-    // Once per boot, and deliberately not once per start: quickshell rebuilds
-    // this whole tree every time a QML file is saved, so a plain
-    // Component.onCompleted would lock the screen on every edit. The claim is
-    // a file under $XDG_RUNTIME_DIR, which is a tmpfs -- gone again after a
-    // reboot, still there after a `pkill quickshell`. So booting locks, and
-    // restarting the shell by hand does not.
+    // The lock that stands in for a greeter: the seat arrives logged in, so this asks for the
+    // password. Raised from here rather than an exec-once, so it's up on the shell's first frame.
+    // Once per boot, not per start (saving a QML file rebuilds the tree): the claim is a file in
+    // $XDG_RUNTIME_DIR, kept across restarts.
     Process {
         id: bootLockClaim
 
         running: true
-        // noclobber makes the redirect itself fail when the file is already
-        // there, so the test and the claim are a single step and two shells
-        // racing cannot both win it.
-        //
-        // The braces matter: redirections are applied left to right, so a
-        // `2>/dev/null` written after the failing `>` comes too late to catch
-        // its complaint, and every reload of this file would put one more
-        // "cannot overwrite existing file" in the log.
+        // noclobber makes the redirect fail if the file exists, so test and claim are one
+        // atomic step. The braces put `2>/dev/null` before the failing `>`, or every reload
+        // logs "cannot overwrite existing file".
         command: ["sh", "-c", "f=\"$XDG_RUNTIME_DIR/quickshell/boot-lock\"; mkdir -p \"${f%/*}\" || exit 1; { set -C; : > \"$f\"; } 2>/dev/null"]
         onExited: (code) => {
-            // The claim is taken either way, so switching the setting on
-            // later in the session does not lock the screen there and then.
+            // The claim is taken either way, so enabling the setting later doesn't
+            // lock the screen there and then.
             if (code === 0 && ShellSettings.lockAtBoot)
                 root.beginLock(false);
 

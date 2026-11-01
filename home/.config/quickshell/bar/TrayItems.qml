@@ -6,9 +6,8 @@ import QtQuick.Layouts
 import qs.components
 import qs.config
 
-// System tray: background apps that publish a StatusNotifierItem (Discord,
-// Steam, Telegram and friends) appear here on their own, the way they do in
-// Waybar. Quickshell registers the host, so nothing else needs to run.
+// System tray: apps publishing a StatusNotifierItem (Discord, Steam, Telegram) appear on
+// their own; Quickshell registers the host.
 RowLayout {
     id: root
 
@@ -28,9 +27,8 @@ RowLayout {
             Layout.preferredWidth: 22
             Layout.preferredHeight: 22
 
-            // Qt happily loads the theme's "missing icon" graphic and reports
-            // Ready, so a broken name has to be caught by asking the theme
-            // whether it actually has it.
+            // Qt loads the theme's "missing icon" and reports Ready, so ask the theme
+            // whether it really has the name.
             readonly property bool iconAvailable: {
                 var src = String(trayItem.modelData.icon || "")
                 if (src.length === 0) return false

@@ -3,15 +3,9 @@ import QtQuick
 import Quickshell
 import qs.config
 
-// The shell's one accent, taken from the wallpaper.
-//
-// The accent marks what is active and nothing else: the current workspace,
-// a toggle that is on, the chosen tab, the connected network. With a single
-// fixed grey there was nothing to tell those apart from plain text; taking
-// it from the wallpaper ties the shell to the picture it sits on.
-//
-// The work is one quantisation of a 64px thumbnail each time the wallpaper
-// changes. Nothing polls and nothing runs between changes.
+// The shell's one accent, taken from the wallpaper: it marks what is active (current
+// workspace, toggles on, chosen tab, connected network). One quantisation of a 64px
+// thumbnail per wallpaper change; nothing polls.
 Singleton {
     id: root
 
@@ -20,9 +14,8 @@ Singleton {
     readonly property real minSaturation: 0.18
     readonly property real maxSaturation: 0.7
 
-    // The accent is drawn as text and as thin rings on the dark glass as well
-    // as a fill, so it has to read as text there: 4.5:1 against the
-    // background, the WCAG AA bar for body text.
+    // Drawn as text and thin rings on the dark glass too, so it must hold 4.5:1
+    // against the background (WCAG AA).
     readonly property real minContrast: 4.5
 
     readonly property string source: Wallpaper.wallpaperStill

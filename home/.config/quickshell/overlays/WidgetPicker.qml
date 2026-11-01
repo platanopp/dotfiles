@@ -8,20 +8,10 @@ import qs.config
 import qs.desktop
 import qs.services
 
-// The widget picker (Super + D): where desktop widgets are put on, moved
-// and taken off.
-//
-// While it is up, this monitor's desktop is drawn here, over the windows
-// and a scrim -- the widgets live under every window (desktop/DesktopLayer),
-// where most of the time they cannot be seen, let alone grabbed. Each one can
-// be dragged to a new place or taken off with its minus. Every kind waits on
-// a shelf along the bottom, drawn as it will look and in its own shape, the
-// way the overview lines up workspaces: drag one up onto the desktop, or
-// click it to drop it into the first gap. A placed one is made bigger or
-// smaller by the handle at its bottom-right corner.
-//
-// Dragging happens inside this one surface: a widget carried off the shelf
-// never crosses into another window, which Wayland would not allow.
+// The widget picker (Super+D): this monitor's desktop drawn over the windows and a scrim, since the
+// widgets live under every window (DesktopLayer). Drag placed ones to move them, minus to remove,
+// the bottom-right handle to resize; drag a kind up from the shelf or click it to drop it in the
+// first gap. All in one surface, since Wayland won't carry a drag into another window.
 PanelWindow {
     id: picker
 
@@ -30,10 +20,8 @@ PanelWindow {
 
     readonly property string screenName: bar.monitor ? bar.monitor.name : ""
 
-    // ── Visibility ───────────────────────────────────────────────────────
-    //
-    // As for the other overlays: one per monitor, the one it was opened on
-    // shows, and `shown` holds the surface mapped until the fade has played.
+    // Visibility: as for the other overlays, pinned to the screen it opened on,
+    // with a `shown` flag for the fade.
     readonly property bool onOpeningScreen: {
         if (!bar.monitor) return true
         if (Panels.widgetsScreen === "") return bar.monitor.focused
@@ -73,8 +61,8 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell:widgets"
     WlrLayershell.layer: WlrLayer.Overlay
     exclusionMode: ExclusionMode.Ignore
-    // Exclusive while mapped, for the search field; held through the fade,
-    // since changing it on a mapped surface drops that surface for a frame.
+    // Exclusive while mapped, for the search field; held through the fade, since changing
+    // it on a mapped surface drops a frame.
     WlrLayershell.keyboardFocus: picker.shown ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     anchors {
@@ -94,31 +82,28 @@ PanelWindow {
 
     function close() { Panels.widgetsOpen = false }
 
-    // ── Geometry ─────────────────────────────────────────────────────────
+    // Geometry
 
     // How near the edges a widget may go, and how far below the bar.
     readonly property int edge: 24
     readonly property int topEdge: (bar.stripHeight || 56) + 16
-    // Widgets land on an 8px grid, so two dropped side by side line up
-    // without being nudged pixel by pixel.
+    // Widgets land on an 8px grid, so two dropped side by side line up.
     readonly property int grid: 8
 
     function snap(v) { return Math.round(v / picker.grid) * picker.grid }
     function clampX(x, w) { return Math.max(picker.edge, Math.min(picker.width - picker.edge - w, x)) }
     function clampY(y, h) { return Math.max(picker.topEdge, Math.min(picker.height - picker.edge - h, y)) }
 
-    // A size for a widget at x, y that keeps it inside the edges: it grows
-    // from its top-left corner, which stays where it is.
+    // A size for a widget at x, y that keeps it inside the edges; it
+    // grows from its top-left corner.
     function fitSize(spec, x, y, want) {
         var most = Math.min(Widgets.maxSize, (picker.width - picker.edge - x) / spec.w,
                             (picker.height - picker.edge - y) / spec.h)
         return Math.max(Widgets.minSize, Math.min(most, want))
     }
 
-    // The shelf. Each kind is shown whole, scaled to one height, so the
-    // shelf reads as the widgets themselves in their own shapes -- the clock
-    // pill long and low, the analog clock round -- rather than as a grid of
-    // same-sized cards. The widest are held to `previewWidthMax`.
+    // The shelf: each kind shown whole at one height, in its own shape; the
+    // widest are held to `previewWidthMax`.
     readonly property int shelfMargin: 24
     readonly property int shelfHeight: 296
     readonly property int shelfTop: picker.height - picker.shelfMargin - picker.shelfHeight
@@ -129,12 +114,12 @@ PanelWindow {
     function previewScale(s) { return Math.min(1, picker.previewHeight / s.h, picker.previewWidthMax / s.w) }
     function tileWidth(s) { return Math.max(Math.round(s.w * picker.previewScale(s)), 84) + 24 }
 
-    // Every kind side by side, filter or not, so the shelf keeps its width
-    // while the categories change what is on it.
+    // Every kind side by side, filter or not, so the shelf keeps its
+    // width as the categories change.
     readonly property int stripWidth: Widgets.catalog.reduce((sum, s) => sum + picker.tileWidth(s), 0)
                                       + (Widgets.catalog.length - 1) * picker.tileGap
 
-    // ── What the shelf shows ─────────────────────────────────────────────
+    // What the shelf shows
 
     property string query: ""
     property string category: ""        // "" for all
@@ -166,8 +151,7 @@ PanelWindow {
     function addKind(kind) {
         var spec = Widgets.spec(kind)
         if (!spec) return
-        // Only above the shelf: one dropped under it would seem not to
-        // have arrived.
+        // Only above the shelf: one dropped under it would seem not to have arrived.
         var spot = Widgets.freeSpot(picker.screenName, spec.w, spec.h, picker.width, picker.shelfTop, picker.topEdge)
         picker.lastAdded = Widgets.add(kind, picker.screenName, spot.x, spot.y)
     }
@@ -182,8 +166,7 @@ PanelWindow {
         picker.setCategory(picker.categoryList[(picker.categoryIndex + step + n) % n])
     }
 
-    // The shelf's insides are loaded only while it is up, so they are told
-    // rather than reached into: scroll the strip to the selection.
+    // The shelf's insides load only while it is up, so they are told rather than reached into.
     signal revealRequested(int index)
 
     function moveSelection(step) {
@@ -192,11 +175,8 @@ PanelWindow {
         picker.revealRequested(picker.selected)
     }
 
-    // ── The desktop being edited ─────────────────────────────────────────
-
-    // The dim over the windows. A click on it does nothing: the picker is
-    // closed with its close button or Escape, never by a stray click beside
-    // a widget.
+    // The dim over the windows. Clicks on it do nothing: only the close
+    // button or Escape close the picker.
     Rectangle {
         anchors.fill: parent
         color: Theme.scrim
@@ -240,14 +220,13 @@ PanelWindow {
                         property real dragX: 0
                         property real dragY: 0
                         property bool leaving: false
-                        // Lands with a spring when it is the one just added;
-                        // the rest are simply there when the picker opens.
+                        // Springs in when it is the one just added; the rest are simply
+                        // there when the picker opens.
                         property bool arrived: picker.lastAdded !== placed.uid
                         // Being resized: drawn at liveSize, saved on release.
                         property bool resizing: false
                         property real liveSize: 1
-                        // The round clock's corner badges sit on its rim, at
-                        // 45 degrees, wherever that is at its size; the rest
+                        // The round clock's badges sit on its rim at 45 degrees; the rest
                         // hang just off their corners.
                         readonly property real badgeInset: placed.kind === "clock-analog"
                             ? Math.round(placed.width * 0.1464 - 13) : -8
@@ -258,8 +237,8 @@ PanelWindow {
                         y: placed.dragging ? placed.dragY : model.wy
                         z: placed.dragging ? 2 : 1
 
-                        // Carried: lifted a little, with a shadow under it. Let
-                        // go: it springs into the grid spot it was dropped on.
+                        // Carried: lifted a little with a shadow. Let go: it springs into the
+                        // grid spot it was dropped on.
                         scale: placed.leaving ? 0.85 : !placed.arrived ? 0.9 : placed.dragging ? 1.03 : 1
                         opacity: placed.leaving || !placed.arrived ? 0 : 1
 
@@ -368,10 +347,8 @@ PanelWindow {
                             }
                         }
 
-                        // Makes it bigger or smaller: dragged out or in along
-                        // the diagonal, the whole widget scaled from its
-                        // top-left corner, which stays put. A double click
-                        // puts it back to the size its kind is made for.
+                        // Resize handle: drag along the diagonal to scale the whole widget from its
+                        // top-left corner; a double click resets it to its kind's size.
                         Rectangle {
                             id: sizeHandle
                             x: placed.width - 26 - placed.badgeInset
@@ -412,16 +389,14 @@ PanelWindow {
                                     if (!placed.resizing) return
                                     var p = sizeMouse.mapToItem(desk, mouse.x, mouse.y)
                                     var s = host.spec
-                                    // The pointer's travel as a share of the
-                                    // kind's own width and height, averaged:
-                                    // straight out along either edge works,
-                                    // and so does the diagonal.
+                                    // The pointer's travel as a share of the kind's width and
+                                    // height, averaged, so either edge or the diagonal works.
                                     var want = sizeMouse.startSize
                                         + ((p.x - sizeMouse.from.x) / s.w + (p.y - sizeMouse.from.y) / s.h) / 2
                                     placed.liveSize = picker.fitSize(s, placed.x, placed.y, want)
                                 }
-                                // Saved only if it changed: a click on the handle,
-                                // or the first of a double click, writes nothing.
+                                // Saved only if it changed: a click, or the first of a
+                                // double click, writes nothing.
                                 onReleased: {
                                     if (!placed.resizing) return
                                     if (Math.abs(placed.liveSize - model.ws) > 0.001)
@@ -429,9 +404,8 @@ PanelWindow {
                                     placed.resizing = false
                                 }
                                 onCanceled: placed.resizing = false
-                                // On the second press, before its release, which
-                                // saves liveSize: set that, and start any drag
-                                // still to come from here.
+                                // On the second press, before the release that saves liveSize:
+                                // reset it, and start any following drag from here.
                                 onDoubleClicked: mouse => {
                                     sizeMouse.from = sizeMouse.mapToItem(desk, mouse.x, mouse.y)
                                     sizeMouse.startSize = picker.fitSize(host.spec, placed.x, placed.y, 1)
@@ -470,8 +444,8 @@ PanelWindow {
         }
     }
 
-    // A widget being dragged off the shelf, at full size under the pointer.
-    // Over the shelf it pales: let go there and nothing is added.
+    // A widget dragged off the shelf, full size under the pointer; it pales over the
+    // shelf, where letting go adds nothing.
     Item {
         id: ghost
         property string kind: ""
@@ -517,12 +491,8 @@ PanelWindow {
         }
     }
 
-    // ── The shelf ────────────────────────────────────────────────────────
-    //
-    // Along the bottom, centred, as wide as the kinds need and the screen
-    // allows. It rises on the spring and leaves as a fade; while a widget is
-    // carried above it, it pales, so the desktop under it shows where that
-    // widget could land.
+    // The shelf, along the bottom: rises on the spring, leaves as a fade, and pales
+    // while a widget is carried above it.
     Item {
         id: shelf
         width: Math.min(picker.width - 2 * picker.shelfMargin, picker.stripWidth + 40)
@@ -569,7 +539,7 @@ PanelWindow {
         id: shelfBody
 
         Item {
-            // ── Top row: name, categories, search, close ─────────────────
+            // Top row: name, categories, search, close
             Item {
                 id: topRow
                 x: 20
@@ -587,9 +557,8 @@ PanelWindow {
                     font.family: Theme.fontText
                 }
 
-                // The categories as one pill, the chosen one filled in the
-                // accent and the fill sliding to the next, as the tabs do
-                // elsewhere in the shell.
+                // The categories as one pill, the fill sliding to the chosen
+                // one, as the tabs do elsewhere.
                 Rectangle {
                     id: segments
                     anchors.left: title.right
@@ -711,8 +680,8 @@ PanelWindow {
                                 if (search.text.length > 0) picker.query = ""
                                 else picker.close()
                             }
-                            // Left and right walk the shelf while there is no
-                            // text to move through; up and down always do.
+                            // Left and right walk the shelf while there is no text to move
+                            // through; up and down always do.
                             Keys.onLeftPressed: event => {
                                 if (search.text.length > 0) { event.accepted = false; return }
                                 picker.moveSelection(-1)
@@ -741,7 +710,7 @@ PanelWindow {
                 }
             }
 
-            // ── The kinds, side by side ──────────────────────────────────
+            // The kinds, side by side
             Flickable {
                 id: strip
                 x: 20
@@ -752,8 +721,8 @@ PanelWindow {
                 contentWidth: tileRow.width
                 contentHeight: height
                 clip: true
-                // Dragging a tile carries the widget out; the strip moves by
-                // the wheel (below) and by the keyboard selection instead.
+                // Dragging a tile carries the widget out; the strip scrolls by wheel
+                // and keyboard selection instead.
                 interactive: false
 
                 Connections {
@@ -798,9 +767,7 @@ PanelWindow {
                             radius: Theme.radiusLarge
                             color: tile.current || tileMouse.containsMouse ? Theme.surfaceContainerHigh
                                                                            : Theme.surfaceContainer
-                            // The keyboard's place, drawn as a ring in the
-                            // accent: the one outline here, because it is the
-                            // focus.
+                            // The keyboard's place: the one outline here, because it is the focus.
                             border.width: tile.current ? 2 : 0
                             border.color: Theme.accent
 
@@ -842,8 +809,7 @@ PanelWindow {
                                     elide: Text.ElideRight
                                 }
 
-                                // How many are out already, so a second one
-                                // is a choice; empty, the line keeps the
+                                // How many are out already; empty, the line keeps the
                                 // tiles the same height.
                                 Text {
                                     width: parent.width
@@ -866,10 +832,9 @@ PanelWindow {
 
                                 onPressed: mouse => tileMouse.from = Qt.point(mouse.x, mouse.y)
                                 onPositionChanged: mouse => {
-                                    // Hover steers the selection only when the
-                                    // pointer really moves, so a still pointer
-                                    // under a scrolling strip leaves the keys'
-                                    // pick.
+                                    // Hover steers the selection only when the pointer really
+                                    // moves, so a still pointer under a scrolling strip
+                                    // leaves the keys' pick.
                                     if (!pressed) {
                                         picker.selected = tile.index
                                         return
@@ -906,9 +871,7 @@ PanelWindow {
                 }
             }
 
-            // The wheel moves the strip sideways a fixed step a notch, as the
-            // launcher's list moves down; the strip does not take the pointer
-            // itself.
+            // The wheel moves the strip sideways a fixed step per notch, like the launcher's list.
             MouseArea {
                 anchors.fill: strip
                 acceptedButtons: Qt.NoButton
@@ -930,7 +893,7 @@ PanelWindow {
                 easing.type: Easing.OutCubic
             }
 
-            // ── Keys, and how it is used ─────────────────────────────────
+            // Keys, and how it is used
             Item {
                 id: footer
                 x: 20

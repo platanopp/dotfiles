@@ -1,16 +1,8 @@
 import QtQuick
 import qs.config
 
-// The text cursor of the overlays' search fields, in the accent.
-//
-// The field is the one active thing on the launcher and the keybinds sheet
-// while they are open, and the caret is where that activity is: so it takes
-// the accent, and the rest of the field stays neutral.
-//
-// Used as a TextInput's cursorDelegate. The input positions it and turns it
-// on and off with cursorVisible; the blink is done here, the way the stock
-// caret blinks, and held solid for a moment after each keystroke so it does
-// not vanish under the text being typed.
+// The overlays' search caret, in the accent: the field is the one active thing there. A TextInput
+// cursorDelegate that blinks like the stock caret but holds solid briefly after each keystroke.
 Rectangle {
     id: caret
 

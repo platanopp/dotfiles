@@ -1,11 +1,8 @@
 import QtQuick
 import qs.config
 
-// A key, drawn as a small keycap: its legend in the mono face, on a raised
-// fill with a hairline edge. The one keycap of the shell -- the overlays'
-// key hints (KeyHint) and the keybinds sheet's combinations are all this.
-// The sheet draws its combinations a size up, through capHeight and
-// fontSize; everywhere else it is left as it is.
+// A key as a small keycap: the mono legend on a raised fill with a hairline edge. The shell's only
+// keycap; the keybinds sheet draws it a size up through capHeight and fontSize.
 Rectangle {
     id: cap
 

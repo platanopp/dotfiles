@@ -1,13 +1,10 @@
 //@ pragma UseQApplication
 //@ pragma Env QSG_RENDER_LOOP=basic
 
-// The basic render loop: every window drawn in one pass. Qt used to pick it
-// here by itself and no longer does (seen on Qt 6.12, 2026-11-01): the
-// threaded one runs a thread per window (17 of them), and the pills,
-// separate surfaces moving together, land a frame apart (see hyprland.lua,
-// where the shell starts).
-// Set here rather than where it starts so the restart after an update
-// (scripts/shell_update.py) gets it too.
+// The basic render loop draws every window in one pass; Qt stopped picking it on its own (seen
+// on Qt 6.12). The threaded loop runs a thread per window and the pills land a frame apart.
+// Basic's cost: animations tick on Qt's 16 ms timer, not the monitor's refresh. Set here so
+// the restart in shell_update.py gets it.
 
 import Quickshell
 import Quickshell.Io
@@ -28,11 +25,8 @@ import qs.services
 Scope {
     id: root
 
-    // Services are singletons, and a singleton starts the first time
-    // something reads it. Named here so they all start with the shell: some
-    // are only read from a panel or a Settings page, and what they do on
-    // their own -- the IPC targets, the keyboard's colours following the
-    // wallpaper -- has to be running before that.
+    // Services are lazy singletons; named here so they all start with the shell (the IPC targets,
+    // the keyboard's colours) even when only a panel reads them.
     readonly property var services: [Accent, AppImages, Audio, Bluetooth, Clock, Display, Hypr, KeyboardRgb,
                                      Keybinds, Network, Panels, Power, Profile, Recorder, Stats, System, Tablet,
                                      Wallpaper, Widgets]
@@ -54,24 +48,17 @@ Scope {
                 right: true
             }
 
-	    // The strip is only as tall as it needs to hold the pill at the
-	    // gap, and its height is what Hyprland reserves -- so raising the
-	    // top gap moves the bar down and the windows with it, instead of
-	    // sliding the pill out of a strip that stayed 51px tall.
-	    //
-	    // The window itself runs 16px deeper than that, for the workspaces
-	    // pill's shadow -- the other pills have one, and without it this one
-	    // read as flatter and shorter than the rest. The reserved space is
-	    // pinned to the strip, and so is input, so the extra room neither
-	    // moves the windows nor takes clicks from their top edge.
+	    // The strip is as tall as the pill at the gap, and that is what Hyprland reserves, so a
+	    // bigger top gap moves the windows too. The window runs 16px deeper for the pill's shadow;
+	    // reserved space and input stay on the strip.
 	    readonly property int stripHeight: Hypr.gapTop + leftPill.implicitHeight + 3
 	    implicitHeight: stripHeight + 16
 	    exclusionMode: ExclusionMode.Normal
 	    exclusiveZone: stripHeight
             color: "transparent"
 
-            // See the pills: masked rather than unmapped, so the layer surface
-            // keeps its place at the bottom of the overlay stack.
+            // Masked rather than unmapped, like the pills, so the surface keeps its place at
+            // the bottom of the overlay stack.
             mask: bar.barHidden ? barBlankMask : barStripMask
 
             Region {
@@ -86,9 +73,8 @@ Scope {
                 height: bar.stripHeight
             }
 
-            // This window spans the whole strip and sits under the pills, so
-            // it is what notices the pointer between them -- that is how the
-            // bar stays up anywhere along its length, not just on a pill.
+            // Spans the whole strip under the pills, so it notices the pointer between
+            // them and the bar stays up along it.
             HoverHandler {
                 id: barHover
             }
@@ -99,32 +85,26 @@ Scope {
 
             property var monitor: Hyprland.monitorFor(modelData)
 
-            // Right edge of the workspace pill. The media widget is its own
-            // window and has to start past it, and the pill's width changes
-            // with the workspace indicators.
+            // Right edge of the workspace pill: the media widget's window starts past it, and the
+            // width changes with the indicators.
             readonly property int leftPillRight: leftPill.x + leftPill.width
 
-            // The right-hand pills are one row: gear, then status, then tray.
-            // Each parks itself off the live width of the one to its right, so
-            // a panel that expands pushes its neighbours along rather than
-            // growing out underneath them.
+            // The right-hand pills are one row (gear, status, tray), each parked off the live width
+            // of the one to its right, so an expanding panel pushes its neighbours along.
             readonly property int pillGap: 10
 
-            // ── Auto-hide while an app is fullscreen ─────────────────────
+            // Auto-hide while an app is fullscreen
             readonly property bool fullscreen: monitor && monitor.activeWorkspace
                 ? monitor.activeWorkspace.hasFullscreen : false
 
-            // Any pill under the pointer keeps the bar up. The reveal zone
-            // alone is not enough: it sits below the pills, so the moment the
-            // bar appears under the cursor the zone loses the pointer, and the
-            // bar would flicker between shown and hidden.
+            // Any pill under the pointer keeps the bar up: the reveal zone sits below the pills and
+            // loses the pointer as soon as the bar appears, so alone it would flicker.
             readonly property bool barHovered: barHover.hovered || revealZone.hovered
                 || mediaWidget.barHovered || statusWidget.barHovered
                 || controlPanelWidget.barHovered || clockWidget.barHovered
                 || trayWidget.barHovered
 
-            // An open panel also holds it, so the bar cannot vanish from under
-            // someone reading it.
+            // An open panel also holds it up, so the bar can't vanish while being read.
             readonly property bool panelsOpen: statusWidget.expandedPanel !== ""
                 || controlPanelWidget.panelOpen || controlPanelWidget.notifOpen
                 || mediaWidget.panelOpen
@@ -134,10 +114,8 @@ Scope {
             readonly property bool wantBar: !(fullscreen && ShellSettings.barHideFullscreen)
                                             || barHovered || panelsOpen
 
-            // Shows at once, hides on a short delay. Revealing drops the pills
-            // under the cursor, and for a frame the zone can have lost the
-            // pointer before a pill has registered it; without the delay that
-            // gap collapses the bar and it oscillates.
+            // Shows at once, hides after a short delay: for a frame after revealing, neither the
+            // zone nor a pill may have the pointer.
             property bool barHidden: false
 
             onWantBarChanged: {
@@ -158,50 +136,25 @@ Scope {
             // Starting up already fullscreen fires no change signal.
             Component.onCompleted: if (!bar.wantBar) hideDelay.restart()
 
-            // Every pill insets its glass 12px inside its own window, so two
-            // windows have to overlap by 24 for the visible edges to end up
-            // pillGap apart. Reads rightMargin rather than margins.right: a
-            // plain property is guaranteed to notify, so the row actually
-            // follows when a neighbour moves.
-            //
-            // A pill's width here is its box as drawn (visualWidth, which
-            // animates) rather than its window, which is sized to hold the
-            // box's whole move and so is wider mid-animation (see PillStage).
-            // The pills that follow take the value frame by frame with no
-            // animation of their own: one animation at the source, and the
-            // row moves with it instead of chasing it.
+            // Pills inset their glass 12px inside their windows, so windows overlap by 24 for
+            // pillGap between visible edges. Reads rightMargin (always notifies) and visualWidth
+            // (the box as drawn), so the row follows one animation.
             function pillLeftOf(w) {
-                // rowWidth where a pill has one: the control panel keeps its
-                // place in the row at the panel's width while it grows into
-                // Settings, so its neighbours are not pushed into the clock.
+                // rowWidth where a pill has one: the control panel keeps its row width
+                // while growing into Settings.
                 var wide = w.rowWidth !== undefined ? w.rowWidth
                          : w.visualWidth !== undefined ? w.visualWidth : w.width
                 return Math.round(w.rightMargin + wide + pillGap - 24)
             }
 
-            // Which MPRIS player the media widget drives.
-            //
-            // Taking list[0] meant whoever registered on the bus first won, and
-            // the browser is usually up long before the music is -- so a
-            // background Zen tab held the widget while Spotify played. Playback
-            // state cannot break the tie either: Firefox reports Playing for a
-            // tab that makes no sound, so both players look active. The tie is
-            // broken by identity instead, earlier in this list winning.
-            //
-            // osu ahead of Spotify: while osu is open its own music is what is
-            // actually coming out of the speakers, so that is what the bar
-            // should be naming. Spotify next, and everything else -- browser
-            // tabs, mostly -- last.
-            //
-            // Note this also widens the lock below: with two preferred players,
-            // the cycle control is hidden whenever either of them is around,
-            // not just Spotify.
+            // Which MPRIS player the media widget drives, earlier in the list winning: list[0] let
+            // a background Zen tab hold the widget, and playback state can't break the tie (Firefox
+            // says Playing for silent tabs). osu first: its music is what plays while it's open.
+            // The cycle control is hidden while either is around.
             readonly property var preferredPlayers: ["osu", "spotify"]
 
-            // Set only when the user cycles players by hand. Holds a dbusName
-            // rather than a list index: the list reorders as players come and
-            // go, so an index quietly starts meaning somebody else. It only
-            // decides between unlisted players -- a preferred one always wins.
+            // Set only when cycling by hand: a dbusName, since indexes shift as players come and
+            // go. Decides only among unlisted players.
             property string pinnedPlayer: ""
 
             // Lower is better; anything unlisted sorts after every preference.
@@ -223,8 +176,7 @@ Scope {
                     if (playerRank(list[j]) < playerRank(best)) best = list[j]
                 }
 
-                // A preferred player holds the widget for as long as it is
-                // open; nothing overrides it, by request.
+                // A preferred player holds the widget as long as it's open, by request.
                 if (playerRank(best) < preferredPlayers.length) return best
 
                 // Otherwise a hand-picked player wins until it goes away.
@@ -234,8 +186,8 @@ Scope {
                 return best
             }
 
-            // True while a preferred player is forcing the choice, so the
-            // widget can stop offering a cycle control that would do nothing.
+            // True while a preferred player forces the choice, so the widget hides a
+            // cycle control that would do nothing.
             readonly property bool playerLocked:
                 activePlayer !== null && playerRank(activePlayer) < preferredPlayers.length
 
@@ -267,17 +219,15 @@ Scope {
                 visible: !bar.barHidden
                 anchors.left: parent.left
                 anchors.top: parent.top
-                // The one pill anchored to the screen rather than to a
-                // neighbour, so it is where the left edge of the row is set.
+                // The one pill anchored to the screen, so it sets the row's left edge.
                 anchors.leftMargin: Hypr.gapLeft
                 anchors.topMargin: Hypr.gapTop
                 implicitWidth: leftRow.implicitWidth + Theme.pillPaddingH * 2
                 implicitHeight: 40
 
-                // Glass and shadow exactly as every other pill draws them: a
-                // hidden layered rectangle through MultiEffect. A shadow item
-                // under a plain translucent rectangle showed through it, and
-                // this pill came out darker than the rest.
+                // Glass and shadow as every pill draws them (a hidden layered rectangle
+                // through MultiEffect): a shadow item under plain translucency showed
+                // through and darkened this pill.
                 Rectangle {
                     id: leftGlass
                     anchors.fill: parent
@@ -367,9 +317,8 @@ Scope {
                 bar: bar
             }
 
-            // Last, so its surface is created last and sits on top of every
-            // other overlay this shell puts up -- the fade has to cover the
-            // bar and any open panel, not slide in behind them.
+            // Last, so its surface is created last and sits above every other overlay,
+            // the bar and open panels included.
             WorkspaceOverview {
                 bar: bar
             }
@@ -385,20 +334,15 @@ Scope {
         }
     }
 
-    // The session lock. Outside Variants because WlSessionLock puts up its
-    // own surface on every screen by itself -- a per-screen copy would have
-    // each of them trying to claim the one session lock.
-    //
-    // Raised by Super + L through Power.lockSession(), by the control
-    // panel, by `loginctl lock-session` from anywhere, and once on the first
-    // start after a boot -- see the claim in LockEngine, which is what stands
-    // in for a greeter on a seat that is handed over already logged in.
+    // The session lock, outside Variants: WlSessionLock puts a surface on every screen by itself.
+    // Raised by Super+L (Power.lockSession()), the control panel, `loginctl lock-session`, and
+    // once per boot (the claim in LockEngine).
     LockScreen {
     }
 
-    // `qs ipc call screens blank HDMI-A-1` / `unblank`. Driven by hypridle
-    // through ~/.config/hypr/scripts/idle-screens.sh; see BlankOverlay for why
-    // some screens are covered rather than powered off.
+    // `qs ipc call screens blank HDMI-A-1` / `unblank`, driven by hypridle via
+    // ~/.config/hypr/scripts/idle-screens.sh (see BlankOverlay for why some screens are
+    // covered rather than powered off).
     IpcHandler {
         target: "screens"
 
@@ -411,9 +355,8 @@ Scope {
         }
     }
 
-    // Outside Variants: one registration for the whole shell, where a
-    // per-screen copy would try to claim the same name once per monitor.
-    // Hyprland reaches it as `hl.dsp.global("quickshell:keybinds")`.
+    // Outside Variants: one registration per shell, not per monitor. Hyprland calls it as
+    // `hl.dsp.global("quickshell:keybinds")`.
     GlobalShortcut {
         appid: "quickshell"
         name: "keybinds"
@@ -422,8 +365,7 @@ Scope {
         onPressed: Panels.toggleKeybinds()
     }
 
-    // Escape while a bar panel is open -- bound by Panels only for as
-    // long as one is (see escapeBind there).
+    // Escape while a bar panel is open, bound by Panels only while one is (escapeBind).
     GlobalShortcut {
         appid: "quickshell"
         name: "dismiss"
@@ -478,9 +420,8 @@ Scope {
         onPressed: Panels.toggleOverview()
     }
 
-    // The lock is this shell's own surface, so the bind has to reach the shell
-    // rather than run a locker of its own -- see Power.lockSession(), which
-    // is also where the control panel and its suspend go.
+    // The lock is this shell's own surface, so the bind goes through the shell
+    // (Power.lockSession(), as the control panel does).
     GlobalShortcut {
         appid: "quickshell"
         name: "lock"
@@ -489,10 +430,8 @@ Scope {
         onPressed: Power.lockSession()
     }
 
-    // Routed through the shell rather than run as a bare wpctl bind, so the
-    // bar's microphone indicator moves with the key instead of waiting for
-    // the next poll to notice -- and so the cue is played by the thing that
-    // knows which way the toggle went.
+    // Through the shell rather than a bare wpctl bind, so the mic indicator updates at once and
+    // the cue knows which way the toggle went.
     GlobalShortcut {
         appid: "quickshell"
         name: "micmute"

@@ -5,17 +5,10 @@ import qs.components
 import qs.config
 import qs.services
 
-// The Settings window's contents: pages down the left, the open page on the
-// right. It is not a window of its own -- the control panel grows into it (see
-// ControlPanel.qml), which is why it has a way back as well as a way out.
-//
-// Monochrome: one accent, the shell's own light grey, for everything chosen
-// or filled -- the same language as the control panel's toggles. Pages tell
-// themselves apart by their icons, not by colour; a colour per page was tried
-// and the colours did not sit together.
-//
-// Only pages with something real behind them. Every control here drives a
-// script that changes the machine; none of them is there to fill the list.
+// The Settings window's contents: pages on the left, the open one on the right. Not a window of
+// its own: the control panel grows into it, hence a way back as well as out. Monochrome, one
+// accent; pages differ by icon. Only pages with something real behind them: every control
+// drives a script that changes the machine.
 Item {
     id: view
 
@@ -58,10 +51,10 @@ Item {
         anchors.fill: parent
         spacing: 0
 
-        // ── Pages ────────────────────────────────────────────────────────
+        // Pages
         ColumnLayout {
-            // Pinned: a layout whose children fill their width fills its own
-            // too, whatever its preferred width says.
+            // Pinned: a layout whose children fill their width fills its own too,
+            // whatever its preferred width says.
             Layout.fillWidth: false
             Layout.preferredWidth: 212
             Layout.minimumWidth: 212
@@ -179,8 +172,7 @@ Item {
                                 anchors.rightMargin: 10
                                 spacing: 11
 
-                                // Only the page you are on takes the accent;
-                                // the rest of the list stays neutral.
+                                // Only the current page takes the accent.
                                 TintBadge {
                                     icon: navItem.modelData.icon
                                     tint: navItem.chosen ? Theme.accent : Theme.textSecondary
@@ -212,7 +204,7 @@ Item {
             Item { Layout.fillHeight: true }
         }
 
-        // ── The open page ────────────────────────────────────────────────
+        // The open page
         Rectangle {
             id: pane
             Layout.fillWidth: true
@@ -250,8 +242,7 @@ Item {
                 }
             }
 
-            // A hairline where the cards pass under the title, only once they
-            // actually do.
+            // A hairline where the cards pass under the title, only once they do.
             Rectangle {
                 anchors.top: scroller.top
                 anchors.left: parent.left
@@ -287,8 +278,8 @@ Item {
                         arrive.restart()
                     }
 
-                    // Each page comes in with a short rise and fade. The rise
-                    // is a transform: the Flickable owns this item's y.
+                    // Each page comes in with a short rise and fade; the rise is a
+                    // transform, since the Flickable owns y.
                     transform: Translate { id: rise }
 
                     ParallelAnimation {
@@ -322,10 +313,8 @@ Item {
                 }
             }
 
-            // ── What happened to the last Hyprland change ────────────────
-            //
-            // Applied and committed, or refused and rolled back -- said once,
-            // at the bottom, then gone.
+            // What happened to the last Hyprland change: applied and committed, or
+            // refused and rolled back, said once.
             Rectangle {
                 id: toast
                 anchors.horizontalCenter: parent.horizontalCenter
@@ -339,9 +328,8 @@ Item {
                 border.color: Theme.alpha(toast.good ? Theme.success : Theme.error, 0.5)
 
                 property bool shown: false
-                // Not merely moved out of sight: parked below the pane it
-                // still showed through, and with no result yet it wore the
-                // error's red.
+                // Not merely moved out of sight: parked below the pane it still showed
+                // through, in the error's red.
                 visible: toast.shown || toastSlide.running
                 readonly property var last: Hypr.hyprLast
                 readonly property bool good: toast.last !== null && toast.last.ok === true

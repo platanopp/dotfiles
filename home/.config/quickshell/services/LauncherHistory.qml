@@ -3,13 +3,8 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// What the launcher has been used to open, so what you open most comes
-// first: on an empty field as "Frequent", and as a nudge within a tier when
-// typing. One singleton rather than state in AppLauncher, which has a copy
-// per monitor -- two writers to one file.
-//
-// Kept under ~/.local/state, not beside the config: it is a record of use,
-// not a setting, and has no place in the dotfiles.
+// What the launcher has opened, so the most used come first. A singleton, since AppLauncher has a
+// copy per monitor. Kept in ~/.local/state: a record of use, not a setting for the dotfiles.
 Singleton {
     id: root
 
@@ -40,16 +35,14 @@ Singleton {
         id: file
         path: Quickshell.env("HOME") + "/.local/state/quickshell-launcher.json"
         printErrors: false
-        // Read before anything is asked of it: the singleton is only made on
-        // first use, and a launch recorded before an asynchronous load came
-        // back would have written over the whole history.
+        // Read before anything is asked: a launch recorded before an async load
+        // returned would overwrite the history.
         blockLoading: true
         onLoaded: root.load()
     }
 
-    // Also straight away: with blockLoading the text is there as soon as the
-    // FileView is, but `loaded` is only signalled later -- after the first
-    // question the launcher asks.
+    // Also at once: with blockLoading the text is there immediately, but `loaded`
+    // only fires after the first query.
     Component.onCompleted: root.load()
 
     function load() {

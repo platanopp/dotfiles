@@ -9,60 +9,26 @@ import qs.components
 import qs.config
 import qs.services
 
-// The workspace overview (Super+Tab), on every screen at once.
+// The workspace overview (Super+Tab), on every screen at once: the shown workspace's windows spread
+// out side by side, under a strip of every workspace grouped by monitor (DP-2 1-10, HDMI-A-1 11-20;
+// 13 shows as 3). Closing sends every window back to its place.
 //
-// On each, the windows of the workspace it shows leave their places and
-// spread out, side by side and none over another, so each can be seen whole
-// and picked.
-// Across the top runs a strip with a picture of every workspace -- the
-// wallpaper and its windows where they sit -- grouped by monitor, each with
-// its own block of ten numbered 1-10 the way Super+N counts them
-// (hyprland.lua: DP-2 has 1-10, HDMI-A-1 11-20; 13 shows as 3). Closing
-// sends every window back to its place, so a picture and the window it
-// stood for never come apart.
+// click a window              go to it
+// drag onto a strip card      move it there and close; onto New, make a workspace and go there
+// drag onto another screen    the same, into the workspace that screen shows or one in its strip
+// click a card                go there; its × removes it (asks first when it has windows)
+// arrows / Tab, Enter         choose a window, go to it (keys act on the screen under the pointer)
+// Ctrl + ← →                  show the previous or next workspace here, without closing
+// 1 - 9, 0                    go to that workspace of this monitor
+// Shift + 1 - 9, 0 / N        move the chosen window there (N: to a new one) and close
+// N                           a new workspace on this monitor
+// Delete                      remove the workspace on screen
+// Esc, Super+Tab              close
 //
-//   click a window              go to it
-//   drag a window onto a        move it there and close; the workspace on
-//   workspace in the strip      screen stays. Onto a monitor's New, a new
-//                               workspace is made for it and gone to
-//   drag it onto another        the same, into the workspace that screen
-//   screen                      shows, or into one of that screen's strip
-//   click a workspace           go there; its × removes it (asks first when
-//                               it has windows)
-//   (the keys, on the screen under the pointer)
-//   arrows / Tab, Enter         choose a window, go to it
-//   Ctrl + ← →                  show the workspace before or after, here,
-//                               without closing
-//   1 - 9, 0                    go to that workspace of this monitor
-//   Shift + 1 - 9, 0            move the chosen window there and close,
-//                               going along when the workspace is a new
-//                               one; Shift + N, to a new workspace
-//   N                           a new workspace on this monitor
-//   Delete                      remove the workspace on screen
-//   Esc, or Super+Tab           close
-//
-// Same house pattern as the launcher: mapped only while up, exclusive
-// keyboard while up -- on every screen, and Hyprland hands it to the one
-// under the pointer. With it on the screen opened on alone, the others got
-// no pointer at all: nothing there could be hovered or clicked (Hyprland
-// 0.57). The keyboard grab is held while the windows fly home (changing it
-// while the surface is up drops it for two frames -- see AppLauncher), and
-// let go at once when the overview closes to go to another workspace, so
-// the window gone to gets the keyboard.
-//
-// A window carried off its screen: the press was on this surface, so the
-// pointer stays this surface's until the button is let go (Wayland's
-// implicit grab), with places past its edges. Where it is in the layout is
-// shared (Panels.overviewDrag), and the screen under it draws a copy of the
-// window -- the two halves meet at the edge -- and says where it would land.
-//
-// Cheap while it is not up: nothing is captured, the models are empty and
-// their views destroyed. While up, each window is captured when its view is
-// built, and again only when its size changes; nothing is streamed.
-//
-// The clickable things are MouseAreas, not TapHandlers: a TapHandler's grab
-// is passive, so a click on a workspace's × was also a click on the
-// workspace under it, which went there before the × could do anything.
+// Exclusive keyboard on every screen: with it on one alone, the others got no pointer (Hyprland
+// 0.57). A window dragged off its screen keeps the pointer (implicit grab); the screen under it
+// draws a copy. Cheap while closed: nothing is captured and the models are empty. MouseAreas, not
+// TapHandlers: a passive TapHandler grab let a click on × also open the workspace.
 PanelWindow {
     id: overview
 
@@ -80,17 +46,14 @@ PanelWindow {
 
     readonly property bool open: Panels.overviewOpen
 
-    // Mapped from opening until the windows are home (see AppLauncher's
-    // `shown` for why this is not `open || timer.running`).
+    // Mapped from opening until the windows are home (a `shown` flag, see AppLauncher).
     property bool shown: false
-    // Closing to go to another workspace: hidden at once, keyboard let go at
-    // once -- on every screen.
+    // Closing to go to a workspace: hidden and keyboard released at once, on every screen.
     readonly property bool leaving: Panels.overviewLeaving
-    // Set while everything comes in, so the windows leave from where they
-    // are on screen and the strip does not animate its sizes while it fills.
+    // While opening: windows leave from their screen places and the
+    // strip doesn't animate its sizes.
     property bool opening: false
-    // The windows are out of their places: from opening until the overview
-    // starts to close, when each heads back to where it is on screen.
+    // Windows are out of their places from opening until closing starts.
     readonly property bool spread: overview.open && !overview.leaving
 
     visible: overview.shown
@@ -112,8 +75,7 @@ PanelWindow {
             overview.slots = ({})
             overview.arrivals = ({})
             overview.selectedKey = ""
-            // Whatever was waiting for the windows to land: focusing the
-            // one picked, now that the keyboard is free to go to it.
+            // Focus the picked window now that the keyboard is free.
             if (overview.pending) actTimer.restart()
         }
     }
@@ -144,9 +106,7 @@ PanelWindow {
                 overview.refresh()
                 overview.rebuild()
                 overview.selectedKey = overview.firstKey()
-                // Once more when the refresh has answered: the first build
-                // used what Quickshell last knew, which misses a window
-                // opened since.
+                // Again once the refresh answers: the first build may miss a window opened since.
                 eventRebuild.restart()
                 keys.forceActiveFocus()
             } else {
@@ -170,11 +130,10 @@ PanelWindow {
         right: true
     }
 
-    // Hyprland's corner rounding, so a window leaves and lands with the
-    // corners it has on screen (asked once per opening, for every screen).
+    // Hyprland's corner rounding, so windows leave and land with their on-screen corners.
     readonly property int windowRounding: Panels.overviewRounding >= 0 ? Panels.overviewRounding : Theme.radiusXLarge
 
-    // ── What is where ────────────────────────────────────────────────────
+    // What is where
 
     // A monitor's box in the layout, in logical pixels.
     function geometryOf(monitor) {
@@ -185,10 +144,8 @@ PanelWindow {
         return { x: o.x, y: o.y, w: (rotated ? o.height : o.width) / s, h: (rotated ? o.width : o.height) / s }
     }
 
-    // Quickshell fills in where windows are only on request; asked on
-    // opening and again after anything moves. By one screen's overview for
-    // all of them: the answers are shared, and every screen asking sent the
-    // same three requests once per screen.
+    // Quickshell fills in window positions only on request. Asked by the home
+    // screen only: the answers are shared.
     function refresh() {
         if (!overview.home) return
         Hyprland.refreshWorkspaces()
@@ -196,21 +153,15 @@ PanelWindow {
         Hyprland.refreshMonitors()
     }
 
-    // The workspace this screen shows: the one whose windows are spread out.
-    // (Hyprland.focusedWorkspace is only known once an event has named it;
-    // the monitor's is what the bar's pill reads too.)
+    // The workspace this screen shows, read from the monitor: Hyprland.focusedWorkspace
+    // is unknown until an event names it.
     function viewedId() {
         return bar.monitor && bar.monitor.activeWorkspace ? bar.monitor.activeWorkspace.id : -1
     }
 
-    // Snapshots, not bindings: rebuilt on opening and when Hyprland says
-    // something moved. A binding re-read every window title as it changed,
-    // and re-captured every window each time.
-    //
-    // Cards are the strip's workspaces, keyed by workspace id (each
-    // monitor's new one by -100 - its block); tiles are the windows spread
-    // out, keyed by address. A key that leaves stays in its model, on its
-    // way out, until goneTimer takes it.
+    // Snapshots, not bindings, rebuilt on open and on Hyprland events: a binding re-read every
+    // title and re-captured every window. Cards are keyed by workspace id (a monitor's new card by
+    // -100 - block), tiles by address; leaving keys stay until goneTimer.
     property var cardData: ({})
     property var cardList: []
     property var goingCards: []
@@ -219,8 +170,8 @@ PanelWindow {
     property var goingTiles: []
     // Where each tile sits while spread out, by address.
     property var slots: ({})
-    // Windows let go here from another screen, by address: where they were
-    // let go, for their tiles to start from when they turn up.
+    // Windows dropped here from another screen, by address: where they were let
+    // go, for their tiles to start from.
     property var arrivals: ({})
     property int revision: 0
     property bool several: false
@@ -231,8 +182,7 @@ PanelWindow {
     function computeCards() {
         var viewed = overview.viewedId()
         var wss = Hyprland.workspaces.values.filter(function(w) { return w.id > 0 })
-        // Grouped by monitor, left to right as they stand, and by number
-        // within each: a workspace lives on one monitor, and the strip says so.
+        // Grouped by monitor, left to right, then by number.
         var monX = function(w) { var g = overview.geometryOf(w.monitor); return g.x }
         wss.sort(function(a, b) {
             var dx = monX(a) - monX(b)
@@ -253,8 +203,7 @@ PanelWindow {
                             floating: !!o.floating, fullscreen: (o.fullscreen || 0) > 0,
                             recency: o.focusHistoryID === undefined ? 99 : o.focusHistoryID })
             }
-            // Tiled under floating, and within each the most recently used on
-            // top -- the order they are stacked on screen.
+            // Tiled under floating, most recently used on top: the on-screen stacking order.
             wins.sort(function(a, b) {
                 if (a.floating !== b.floating) return a.floating ? 1 : -1
                 return b.recency - a.recency
@@ -266,9 +215,8 @@ PanelWindow {
                        active: !!(mon && mon.activeWorkspace && mon.activeWorkspace.id === ws.id),
                        windows: wins, isNew: false })
         }
-        // Each monitor's run ends in a new card of its own: the number after
-        // its highest, or its lowest free one once 10 is taken; none when
-        // all ten are in use.
+        // Each monitor's run ends in its own new card: the number after its highest, or its lowest
+        // free one once 10 is taken; none when all ten are used.
         var cards = []
         for (var j = 0; j < out.length; j++) {
             cards.push(out[j])
@@ -283,9 +231,7 @@ PanelWindow {
                          monitor: out[j].monitor, monitorLabel: "", viewed: false, active: false,
                          windows: [], isNew: true })
         }
-        // Where each monitor's run starts and ends: the first card gets the
-        // monitor's name over it, the last a wider gap after it; the very
-        // last none.
+        // Each monitor's first card gets its name; its last gets a wider gap, except the very last.
         var monitors = {}
         for (var m = 0; m < cards.length; m++) monitors[cards[m].monitor] = true
         var several = Object.keys(monitors).length > 1
@@ -297,9 +243,8 @@ PanelWindow {
         return cards
     }
 
-    // The windows of the workspace on screen, each with where it is on it
-    // (`home`, in this window's coordinates: the overview covers the monitor
-    // exactly, so a window's place on screen is its place here).
+    // The windows of the workspace on screen, each with its `home` rect: the overview covers the
+    // monitor exactly, so screen coordinates are window coordinates.
     function computeTiles() {
         var viewed = overview.viewedId()
         var g = overview.geometryOf(bar.monitor)
@@ -345,8 +290,7 @@ PanelWindow {
         return null
     }
 
-    // The card that stands for a workspace id: the workspace itself, or the
-    // new card that would make it.
+    // The card for a workspace id: the workspace, or the new card that would create it.
     function cardFor(id) {
         var fresh = null
         for (var i = 0; i < overview.cardList.length; i++) {
@@ -370,8 +314,8 @@ PanelWindow {
         return Quickshell.iconPath(e ? e.icon : String(cls).toLowerCase(), "application-x-executable")
     }
 
-    // What a card or a tile shows, as a string: two builds that agree on it
-    // keep the first object, so its views are not rebuilt and re-captured.
+    // A card or tile as a string: builds that agree keep the first object, so views
+    // aren't rebuilt and re-captured.
     function cardSignature(c) {
         return JSON.stringify([c.id, c.viewed, c.active, c.monitor, c.geom, c.groupStart, c.groupEnd, c.last,
                                c.windows.map(function(w) {
@@ -393,8 +337,8 @@ PanelWindow {
         return out
     }
 
-    // Adds the keys a model lacks, each where it belongs among those
-    // staying, so a view that stays keeps its delegate (and its capture).
+    // Adds missing keys in order among the staying ones, so a staying view
+    // keeps its delegate and capture.
     function insertKeys(model, keys, going) {
         var staying = []
         for (var s = 0; s < model.count; s++) {
@@ -441,8 +385,7 @@ PanelWindow {
         for (var h = 0; h < tilesGoing.length; h++)
             if (overview.tileData[tilesGoing[h]]) tmap[tilesGoing[h]] = overview.tileData[tilesGoing[h]]
 
-        // The data first, then the models: a delegate made by the insert
-        // reads its data as it is made.
+        // Data before models: a delegate created by the insert reads its data immediately.
         var monitors = {}
         for (var m = 0; m < cards.length; m++) monitors[cards[m].monitor] = true
         overview.several = Object.keys(monitors).length > 1
@@ -485,8 +428,7 @@ PanelWindow {
         }
     }
 
-    // Anything that moves a window or a workspace: read again, a moment
-    // later, once Hyprland has settled and answered.
+    // Anything that moves a window or workspace: re-read a moment later, once Hyprland has settled.
     Connections {
         target: Hyprland
         enabled: overview.shown
@@ -515,16 +457,9 @@ PanelWindow {
         onTriggered: overview.rebuild()
     }
 
-    // ── Laying the windows out ───────────────────────────────────────────
-    //
-    // Between the strip and the key hints, the windows in rows, each keeping
-    // its shape and the size it has next to the others. Every row count
-    // from one to one per window is tried, windows going into rows by where
-    // they sit on screen (top to bottom, then left to right), and the count
-    // that lets them be biggest wins; one with fewer rows wins a near tie,
-    // since a row reads more easily than a grid. A window is never shown
-    // above `maxWindowScale` of its size, so a workspace with one window
-    // still visibly steps back from the screen.
+    // Laying the windows out: rows between the strip and the key hints, each window
+    // keeping its shape. Every row count is tried and the biggest windows win (fewer rows
+    // on a near tie); never above maxWindowScale.
     readonly property real maxWindowScale: 0.7
     readonly property int columnGap: 40
     // Room under each row for the caption of the chosen window.
@@ -597,7 +532,7 @@ PanelWindow {
         return out
     }
 
-    // ── The strip's size ─────────────────────────────────────────────────
+    // The strip's size
 
     readonly property int stripTop: 24
     readonly property int stripPadding: 14
@@ -615,8 +550,8 @@ PanelWindow {
         return overview.stripPadding * 2 + overview.labelRoom + thumb + overview.chipGap + overview.chipHeight
     }
 
-    // Every picture as high as the others and as wide as its monitor is for
-    // that height, small enough for the strip to fit across the screen.
+    // Every picture the same height at its monitor's aspect, small enough
+    // for the strip to fit the screen.
     readonly property real thumbHeight: {
         var aspects = 0
         for (var i = 0; i < overview.cardList.length; i++)
@@ -628,22 +563,20 @@ PanelWindow {
         var most = Math.min(96, overview.height * 0.1)
         return Math.round(Math.max(40, Math.min(most, aspects > 0 ? room / aspects : most)))
     }
-    // Eased when a workspace comes or goes, so the strip grows and shrinks
-    // rather than snapping; not while it first fills.
+    // Eased as workspaces come and go, except while the strip first fills.
     property real shownThumb: overview.thumbHeight
     Behavior on shownThumb {
         enabled: !overview.opening
         Elastic {}
     }
 
-    // ── Choosing ─────────────────────────────────────────────────────────
+    // Choosing
 
     // The window the keyboard is on, by address.
     property string selectedKey: ""
 
-    // Whether the pointer has moved since the overview opened. Only then
-    // does hovering pick a window: opening under a pointer that sat still
-    // put the selection on whichever window came out beneath it.
+    // Hover picks a window only once the pointer has moved: a still pointer
+    // stole the selection on open.
     property bool pointerSteers: false
     property point lastPointer: Qt.point(-1, -1)
 
@@ -657,15 +590,13 @@ PanelWindow {
         return best ? best.key : ""
     }
 
-    // Where the selection starts: on the window last used on the screen it
-    // was opened on, and nowhere on the others until a window is pointed at
-    // or a key pressed there.
+    // Starts on the last used window on the screen it opened on; elsewhere nowhere
+    // until pointed at or a key is pressed.
     function firstKey() {
         return overview.home ? overview.mostRecent() : ""
     }
 
-    // The nearest window in a direction, by where they sit spread out:
-    // straight ahead counts more than off to the side.
+    // The nearest window in a direction; straight ahead counts more than off to the side.
     function step(dx, dy) {
         var cur = overview.slots[overview.selectedKey]
         if (!cur) { overview.selectedKey = overview.mostRecent(); return }
@@ -696,15 +627,15 @@ PanelWindow {
         overview.selectedKey = keys[((at + dir) % keys.length + keys.length) % keys.length]
     }
 
-    // ── Dragging ─────────────────────────────────────────────────────────
+    // Dragging
 
     readonly property int noCard: -999
     // The card under a window being dragged; the strip lights it.
     property int dropKey: overview.noCard
     property string draggingKey: ""
 
-    // The strip's cards and the tiles, by key, as their delegates register
-    // themselves: where a dragged window is let go, and what flies there.
+    // Strip cards and tiles by key, registered by their delegates: drop
+    // targets and what flies there.
     property var thumbs: ({})
     property var tileItems: ({})
 
@@ -737,10 +668,9 @@ PanelWindow {
         Panels.overviewDropAt = null
     }
 
-    // A floating window let go over another screen's windows lands where it
-    // was let go -- the point of it that was held under the pointer, kept on
-    // that screen -- and over the windows there. A tiled one goes where that
-    // screen's layout puts it.
+    // A floating window dropped on another screen lands where it was let go (the held
+    // point under the pointer, clamped to that screen), on top. A tiled one goes
+    // where that screen's layout puts it.
     function placeOn(name, tile) {
         if (!tile.d.floating) return ""
         var mon = Hyprland.monitors.values.filter(function(m) { return m.name === name })[0]
@@ -755,10 +685,9 @@ PanelWindow {
              + "hl.dispatch(hl.dsp.window.alter_zorder({ mode = 'top', " + win + " }))"
     }
 
-    // Let go over a workspace other than this one: the window goes there and
-    // the tile into its picture. On another screen, into the workspace it
-    // shows, or the one under it in its strip; that screen draws the landing.
-    // Anywhere else, the tile goes back.
+    // Dropped on another workspace: the window moves there and the tile flies into its
+    // picture. On another screen, into the workspace it shows or the card under it;
+    // anywhere else the tile goes back.
     function dropped(tile) {
         var key = overview.dropKey
         var at = Panels.overviewDropAt
@@ -791,7 +720,7 @@ PanelWindow {
         }
     }
 
-    // ── A window carried here from another screen ───────────────────────
+    // A window carried here from another screen
 
     readonly property var visitor: {
         var d = Panels.overviewDrag
@@ -799,17 +728,15 @@ PanelWindow {
     }
     // The pointer, in this window's coordinates.
     readonly property point visitorAt: {
-        // Nothing to follow: nothing read, so nothing runs as the monitors
-        // are refreshed.
+        // Nothing read when there's no visitor, so nothing re-runs on monitor refreshes.
         if (!overview.visitor) return Qt.point(-1, -1)
         var g = overview.geometryOf(bar.monitor)
         return Qt.point(Panels.overviewDragAt.x - g.x, Panels.overviewDragAt.y - g.y)
     }
     readonly property bool hosting: overview.visitor !== null && overview.spread && overview.inside(overview.visitorAt)
 
-    // The card under it, lit as for a window of this screen's, and said: a
-    // workspace in the strip, or else the one this screen shows. Only when
-    // it changes, as every screen reads it.
+    // The card under the visitor (a strip card, else the shown workspace), published only on
+    // change since every screen reads it.
     function aimVisitor() {
         var at = Panels.overviewDropAt
         if (!overview.hosting) {
@@ -848,12 +775,9 @@ PanelWindow {
         overview.afterMove(tile.d.address, !card || card.isNew)
     }
 
-    // A window moved is the end of the visit: the overview closes once the
-    // window has landed in its picture. Into a workspace that was already
-    // there, the rest fly home to the places Hyprland has retiled them into
-    // meanwhile and the workspace on screen stays. Into a new one, made for
-    // it, the window is gone to: the overview closes the quick way and
-    // focusing the window takes Hyprland to its workspace.
+    // Moving a window closes the overview once it has landed. Into an existing workspace
+    // the rest fly home to their retiled places; into a new one the overview closes quickly
+    // and focus follows the window there.
     property string followAddress: ""
 
     function afterMove(address, follow) {
@@ -878,7 +802,7 @@ PanelWindow {
         }
     }
 
-    // ── Acting ───────────────────────────────────────────────────────────
+    // Acting
 
     function close() {
         Panels.overviewOpen = false
@@ -886,8 +810,8 @@ PanelWindow {
 
     property var pending: null
 
-    // Closes at once and does `what` a moment later, once the keyboard has
-    // been let go -- or focus would be asked to move into the grab.
+    // Closes at once and runs `what` a moment later, once the keyboard is released,
+    // or focus would move into the grab.
     function leaveThen(what) {
         Panels.overviewLeaving = true
         overview.pending = what
@@ -895,8 +819,8 @@ PanelWindow {
         actTimer.restart()
     }
 
-    // Closes the slow way, every window flying home, and does `what` once
-    // they have landed and the surface is gone.
+    // Closes the slow way, windows flying home, and runs `what` once they've
+    // landed and the surface is gone.
     function dismissThen(what) {
         overview.pending = what
         overview.close()
@@ -921,8 +845,8 @@ PanelWindow {
         return "\"" + String(s).replace(/\\/g, "\\\\").replace(/"/g, "\\\"") + "\""
     }
 
-    // The workspace on screen is the one the windows fly back into; any
-    // other is gone to the quick way, letting Hyprland's own animation play.
+    // Back to the shown workspace, the windows fly home; to any other, close quickly
+    // and let Hyprland's animation play.
     function goToWorkspace(id) {
         if (id === overview.viewedId()) {
             overview.close()
@@ -931,9 +855,8 @@ PanelWindow {
         overview.leaveThen(function() { overview.run("hl.dispatch(hl.dsp.focus({ workspace = " + id + " }))") })
     }
 
-    // Focused and raised over the others: focusing alone left a floating
-    // window under the one it was behind. It lands on top on the way home
-    // too, as it will be.
+    // Focused and raised: focusing alone left a floating window under the one it was behind.
+    // It also lands on top on the way home.
     property string chosenKey: ""
 
     function chooseWindow(key) {
@@ -948,9 +871,8 @@ PanelWindow {
         })
     }
 
-    // The workspace before or after this one on this monitor, shown here
-    // without closing: the monitor really switches, behind the overview, so
-    // closing lands the windows where they now are.
+    // Switches this monitor to the previous or next workspace behind the overview, so closing
+    // lands the windows where they now are.
     function viewWorkspace(delta) {
         var name = bar.monitor ? bar.monitor.name : ""
         var mine = overview.cardList.filter(function(c) { return !c.isNew && c.monitor === name })
@@ -961,8 +883,7 @@ PanelWindow {
         overview.run("hl.get_monitor(" + overview.luaString(name) + "):set_workspace({ workspace = " + next.id + " })")
     }
 
-    // Without following it: the workspace on screen stays. `then`, Lua run
-    // right after, in the same call.
+    // Without following it; `then` is Lua run right after, in the same call.
     function moveWindow(address, id, then) {
         overview.run("hl.dispatch(hl.dsp.window.move({ workspace = " + id
                      + ", follow = false, window = 'address:0x" + address + "' }))"
@@ -973,13 +894,9 @@ PanelWindow {
         overview.run("hl.dispatch(hl.dsp.window.close({ window = 'address:0x" + address + "' }))")
     }
 
-    // ── Removing a workspace ─────────────────────────────────────────────
-    //
-    // Hyprland keeps a workspace for as long as it has windows or a monitor
-    // shows it, and drops it the moment neither is true. So removing one is
-    // closing its windows and, if it is on screen, showing that monitor
-    // another of its workspaces -- without moving focus there. A monitor's
-    // only workspace cannot go: a monitor always shows one.
+    // Removing a workspace: Hyprland drops one once it has no windows and no monitor shows
+    // it, so close its windows and show its monitor another workspace without moving focus.
+    // A monitor's only workspace can't go.
     property int confirmId: -2          // the workspace asking "close N windows?"
 
     function fallbackFor(card) {
@@ -1014,12 +931,10 @@ PanelWindow {
         }
     }
 
-    // ── Drawing ──────────────────────────────────────────────────────────
+    // Drawing
 
-    // How much of the backdrop is up. Driven by hand rather than by a
-    // Behavior, because it comes in and goes out on different curves: in
-    // quickly, out over the windows' whole flight home and late, so the real
-    // windows show through only as the pictures land on them.
+    // How much of the backdrop is up, driven by hand: in quickly, out late over the whole flight
+    // home, so the real windows show only as the pictures land.
     property real veil: 0
 
     NumberAnimation {
@@ -1039,8 +954,7 @@ PanelWindow {
     Item {
         id: stage
         anchors.fill: parent
-        // Going to another workspace: gone at once, for Hyprland's own
-        // animation to show.
+        // Going to another workspace: gone at once so Hyprland's animation shows.
         opacity: overview.leaving ? 0 : 1
 
         HoverHandler {
@@ -1053,16 +967,12 @@ PanelWindow {
             }
         }
 
-        // Keyboard.
         Item {
             id: keys
             focus: true
 
-            // The number row by position, not by symbol: with Shift held the
-            // key is whatever the layout puts over the digit ("!" on US,
-            // "!" to "=" on the Latin American one), while its scan code is
-            // the same everywhere. xkb codes are evdev's plus 8, so 1-9 are
-            // 10-18 and 0 is 19.
+            // The number row by scan code, not symbol: Shift changes the symbol per layout. xkb
+            // codes are evdev + 8, so 1-9 are 10-18 and 0 is 19.
             function digitOf(event) {
                 var c = event.nativeScanCode
                 if (c >= 10 && c <= 18) return c - 9
@@ -1122,11 +1032,8 @@ PanelWindow {
             }
         }
 
-        // The desktop the windows came off: the wallpaper, dimmed, with the
-        // real windows hidden under it. Opaque, so the bar and every window
-        // behind are gone while it is up, and the only windows on screen are
-        // the pictures; a plain fill under the image covers the moment it
-        // takes to load.
+        // The backdrop: the dimmed wallpaper, opaque so the bar and real windows are hidden; a
+        // plain fill covers the image's load.
         Item {
             anchors.fill: parent
             opacity: overview.veil
@@ -1159,7 +1066,7 @@ PanelWindow {
             }
         }
 
-        // ── The strip ────────────────────────────────────────────────────
+        // The strip
 
         RectangularShadow {
             anchors.fill: strip
@@ -1188,9 +1095,8 @@ PanelWindow {
                 anchors.fill: parent
             }
 
-            // A plain row: it always knows where its cards are. (A ListView
-            // here, with its transitions and a sliding highlight, lost track
-            // when the cards changed width as one came or went.)
+            // A Row, not a ListView: ListView lost track of its cards when one came
+            // or went and the widths changed.
             Row {
                 id: stripRow
                 x: overview.stripPadding
@@ -1213,14 +1119,11 @@ PanelWindow {
                         readonly property bool hovered: cardHover.hovered && overview.draggingKey === ""
                         readonly property bool aimed: overview.dropKey === card.key && !card.going
                         readonly property bool confirming: overview.confirmId === card.d.id && !card.d.isNew
-                        // What a dragged window is measured against and
-                        // flies into.
+                        // What a dragged window is measured against and flies into.
                         readonly property Item picture: face
 
-                        // Each card carries the gap after it (the last has
-                        // none), and hands over its whole width as it goes
-                        // -- or takes it as it comes -- so the strip closes up
-                        // and opens out smoothly instead of jumping.
+                        // Each card carries the gap after it and hands over its whole width as it
+                        // goes or comes, so the strip resizes smoothly.
                         readonly property real faceWidth: Math.round(overview.shownThumb * card.geom.w / card.geom.h)
                         property real grow: 1
                         width: Math.round((card.faceWidth + (card.d.last ? 0
@@ -1230,8 +1133,8 @@ PanelWindow {
                         opacity: 0
                         scale: 0.9
 
-                        // Set once, not bound: a card that arrives after the
-                        // strip has filled grows in from nothing.
+                        // Set once, not bound: a card that arrives after the strip
+                        // filled grows in from nothing.
                         Component.onCompleted: {
                             overview.thumbs[card.key] = card
                             entrance.start()
@@ -1288,8 +1191,7 @@ PanelWindow {
                             }
                         }
 
-                        // Lifts a little under the pointer, and more under a
-                        // window held over it.
+                        // Lifts a little on hover, more under a held window.
                         Item {
                             id: face
                             width: card.faceWidth
@@ -1309,8 +1211,7 @@ PanelWindow {
                                 Behavior on color { ColorAnimation { duration: Theme.durShort } }
                             }
 
-                            // The new card's outline, dashed: a place for a
-                            // workspace, not one yet.
+                            // The new card's dashed outline: a place for a workspace, not one yet.
                             Canvas {
                                 anchors.fill: parent
                                 visible: card.d.isNew
@@ -1337,9 +1238,8 @@ PanelWindow {
                                 Behavior on opacity { NumberAnimation { duration: Theme.durShort } }
                             }
 
-                            // A click anywhere on the card that nothing on it
-                            // takes: go to that workspace. First, so the ×
-                            // above it gets its click first.
+                            // Click on the card: go there. Declared first so the ×
+                            // above takes its own click.
                             MouseArea {
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
@@ -1393,16 +1293,16 @@ PanelWindow {
                                         readonly property real sy: screenArea.height / card.geom.h
                                         readonly property bool whole: win.modelData.fullscreen
 
-                                        // Clamped to the card: a window partly
-                                        // off its monitor stays inside the picture.
+                                        // Clamped so a window partly off its monitor
+                                        // stays in the picture.
                                         x: whole ? 0 : Math.max(0, Math.min(parent.width - width,
                                                                              Math.round((win.modelData.x - card.geom.x) * sx)))
                                         y: whole ? 0 : Math.max(0, Math.min(parent.height - height,
                                                                              Math.round((win.modelData.y - card.geom.y) * sy)))
                                         width: whole ? parent.width : Math.min(parent.width, Math.max(10, Math.round(win.modelData.w * sx)))
                                         height: whole ? parent.height : Math.min(parent.height, Math.max(8, Math.round(win.modelData.h * sy)))
-                                        // Fades in when its capture has arrived,
-                                        // rather than popping in over a blank.
+                                        // Fades in once the capture arrives, instead of
+                                        // popping in over a blank.
                                         opacity: miniShot.hasContent ? 1 : 0
 
                                         Behavior on opacity { NumberAnimation { duration: Theme.durMedium; easing.type: Easing.OutQuad } }
@@ -1420,8 +1320,7 @@ PanelWindow {
                                             }
                                         }
 
-                                        // Its app, over the middle, where
-                                        // there is room for it.
+                                        // Its app icon, centred, when there's room.
                                         Rectangle {
                                             anchors.centerIn: parent
                                             width: 22
@@ -1454,8 +1353,7 @@ PanelWindow {
                                 Behavior on opacity { NumberAnimation { duration: Theme.durShort; easing.type: Easing.OutQuad } }
                             }
 
-                            // Remove the workspace. Last, so it is on top of
-                            // everything the card holds and takes its click.
+                            // Remove the workspace; last, so it's on top and takes its click.
                             Rectangle {
                                 anchors.top: parent.top
                                 anchors.right: parent.right
@@ -1498,8 +1396,7 @@ PanelWindow {
                             }
                         }
 
-                        // The number, filled in the accent on the workspace
-                        // whose windows are out.
+                        // The number, accent-filled on the workspace whose windows are out.
                         Rectangle {
                             anchors.horizontalCenter: face.horizontalCenter
                             y: overview.shownThumb + overview.chipGap
@@ -1553,8 +1450,7 @@ PanelWindow {
             }
         }
 
-        // The keys, on a surface of their own: the wallpaper under them can
-        // be any brightness.
+        // The key hints on their own surface: the wallpaper under them can be any brightness.
         Rectangle {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom
@@ -1587,9 +1483,8 @@ PanelWindow {
             }
         }
 
-        // Where a window carried over from another screen goes if let go
-        // here: into the workspace this screen shows. Outlined like a card
-        // in the strip under a dragged window.
+        // Drop target for a window carried from another screen: the workspace this screen
+        // shows, outlined like a strip card.
         Rectangle {
             x: overview.area.x - 24
             y: overview.area.y - 24
@@ -1608,9 +1503,7 @@ PanelWindow {
             Behavior on scale { Elastic { small: true } }
         }
 
-        // ── The windows ──────────────────────────────────────────────────
-        //
-        // Over the strip, so one dragged up there passes over it.
+        // The windows, above the strip so one dragged up there passes over it.
         Item {
             id: tilesLayer
             anchors.fill: parent
@@ -1634,29 +1527,27 @@ PanelWindow {
                     readonly property bool going: overview.goingTiles.indexOf(tile.key) !== -1
                     readonly property bool chosen: overview.selectedKey === tile.key && !tile.going
 
-                    // Out of its place: off on opening, a beat after the
-                    // tile is made where the window is, so it has somewhere
-                    // to leave from.
+                    // Out of its place: set a beat after the tile is made at the window's spot, so
+                    // it has somewhere to leave from.
                     property bool launched: false
                     // Moves are animated; off while it follows the pointer.
                     property bool animate: true
                     property bool dragging: false
-                    // The picture in the strip it is flying into, once it has
-                    // been sent to another workspace.
+                    // The strip picture it flies into once sent to another workspace.
                     property var sendTo: null
                     property real sent: 0
                     property real appear: 0
-                    // Grows in where it is (a window that turns up while the
-                    // overview is up), rather than flying out of its place.
+                    // A window that appears while the overview is up grows in
+                    // place instead of flying out.
                     property bool popIn: true
                     property point pointer: Qt.point(0, 0)
-                    // Where on it it was picked up, so that point stays under
-                    // the pointer however small it is carried.
+                    // Where it was picked up, so that point stays under the
+                    // pointer at any carry size.
                     property real grabFx: 0.5
                     property real grabFy: 0.5
 
-                    // Carried at most this wide, so it can be aimed; over a
-                    // workspace, the size it would be in that picture.
+                    // Carried at most 320px wide so it can be aimed; over a workspace, the
+                    // size it would be in that picture.
                     readonly property real carryScale: Math.min(1, 320 / Math.max(1, tile.slot.width))
                     readonly property real miniScale: {
                         var it = overview.thumbs[overview.dropKey]
@@ -1665,8 +1556,8 @@ PanelWindow {
                         var w = it.picture.width * tile.d.home.width / c.geom.w
                         return Math.max(0.04, Math.min(tile.carryScale, w / Math.max(1, tile.slot.width)))
                     }
-                    // Over another screen, the size that screen draws it at,
-                    // so the two halves meet at the edge.
+                    // Over another screen, the size that screen draws it at, so the
+                    // two halves meet at the edge.
                     readonly property real remoteScale: {
                         var at = Panels.overviewDropAt
                         return tile.dragging && at && at.screen !== overview.screenName && at.scale > 0 ? at.scale : 0
@@ -1686,10 +1577,8 @@ PanelWindow {
                         return tile.d.home
                     }
 
-                    // By hand, not with Behaviors, so each move picks its
-                    // curve from where it is headed, read after the change:
-                    // out to its place on the soft spring, home and into the
-                    // strip on a plain ease, under the pointer with none.
+                    // By hand, not Behaviors, so each move picks its curve: out on the soft spring,
+                    // home and into the strip on a plain ease, none under the pointer.
                     onGoalChanged: tile.moveTo(tile.goal)
 
                     property bool springMove: true
@@ -1747,8 +1636,7 @@ PanelWindow {
                         overview.selectedKey = tile.key
                         Panels.overviewDropped = null
                         Panels.overviewDropAt = null
-                        // Where it is first, or the other screens would read
-                        // where the last drag ended.
+                        // Where it is first, or other screens would read where the last drag ended.
                         var g = overview.geometryOf(bar.monitor)
                         Panels.overviewDragAt = Qt.point(g.x + p.x, g.y + p.y)
                         Panels.overviewDrag = { address: tile.d.address, toplevel: tile.d.toplevel, cls: tile.d.cls,
@@ -1763,8 +1651,8 @@ PanelWindow {
                         tile.dragging = false
                     }
 
-                    // Let go on another screen, which draws it landing: the
-                    // part of it still on this one fades where it is.
+                    // Dropped on another screen, which draws the landing; the part
+                    // still here fades in place.
                     function handOff() {
                         tile.sendTo = Qt.rect(tile.x, tile.y, tile.width, tile.height)
                         tile.dragging = false
@@ -1773,9 +1661,8 @@ PanelWindow {
                         sendGuard.restart()
                     }
 
-                    // Into a workspace's picture in the strip, fading as it
-                    // lands; with no picture to aim at (a workspace the strip
-                    // does not show yet), up towards the strip.
+                    // Into a workspace picture, fading as it lands; with no picture (not in the
+                    // strip yet), up towards the strip.
                     function sendInto(picture, geom) {
                         var r
                         if (picture && tile.d) {
@@ -1796,8 +1683,7 @@ PanelWindow {
                     z: tile.dragging ? 1000 : overview.chosenKey === tile.key ? 999 : (tile.d ? tile.d.order : 0)
                     opacity: tile.appear * tile.presence * (1 - tile.sent)
 
-                    // Fades out over the flight home, late, so the window
-                    // under it takes over as it lands.
+                    // Fades late over the flight home, so the real window takes over as it lands.
                     property real presence: overview.spread ? 1 : 0
                     Behavior on presence { NumberAnimation { duration: Theme.durLong; easing.type: Easing.InQuad } }
 
@@ -1808,14 +1694,12 @@ PanelWindow {
                         yScale: tile.popIn ? 0.92 + 0.08 * tile.appear : 1
                     }
 
-                    // Put where it starts without a move: at its place on
-                    // screen when the overview is opening, at its place in
-                    // the layout when it turns up later.
+                    // Placed without a move: at its screen place while opening, at its layout
+                    // place when it turns up later.
                     Component.onCompleted: {
                         overview.tileItems[tile.key] = tile
                         tile.capturedSize = tile.sizeKey
-                        // Let go here from another screen: from where it was
-                        // let go, already whole, to its place.
+                        // Dropped here from another screen: starts whole where it was let go.
                         var from = overview.arrivals[tile.key]
                         if (from) {
                             delete overview.arrivals[tile.key]
@@ -1860,8 +1744,8 @@ PanelWindow {
                         }
                     }
 
-                    // Quick when it leaves its place, so the picture is solid
-                    // before the backdrop has hidden the window under it.
+                    // Quick on the way out, so the picture is solid before the
+                    // backdrop hides the window.
                     NumberAnimation {
                         id: appearAnim
                         target: tile; property: "appear"; to: 1
@@ -1878,7 +1762,7 @@ PanelWindow {
                         duration: Theme.durLong; easing.type: Easing.InQuad
                     }
 
-                    // A move Hyprland did not make: the window is still here,
+                    // Hyprland didn't make the move: the window is still here,
                     // so the tile comes back.
                     Timer {
                         id: sendGuard
@@ -1891,10 +1775,8 @@ PanelWindow {
                         }
                     }
 
-                    // A capture is a still, taken once; when the window
-                    // changes shape -- the others retiling after one has left
-                    // -- it is taken again once Hyprland's own animation has
-                    // had time to finish, instead of stretching the old one.
+                    // Captures are stills; when the window changes shape (retiling) it is
+                    // re-captured after Hyprland's animation instead of stretched.
                     readonly property string sizeKey: tile.d ? tile.d.home.width + "x" + tile.d.home.height : ""
                     property string capturedSize: ""
                     onSizeKeyChanged: {
@@ -1909,8 +1791,7 @@ PanelWindow {
                         onTriggered: shot.captureFrame()
                     }
 
-                    // Lifted off the desktop while out; on the way home the
-                    // window's own shadow takes over.
+                    // Shadow while out; on the way home the window's own shadow takes over.
                     RectangularShadow {
                         anchors.fill: parent
                         radius: face.radius
@@ -1925,8 +1806,7 @@ PanelWindow {
                     ClippingRectangle {
                         id: face
                         anchors.fill: parent
-                        // The window's own corners at home, the overlay's
-                        // card corners while out.
+                        // The window's own corners at home, card corners while out.
                         radius: tile.sendTo ? Theme.radiusSmall
                               : tile.launched && overview.spread ? Theme.radiusLarge : overview.windowRounding
                         color: Theme.surfaceContainerHigh
@@ -2010,9 +1890,8 @@ PanelWindow {
                                               overview.selectedKey = tile.key
                     }
 
-                    // Its name, under it, for the chosen window only: one
-                    // label at a time reads, a label under every window is a
-                    // wall of text.
+                    // Caption for the chosen window only: one label reads, one under
+                    // every window is a wall of text.
                     Rectangle {
                         anchors.horizontalCenter: parent.horizontalCenter
                         anchors.top: parent.bottom
@@ -2022,8 +1901,8 @@ PanelWindow {
                         height: 28
                         radius: height / 2
                         color: Theme.surface
-                        // Once the window has landed: in flight it trailed
-                        // under it and crossed the key hints.
+                        // Only once landed: in flight it trailed under the window
+                        // and crossed the key hints.
                         opacity: tile.chosen && overview.spread && !tile.dragging && !tile.sendTo && !motion.running ? 1 : 0
                         visible: opacity > 0
 
@@ -2061,11 +1940,9 @@ PanelWindow {
                 }
             }
 
-            // A window carried over from another screen: the part of it past
-            // that screen's edge, drawn here where the pointer is, at the
-            // size that screen draws the rest. Let go here, it flies into the
-            // picture it was let go over, or fades where it is while the
-            // window turns up among this screen's.
+            // A window carried from another screen: the part past that screen's edge, drawn here
+            // at the same scale. Dropped here, it flies into the card under it, or fades in
+            // place while the window turns up here.
             Item {
                 id: ghost
 
@@ -2091,8 +1968,8 @@ PanelWindow {
                 visible: ghost.held !== null && (overview.hosting || ghost.landing)
                 opacity: 1 - ghost.fade
 
-                // Here rather than on the overview, so nothing calls into it
-                // before it is made or after it is gone.
+                // Here rather than on the overview, so nothing calls into it before
+                // it exists or after it's gone.
                 Connections {
                     target: overview
                     function onVisitorChanged() {
@@ -2148,9 +2025,8 @@ PanelWindow {
                         landAnim.restart()
                         return
                     }
-                    // Over this screen's windows: it waits where it was let
-                    // go for the window to turn up among them, and the
-                    // window's tile sets off from here.
+                    // Over this screen's windows: wait where dropped; the window's tile sets
+                    // off from here when it appears.
                     overview.arrivals[ghost.held.address] = Qt.rect(ghost.x, ghost.y, ghost.width, ghost.height)
                     arrivalGuard.restart()
                 }
@@ -2216,8 +2092,7 @@ PanelWindow {
                         source: ghost.held ? overview.iconFor(ghost.held.cls) : ""
                     }
 
-                    // Taken as the drag starts, so it is there by the time
-                    // the window comes over the edge.
+                    // Taken as the drag starts, so it's ready when the window crosses the edge.
                     ScreencopyView {
                         id: ghostShot
                         anchors.fill: parent
@@ -2228,8 +2103,7 @@ PanelWindow {
             }
         }
 
-        // "Remove workspace N?" -- the one question asked before a workspace
-        // with windows goes, under its picture.
+        // The "Remove workspace N?" question, under its picture, asked only when it has windows.
         RectangularShadow {
             anchors.fill: confirmCard
             radius: confirmCard.radius

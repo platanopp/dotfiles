@@ -3,10 +3,8 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// The Steam games installed here, for the launcher (scripts/steam_games.py
-// reads them off Steam's own files). Read when the launcher opens, at most
-// once a minute, so a game installed since shows up without anything
-// polling in between.
+// The installed Steam games for the launcher (steam_games.py reads Steam's files),
+// read on open at most once a minute.
 Singleton {
     id: root
 

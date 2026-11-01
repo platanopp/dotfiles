@@ -3,15 +3,9 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// How hard the machine is working: CPU and memory from /proc, the CPU's
-// package temperature from its hwmon sensor, and the GPU from nvidia-smi.
-// For the desktop's system widget, which took the place of a btop window.
-//
-// Nothing here runs unless something is showing it. Consumers call
-// subscribe()/unsubscribe(), as with Spectrum: there can be a widget on each
-// monitor and a preview in the widget picker, and each comes and goes on its
-// own. /proc is read in place, without a process; the GPU is one nvidia-smi
-// left running in its own loop (-lms) rather than one started per reading.
+// CPU and memory from /proc, the CPU package temperature from hwmon, and the GPU from nvidia-smi,
+// for the desktop's system widget. Runs only while subscribed (subscribe()/unsubscribe(), as
+// Spectrum); /proc is read in place, and the GPU is one long-running nvidia-smi (-lms).
 Singleton {
     id: root
 
@@ -83,9 +77,8 @@ Singleton {
         }
     }
 
-    // The package sensor's hwmon number is handed out at boot and moves
-    // between kernels, so it is looked up by driver name once: coretemp for
-    // Intel, k10temp for AMD, temp1 being the package or Tctl on both.
+    // The package sensor's hwmon number moves between boots, so it's found by
+    // driver name once (coretemp, k10temp).
     FileView {
         id: cpuTempFile
         path: ""

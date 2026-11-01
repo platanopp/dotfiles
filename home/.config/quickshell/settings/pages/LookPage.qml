@@ -6,15 +6,9 @@ import qs.config
 import qs.services
 import qs.settings
 
-// Settings -> Hyprland -> Look: gaps, borders, corners, transparency and
-// effects. Everything goes through scripts/hypr_settings.py, which keeps to a
-// fixed list of options, writes gui-settings.lua rather than hyprland.lua,
-// checks the change live, puts it back if Hyprland refuses it, and commits it
-// to ~/dotfiles when it took.
-//
-// The preview at the top is the point of the page: two windows over your own
-// wallpaper, drawn with the values the sliders are showing -- including the
-// one being dragged, before it has been applied.
+// Settings -> Hyprland -> Look: gaps, borders, corners, transparency and effects, through
+// hypr_settings.py. The preview draws two windows over your wallpaper with the sliders'
+// values, the one being dragged included.
 Column {
     id: page
     spacing: 24
@@ -27,7 +21,7 @@ Column {
         return o && o.value !== null && o.value !== undefined ? o.value : fallback
     }
 
-    // ── Preview ──────────────────────────────────────────────────────────
+    // Preview
     Rectangle {
         id: preview
         width: parent.width
@@ -64,9 +58,8 @@ Column {
                 sourceSize.width: 800
             }
 
-            // The two windows, laid out the way the chosen layout would:
-            // dwindle halves the screen, master gives the first one more,
-            // scrolling runs columns off the right edge.
+            // Laid out as the chosen layout would: dwindle halves the screen, master favours the
+            // first, scrolling runs off the right.
             Repeater {
                 model: 2
 
@@ -142,7 +135,7 @@ Column {
         }
     }
 
-    // ── Spacing ──────────────────────────────────────────────────────────
+    // Spacing
     SettingsGroup {
         width: parent.width
         title: "Spacing"
@@ -242,7 +235,7 @@ Column {
         }
     }
 
-    // ── Shape ────────────────────────────────────────────────────────────
+    // Shape
     SettingsGroup {
         width: parent.width
         title: "Shape"
@@ -288,7 +281,7 @@ Column {
         }
     }
 
-    // ── Transparency ─────────────────────────────────────────────────────
+    // Transparency
     SettingsGroup {
         width: parent.width
         title: "Transparency"
@@ -349,7 +342,7 @@ Column {
         }
     }
 
-    // ── Effects ──────────────────────────────────────────────────────────
+    // Effects
     SettingsGroup {
         width: parent.width
         title: "Effects"

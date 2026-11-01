@@ -27,9 +27,8 @@ SILENCE_RMS = 1e-4
 
 ATTACK, RELEASE = 0.55, 0.16   # per-frame smoothing, rising faster than falling
 
-# Everything is scaled against a rolling peak so quiet tracks still fill the
-# ring, and spread over this many dB below it -- a linear scale would leave
-# every band pinned near the top, since loudness is logarithmic.
+# Scaled against a rolling peak so quiet tracks still fill the ring, over this many dB below it:
+# loudness is logarithmic, so a linear scale pinned every band near the top.
 DB_RANGE = 38.0
 PEAK_DECAY = 0.995
 
