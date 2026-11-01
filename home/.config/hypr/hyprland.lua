@@ -393,7 +393,17 @@ hl.bind(mainMod .. " + SHIFT + R", hl.dsp.global("quickshell:record"))
 -- Each of them drops back to the normal binds itself before asking the
 -- shell, so the way out never depends on Quickshell answering: a shell
 -- that died with the overview up cannot leave the keyboard stuck here.
+--
+-- The screenshot key is in it too, and leaves the overlay up, so a menu can
+-- be captured as well. The name is dated by the shell when the key is
+-- pressed. It used to be built with os.date() here, which runs once, when
+-- this file is loaded: every screenshot between two reloads got the same name
+-- and overwrote the last.
+local screenshot =
+    'grimblast --notify copysave area "$HOME/Pictures/Screenshots/screenshot_$(date +%Y-%m-%d_%H-%M-%S).png"'
+
 hl.define_submap("shell-modal", function()
+    hl.bind("SUPER + SHIFT + P", hl.dsp.exec_cmd(screenshot))
     hl.bind(mainMod .. " + Tab", function()
         hl.dispatch(hl.dsp.submap("reset"))
         hl.dispatch(hl.dsp.global("quickshell:overview"))
@@ -483,12 +493,7 @@ hl.bind("XF86AudioPause", hl.dsp.exec_cmd("playerctl play-pause"), { locked = tr
 hl.bind("XF86AudioPlay",  hl.dsp.exec_cmd("playerctl play-pause"), { locked = true })
 hl.bind("XF86AudioPrev",  hl.dsp.exec_cmd("playerctl previous"),   { locked = true })
 
--- The name is dated by the shell when the key is pressed. It used to be
--- built with os.date() here, which runs once, when this file is loaded: every
--- screenshot between two reloads got the same name and overwrote the last.
-hl.bind("SUPER + SHIFT + P", hl.dsp.exec_cmd(
-    'grimblast --notify copysave area "$HOME/Pictures/Screenshots/screenshot_$(date +%Y-%m-%d_%H-%M-%S).png"'
-))
+hl.bind("SUPER + SHIFT + P", hl.dsp.exec_cmd(screenshot))
 
 local suppressMaximizeRule = hl.window_rule({
     name  = "suppress-maximize-events",
